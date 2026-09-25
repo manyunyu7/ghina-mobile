@@ -331,7 +331,7 @@ class _ForecastBody extends ConsumerWidget {
                   title: a.category.name,
                   subtitle: 'rata-rata / bulan',
                   trailing: MoneyText(
-                    text: '~${GhinaMoney.format(a.avg, currency: currency)}',
+                    text: '~${context.money(a.avg, currency: currency)}',
                     tone: MoneyTone.expense,
                     style: GhinaType.moneyS.copyWith(fontSize: 15),
                   ),
@@ -404,7 +404,7 @@ class _ProjectionCard extends StatelessWidget {
             children: [
               ChunkyPill(
                 label:
-                    '${net >= 0 ? '+' : '-'}${GhinaMoney.format(net.abs(), currency: currency)} bersih',
+                    '${net >= 0 ? '+' : '-'}${context.money(net.abs(), currency: currency)} bersih',
                 color: net >= 0 ? GhinaColors.green : GhinaColors.red,
                 soft: true,
                 uppercase: false,
@@ -413,7 +413,7 @@ class _ProjectionCard extends StatelessWidget {
                     : Icons.trending_down_rounded,
               ),
               Text(
-                'dari saldo sekarang ${GhinaMoney.format(start, currency: currency, compact: true)}',
+                'dari saldo sekarang ${context.money(start, currency: currency, compact: true)}',
                 style: GhinaType.caption.copyWith(color: g.textSecondary),
               ),
             ],
@@ -585,7 +585,7 @@ class _PlannedCardState extends ConsumerState<_PlannedCard> {
       );
       return;
     }
-    final amount = GhinaMoney.format(p.amount, currency: widget.currency);
+    final amount = context.money(p.amount, currency: widget.currency);
     final ok = await showChunkyConfirm(
       context,
       title: 'Jadikan transaksi beneran?',

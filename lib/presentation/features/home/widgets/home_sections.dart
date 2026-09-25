@@ -182,64 +182,7 @@ class DailyGoalCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------- balance
-
-class BalanceCard extends StatelessWidget {
-  const BalanceCard({super.key, required this.dash, required this.currency});
-
-  final DashboardSummary dash;
-  final String currency;
-
-  @override
-  Widget build(BuildContext context) {
-    final white70 = Colors.white.withValues(alpha: 0.82);
-    final n = dash.wallets.length;
-    return ChunkyCard(
-      color: GhinaColors.blue,
-      onTap: () => context.push('/wallets'),
-      semanticLabel: 'Total saldo, buka dompet',
-      padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TOTAL SALDO',
-                  style: GhinaType.overline.copyWith(color: white70),
-                ),
-                const SizedBox(height: 4),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: MoneyText(
-                    amount: dash.totalBalance,
-                    currency: currency,
-                    tone: MoneyTone.neutral,
-                    color: Colors.white,
-                    countUp: true,
-                    style: GhinaType.moneyL.copyWith(fontSize: 34),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  n == 0 ? 'Belum ada dompet · tambah yuk' : 'di $n dompet',
-                  style: GhinaType.bodyS.w(700).copyWith(color: white70),
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: Colors.white,
-            size: 30,
-          ),
-        ],
-      ),
-    );
-  }
-}
+// Balance / net worth: see balance_card.dart.
 
 /// This month's income / expense / net, plus today's spending.
 class MonthFlowCard extends StatelessWidget {
@@ -292,7 +235,7 @@ class MonthFlowCard extends StatelessWidget {
     );
 
     final budgetLine = dash.monthBudgeted > 0
-        ? ' · anggaran ${GhinaMoney.format(dash.monthBudgeted, currency: currency, compact: true)}'
+        ? ' · anggaran ${context.money(dash.monthBudgeted, currency: currency, compact: true)}'
         : '';
     return ChunkyCard(
       onTap: () => context.push('/reports'),
@@ -341,7 +284,7 @@ class MonthFlowCard extends StatelessWidget {
               borderRadius: GhinaRadii.rMd,
             ),
             child: Text(
-              'Hari ini keluar ${GhinaMoney.format(dash.todayExpense, currency: currency)}$budgetLine',
+              'Hari ini keluar ${context.money(dash.todayExpense, currency: currency)}$budgetLine',
               style: GhinaType.bodyS.w(700).copyWith(color: g.textSecondary),
             ),
           ),
@@ -474,6 +417,13 @@ const _actions = [
     GhinaColors.blue,
     '/wallets',
   ),
+  // Investasi (`docs/investments.md` → UI): with Kebiasaan it fills a 4×3 grid.
+  _QuickAction(
+    'Investasi',
+    Icons.trending_up_rounded,
+    GhinaColors.purple,
+    '/investments',
+  ),
   _QuickAction(
     'Anggaran',
     Icons.pie_chart_rounded,
@@ -508,6 +458,14 @@ const _actions = [
     '/reports',
   ),
   _QuickAction('Sholat', Icons.mosque_rounded, GhinaColors.lime, '/prayers'),
+  // Kebiasaan (`docs/habits.md` → UI): quick action + Profil menu.
+  _QuickAction(
+    'Kebiasaan',
+    Icons.self_improvement_rounded,
+    GhinaColors.green,
+    '/habits',
+    longPressPath: '/habits/new',
+  ),
   _QuickAction(
     'Kesehatan',
     Icons.monitor_heart_rounded,
@@ -657,11 +615,7 @@ class SpendingCard extends StatelessWidget {
                   padding: const EdgeInsets.all(38),
                   child: FittedBox(
                     child: Text(
-                      GhinaMoney.format(
-                        total,
-                        currency: currency,
-                        compact: true,
-                      ),
+                      context.money(total, currency: currency, compact: true),
                       style: GhinaType.moneyS
                           .w(900)
                           .copyWith(color: g.textPrimary),
@@ -785,7 +739,7 @@ class BudgetSnapshotCard extends StatelessWidget {
                       ChunkyProgressBar.budget(used: b.pct / 100, height: 12),
                       const SizedBox(height: 4),
                       Text(
-                        '${GhinaMoney.format(b.spent, currency: currency)} dari ${GhinaMoney.format(b.budget.amount, currency: currency)}',
+                        '${context.money(b.spent, currency: currency)} dari ${context.money(b.budget.amount, currency: currency)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GhinaType.caption.copyWith(color: g.textMuted),
@@ -919,7 +873,14 @@ class TransactionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = view;
-    final leading = t.type == TxType.adjustment
+    final leading = t.type == TxType.investment
+        ? CategoryAvatar(
+            icon: Icons.trending_up_rounded,
+            color: GhinaColors.purple.base,
+            size: 40,
+            soft: true,
+          )
+        : t.type == TxType.adjustment
         ? CategoryAvatar(
             icon: Icons.tune_rounded,
             color: GhinaColors.gray.base,
@@ -940,7 +901,7 @@ class TransactionRow extends StatelessWidget {
     final what = switch (t.type) {
       TxType.transfer =>
         '${t.wallet?.name ?? 'Dompet'} → ${t.toWallet?.name ?? 'Dompet'}',
-      TxType.adjustment => t.wallet?.name ?? 'Dompet',
+      TxType.adjustment || TxType.investment => t.wallet?.name ?? 'Dompet',
       _ => t.category?.name ?? t.type.label,
     };
     return ChunkyTile(
@@ -950,9 +911,9 @@ class TransactionRow extends StatelessWidget {
       leading: leading,
       title: t.title,
       subtitle: '$what · ${Fmt.relativeDay(t.date, now: now)}',
-      trailing: t.type == TxType.adjustment
+      trailing: t.type.isSigned
           ? MoneyText(
-              text: GhinaMoney.format(
+              text: context.money(
                 t.amount,
                 currency: t.wallet?.currency ?? currency,
                 showSign: true,

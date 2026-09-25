@@ -15,6 +15,8 @@ import '../../../state/game/task_game_providers.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/rewards/rewards.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../widgets/balance_card.dart';
+import '../widgets/home_habits.dart';
 import '../widgets/home_sections.dart';
 import '../widgets/home_tasks.dart';
 
@@ -204,6 +206,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       MonthFlowCard(dash: d, currency: currency),
       GhinaSpace.gapXl,
       const HomeTasksSection(),
+      const HomeHabitsCard(padding: EdgeInsets.only(top: 16)),
       const TodayPostsCard(padding: EdgeInsets.only(top: 16)),
       if (path != null) ...[GhinaSpace.gapLg, ContinueLearningCard(path: path)],
       GhinaSpace.gapXl,
@@ -213,8 +216,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         GhinaSpace.gapXl,
         SectionHeader(
           title: 'Pengeluaran bulan ini',
-          actionLabel: 'Laporan',
-          onAction: () => context.push('/reports'),
+          actionLabel: 'Analitik',
+          onAction: () => context.push('/analytics'),
         ),
         SpendingCard(items: d.spendingByCategory, currency: currency),
       ],

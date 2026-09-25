@@ -1,7 +1,9 @@
 // Tasks + transaction photos over the real drift DB and the fake server
 // (docs/tasks.md, docs/transaction-photos.md, docs/mobile-sync.md).
 import 'dart:async';
+import 'dart:io' show FileSystemException;
 
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/core/dates.dart';
@@ -9,6 +11,8 @@ import 'package:ghina/core/failure.dart';
 import 'package:ghina/data/datasources/local/app_database.dart';
 import 'package:ghina/data/models/entity_names.dart';
 import 'package:ghina/data/models/mappers.dart';
+import 'package:ghina/data/repositories/finance_repositories.dart';
+import 'package:ghina/data/repositories/photo_store.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/usecases/usecases.dart';
 
@@ -619,22 +623,112 @@ void main() {
       },
     );
 
-    test('a server error (5xx) keeps the photo pending and retries', () async {
-      h.server.uploadErrors['/tmp/a.jpg'] = const UnknownFailure(
-        'Server bermasalah (500)',
+    test(
+      'a server error (5xx) keeps the photo pending, never blocks the push',
+      () async {
+        h.server.uploadErrors['/tmp/a.jpg'] = UnknownFailure(
+          'Server bermasalah (500)',
+          dioStatus(500),
+        );
+        final t = await expenseWithPhotos(['/tmp/a.jpg']);
+        await h.engine.syncNow(); // no throw: the transaction still syncs
+        expect(
+          (await h.transactions.getById(t.id))!.photos.single.isPending,
+          isTrue,
+        );
+        expect(
+          h.server.rows[SyncEntity.transactions]![t.id]!['photos'],
+          isEmpty,
+        );
+        expect(
+          (await h.db.getMeta()).lastError,
+          contains('Foto transaksi belum terunggah (server bermasalah (500))'),
+        );
+        expect(h.photos.deleted, isEmpty);
+        // Next sync: the upload works and the photo reaches the server.
+        h.server.uploadErrors.clear();
+        await h.engine.syncNow();
+        expect(
+          h.server.rows[SyncEntity.transactions]![t.id]!['photos'],
+          hasLength(1),
+        );
+        expect(
+          (await h.transactions.getById(t.id))!.photos.single.isPending,
+          isFalse,
+        );
+        expect((await h.db.getMeta()).lastError, isNull);
+      },
+    );
+
+    test(
+      'copying the picked file into app storage fails → the transaction '
+      'still saves, the photo stays pending at its picked path and uploads',
+      () async {
+        final repo = DriftTransactionRepository(h.store, _CopyFailsStore());
+        final create = CreateTransaction(
+          repo,
+          h.wallets,
+          h.categories,
+          h.clock,
+        );
+        final w = await h.newWallet('Tunai', 100000);
+        h.tick();
+        final r = await create(
+          TransactionInput(
+            type: TxType.expense,
+            amount: 12000,
+            walletId: w,
+            date: h.clock.now(),
+            photos: const [TransactionPhoto.local('/cache/picked1.jpg')],
+          ),
+        );
+        final t = r.valueOrThrow;
+        expect((await repo.getById(t.id))!.photos, const [
+          TransactionPhoto.local('/cache/picked1.jpg'),
+        ]);
+        await h.engine.syncNow();
+        expect(h.server.rows[SyncEntity.transactions]![t.id]!['photos'], [
+          '/uploads/0-picked1.jpg',
+        ]);
+      },
+    );
+
+    test('HTTP 413 (proxy body limit) is retried, not dropped', () async {
+      // nginx answers an HTML page → no {error} message, just the status.
+      h.server.uploadErrors['/tmp/big.jpg'] = UnknownFailure(
+        'Server bermasalah (413)',
+        dioStatus(413),
       );
+      final t = await expenseWithPhotos(['/tmp/ok.jpg', '/tmp/big.jpg']);
+      await h.engine.syncNow();
+      expect(h.server.rows[SyncEntity.transactions]![t.id]!['photos'], [
+        '/uploads/0-ok.jpg',
+      ]);
+      final photos = (await h.transactions.getById(t.id))!.photos;
+      expect(photos, [
+        const TransactionPhoto.remote('/uploads/0-ok.jpg'),
+        const TransactionPhoto.local('/tmp/big.jpg'),
+      ]);
+      expect(
+        (await h.db.getMeta()).lastError,
+        contains('file terlalu besar untuk server'),
+      );
+      expect(h.photos.deleted, isNot(contains('/tmp/big.jpg')));
+      h.server.uploadErrors.clear(); // e.g. client_max_body_size raised
+      await h.engine.syncNow();
+      expect(h.server.rows[SyncEntity.transactions]![t.id]!['photos'], [
+        '/uploads/0-ok.jpg',
+        '/uploads/1-big.jpg',
+      ]);
+    });
+
+    test('offline during upload still rethrows (retry with backoff)', () async {
+      h.server.uploadErrors['/tmp/a.jpg'] = const NetworkFailure();
       final t = await expenseWithPhotos(['/tmp/a.jpg']);
-      await expectLater(h.engine.syncNow(), throwsA(isA<UnknownFailure>()));
+      await expectLater(h.engine.syncNow(), throwsA(isA<NetworkFailure>()));
       expect(
         (await h.transactions.getById(t.id))!.photos.single.isPending,
         isTrue,
-      );
-      expect(h.server.pushed, isEmpty);
-      h.server.uploadErrors.clear();
-      await h.engine.syncNow();
-      expect(
-        h.server.rows[SyncEntity.transactions]![t.id]!['photos'],
-        hasLength(1),
       );
     });
 
@@ -830,4 +924,31 @@ void main() {
       expect(dateKey(DateTime(2026, 9, 24, 23, 59)), '2026-09-24');
     });
   });
+}
+
+/// A dio error carrying only an HTTP [status] (like a proxy's HTML error page).
+DioException dioStatus(int status) {
+  final req = RequestOptions(path: '/api/mobile/upload');
+  return DioException(
+    requestOptions: req,
+    response: Response<Object?>(requestOptions: req, statusCode: status),
+    type: DioExceptionType.badResponse,
+  );
+}
+
+/// A photo store whose copy step always fails (full disk, revoked URI, …).
+final class _CopyFailsStore implements PhotoStore {
+  @override
+  Future<String> ensureStored(String path, String id) =>
+      Future.error(const FileSystemException('No space left on device'));
+  @override
+  Future<String> ensureStoredIn(String path, String id, String folder) =>
+      ensureStored(path, id);
+  @override
+  Future<String> importPhoto(String sourcePath, String id) =>
+      ensureStored(sourcePath, id);
+  @override
+  Future<bool> exists(String path) async => true;
+  @override
+  Future<void> delete(String? path) async {}
 }

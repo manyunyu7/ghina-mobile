@@ -231,17 +231,17 @@ class _Variance extends StatelessWidget {
         children: [
           cell(
             'Target',
-            GhinaMoney.format(view.budget.amount, currency: currency),
+            context.money(view.budget.amount, currency: currency),
             g.textPrimary,
           ),
           cell(
             'Aktual',
-            GhinaMoney.format(view.spent, currency: currency),
+            context.money(view.spent, currency: currency),
             g.textPrimary,
           ),
           cell(
             'Selisih',
-            '${diff > 0 ? '+' : '−'}${GhinaMoney.format(diff.abs(), currency: currency)}',
+            '${diff > 0 ? '+' : '−'}${context.money(diff.abs(), currency: currency)}',
             diff > 0
                 ? GhinaColors.red.base
                 : (g.isDark ? GhinaColors.green.base : GhinaColors.green.edge),
@@ -272,8 +272,8 @@ class RemainingLabel extends StatelessWidget {
     final style = (small ? GhinaType.caption : GhinaType.bodyS).w(900);
     return Text(
       over
-          ? 'Lebih ${GhinaMoney.format(-remaining, currency: currency)}'
-          : 'Sisa ${GhinaMoney.format(remaining, currency: currency)}',
+          ? 'Lebih ${context.money(-remaining, currency: currency)}'
+          : 'Sisa ${context.money(remaining, currency: currency)}',
       style: style.copyWith(
         color: over
             ? GhinaColors.red.base

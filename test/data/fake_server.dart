@@ -4,6 +4,7 @@ import 'package:ghina/data/models/api_dto.dart';
 import 'package:ghina/data/models/entity_names.dart';
 import 'package:ghina/data/models/wire.dart';
 import 'package:ghina/domain/entities/entities.dart';
+import 'package:ghina/domain/usecases/investment_rules.dart' as inv;
 import 'package:ghina/domain/usecases/notes_rules.dart' as notes;
 import 'package:ghina/domain/usecases/prayer_quality.dart';
 
@@ -49,6 +50,11 @@ class FakeServer implements SyncApi {
   /// When set, a pull seeds the default "Ide Konten" label and pillars for this
   /// user id once, like the real server (not after a tombstone / name clash).
   String? seedNotesFor;
+
+  /// Pretend to be a server from before habits/investments (v4 era): no
+  /// habits/assets keys on pull, those entities unknown on push, and the
+  /// `investment` transaction type rejected.
+  bool preHabits = false;
 
   /// Upload of these file paths returns this URL instead (e.g. an image where
   /// audio was expected).
@@ -139,7 +145,10 @@ class FakeServer implements SyncApi {
       if ((!legacy || (e != SyncEntity.taskAreas && e != SyncEntity.tasks)) &&
           (!(legacy || preNotes) ||
               (!SyncEntity.notesModule.contains(e) &&
-                  !SyncEntity.contentModule.contains(e))))
+                  !SyncEntity.contentModule.contains(e))) &&
+          (!(legacy || preNotes || preHabits) ||
+              (!SyncEntity.habitsModule.contains(e) &&
+                  !SyncEntity.investmentsModule.contains(e))))
         e,
   ];
 
@@ -255,6 +264,7 @@ class FakeServer implements SyncApi {
     }
 
     final data = _normalize(e, m.entityId, existing, m.data!);
+    _currentId = m.entityId;
     final err = _validate(e, data);
     if (err != null) return (PushStatus.rejected, err);
     if (_duplicate(e, m.entityId, data)) return (PushStatus.duplicate, null);
@@ -331,6 +341,24 @@ class FakeServer implements SyncApi {
         out['postedAt'] ??= iso(now);
       }
     }
+    if (e == SyncEntity.habits && out['kind'] == 'quit') {
+      out['schedule'] = {'type': 'daily'};
+      out['target'] = {'type': 'check'};
+    }
+    if (e == SyncEntity.assets) {
+      if (out['kind'] != 'stock' && out['kind'] != 'crypto') {
+        out['priceMode'] = 'manual';
+      }
+      if (out['walletId'] != null &&
+          !_owned(SyncEntity.wallets, out['walletId'] as String)) {
+        out['walletId'] = null;
+      }
+    }
+    if (e == SyncEntity.assetTrades &&
+        out['cashTransactionId'] != null &&
+        !_owned(SyncEntity.transactions, out['cashTransactionId'] as String)) {
+      out['cashTransactionId'] = null; // deleted offline: soft link
+    }
     if (e == SyncEntity.tasks) {
       if (out['recurrence'] != null && out['seriesId'] == null) {
         out['seriesId'] = id;
@@ -344,6 +372,27 @@ class FakeServer implements SyncApi {
     return out;
   }
 
+  /// The entity id being validated.
+  String? _currentId;
+
+  AssetTrade? _trade(Json r) {
+    final type = TradeType.tryFromWire(r['type'] as String?);
+    if (type == null) return null;
+    return AssetTrade(
+      id: r['id'] as String,
+      assetId: r['assetId'] as String,
+      type: type,
+      date: DateTime.parse(r['date'] as String),
+      quantity: (r['quantity'] as num?)?.toDouble(),
+      price: (r['price'] as num?)?.toDouble(),
+      fee: (r['fee'] as num?)?.toDouble() ?? 0,
+      amount: (r['amount'] as num?)?.toDouble(),
+      ratio: (r['ratio'] as num?)?.toDouble(),
+      createdAt: DateTime.parse(r['createdAt'] as String),
+      updatedAt: DateTime.parse(r['updatedAt'] as String),
+    );
+  }
+
   bool _owned(String entity, String? id) =>
       id != null && rows[entity]!.containsKey(id) && !foreignIds.contains(id);
 
@@ -352,14 +401,16 @@ class FakeServer implements SyncApi {
       case SyncEntity.transactions:
         final type = d['type'];
         if (!const [
-          'expense',
-          'income',
-          'transfer',
-          'adjustment',
-        ].contains(type)) {
+              'expense',
+              'income',
+              'transfer',
+              'adjustment',
+              'investment',
+            ].contains(type) ||
+            (preHabits && type == 'investment')) {
           return 'Invalid type';
         }
-        if (type == 'adjustment') {
+        if (type == 'adjustment' || type == 'investment') {
           final a = (d['amount'] as num).toDouble();
           if (!a.isFinite || a == 0) return 'Amount must not be 0';
           if (d['categoryId'] != null || d['toWalletId'] != null) {
@@ -476,6 +527,72 @@ class FakeServer implements SyncApi {
         if (d['status'] == 'scheduled' && d['scheduledAt'] == null) {
           return 'Posting terjadwal butuh waktu tayang';
         }
+      case SyncEntity.habits:
+        final name = (d['name'] as String? ?? '').trim();
+        if (name.isEmpty || name.length > 60) return 'Nama wajib diisi';
+        if (d['schedule'] is String || d['target'] is String) {
+          return 'Jadwal tidak valid';
+        }
+      case SyncEntity.habitLogs:
+        final h = rows[SyncEntity.habits]![d['habitId']];
+        if (h == null || foreignIds.contains(d['habitId'])) {
+          return 'Kebiasaan tidak ditemukan';
+        }
+        final kind = h['kind'] == 'quit' ? 'quit' : 'build';
+        final type = d['type'];
+        final ok = kind == 'build'
+            ? (type == 'done' || type == 'skip')
+            : (type == 'done' || type == 'relapse' || type == 'urge');
+        if (!ok) {
+          return kind == 'build'
+              ? 'Kebiasaan membangun hanya bisa dicatat selesai atau libur'
+              : 'Kebiasaan berhenti tidak bisa diberi hari libur';
+        }
+      case SyncEntity.assets:
+        final kind = AssetKind.fromWire(d['kind'] as String?);
+        try {
+          inv.requireAssetSymbol(kind, d['symbol'] as String?);
+        } on ValidationFailure catch (f) {
+          return f.message;
+        }
+      case SyncEntity.assetTrades:
+        final assetId = d['assetId'] as String?;
+        if (!_owned(SyncEntity.assets, assetId)) return 'Aset tidak ditemukan';
+        final cash = d['cashTransactionId'] as String?;
+        final type = TradeType.tryFromWire(d['type'] as String?);
+        if (type == null) return 'Jenis transaksi aset tidak valid';
+        if (cash != null) {
+          final tx = rows[SyncEntity.transactions]![cash]!;
+          final txType = TxType.tryFromWire(tx['type'] as String?);
+          final err = txType == null
+              ? 'Transaksi kas harus bertipe investasi'
+              : inv.linkedTransactionError(
+                  type,
+                  txType,
+                  (tx['amount'] as num).toDouble(),
+                );
+          if (err != null) return err;
+          if (rows[SyncEntity.assetTrades]!.values.any(
+            (t) => t['cashTransactionId'] == cash && t['id'] != _currentId,
+          )) {
+            return 'Transaksi kas sudah dipakai transaksi aset lain';
+          }
+        }
+        // The sanity check (server `assertTradeSequence`).
+        final current = [
+          for (final r in rows[SyncEntity.assetTrades]!.values)
+            if (r['assetId'] == assetId) ?_trade(r),
+        ];
+        final next = _trade({
+          ...d,
+          'id': _currentId,
+          'createdAt':
+              rows[SyncEntity.assetTrades]![_currentId]?['createdAt'] ??
+              iso(now),
+          'updatedAt': iso(now),
+        });
+        final err = inv.tradeChangeError(current, _currentId!, next);
+        if (err != null) return err;
       case SyncEntity.tasks:
         if (!_owned(SyncEntity.taskAreas, d['areaId'] as String?)) {
           return 'Area not found';
@@ -529,6 +646,18 @@ class FakeServer implements SyncApi {
         (r) =>
             notes.nameKey(r['name'] as String) ==
             notes.nameKey(d['name'] as String),
+      ),
+      SyncEntity.habitLogs => clash(
+        (r) =>
+            r['habitId'] == d['habitId'] &&
+            r['date'] == d['date'] &&
+            r['type'] == d['type'],
+      ),
+      SyncEntity.assets => clash(
+        (r) =>
+            r['kind'] == d['kind'] &&
+            (r['symbol'] as String).toUpperCase() ==
+                (d['symbol'] as String).toUpperCase(),
       ),
       _ => false,
     };
@@ -594,6 +723,30 @@ class FakeServer implements SyncApi {
       _ledger(row, -1);
       _nullRef(SyncEntity.tasks, 'transactionId', id);
       _detachTransaction(id);
+      _nullRef(SyncEntity.assetTrades, 'cashTransactionId', id);
+    }
+    if (e == SyncEntity.habits) {
+      for (final l
+          in rows[SyncEntity.habitLogs]!.values
+              .where((l) => l['habitId'] == id)
+              .map((l) => l['id'] as String)
+              .toList()) {
+        rows[SyncEntity.habitLogs]!.remove(l);
+        _tomb(SyncEntity.habitLogs, l);
+      }
+    }
+    if (e == SyncEntity.assets) {
+      for (final t
+          in rows[SyncEntity.assetTrades]!.values
+              .where((t) => t['assetId'] == id)
+              .map((t) => t['id'] as String)
+              .toList()) {
+        delete(SyncEntity.assetTrades, t);
+      }
+    }
+    if (e == SyncEntity.assetTrades && row['cashTransactionId'] != null) {
+      // The trade's delete removes its linked transaction (ledger reversed).
+      delete(SyncEntity.transactions, row['cashTransactionId'] as String);
     }
     if (e == SyncEntity.tasks) _nullRef(SyncEntity.notes, 'linkedTaskId', id);
     if (e == SyncEntity.notes) _nullRef(SyncEntity.contentItems, 'noteId', id);
@@ -644,10 +797,12 @@ class FakeServer implements SyncApi {
         rows[SyncEntity.transactions]!.remove(t); // no balance reversal
         _tomb(SyncEntity.transactions, t);
         _nullRef(SyncEntity.tasks, 'transactionId', t);
+        _nullRef(SyncEntity.assetTrades, 'cashTransactionId', t);
       }
       _nullRef(SyncEntity.subscriptions, 'walletId', id);
       _nullRef(SyncEntity.planned, 'walletId', id);
       _nullRef(SyncEntity.tasks, 'walletId', id);
+      _nullRef(SyncEntity.assets, 'walletId', id);
     }
     if (e == SyncEntity.categories) {
       _nullRef(SyncEntity.transactions, 'categoryId', id);

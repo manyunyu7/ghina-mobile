@@ -238,6 +238,18 @@ class GameActions {
   Future<void> acknowledgeCelebrations(GameCelebrations celebrations) => _local
       .apply((s) => const AcknowledgeCelebrations()(s, celebrations, _today));
 
+  /// Claims a one-off celebration [key] (see [MarkCelebrated]): true the first
+  /// time (show it now), false when it was already shown on this device.
+  Future<bool> claimCelebration(String key) async {
+    var claimed = false;
+    await _local.apply((s) {
+      final next = const MarkCelebrated()(s, key);
+      claimed = !identical(next, s);
+      return next;
+    });
+    return claimed;
+  }
+
   Future<void> completeOnboarding({DailyGoalLevel? goal}) => _local.apply(
     (s) => const CompleteOnboarding()(s, goal: goal, today: _today),
   );

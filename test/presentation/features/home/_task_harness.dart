@@ -12,6 +12,7 @@ import 'package:ghina/domain/entities/entities.dart';
 
 import '../../../domain/fakes.dart';
 import '../shell/test_utils.dart';
+import '../../../di/habits_investments_test_overrides.dart';
 
 class HomeTaskFixture {
   HomeTaskFixture({DateTime? now}) : now = now ?? testNow;
@@ -24,6 +25,7 @@ class HomeTaskFixture {
   final categories = FakeCategoryRepository();
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     taskRepositoryProvider.overrideWithValue(tasks),
     // Notes/content sources (game events, merged reminders) in memory.
     contentItemRepositoryProvider.overrideWithValue(

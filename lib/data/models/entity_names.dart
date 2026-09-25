@@ -17,6 +17,10 @@ abstract final class SyncEntity {
   static const contentPillars = 'contentPillars';
   static const contentItems = 'contentItems';
   static const contentPosts = 'contentPosts';
+  static const habits = 'habits';
+  static const habitLogs = 'habitLogs';
+  static const assets = 'assets';
+  static const assetTrades = 'assetTrades';
 
   /// Apply order for pulls (referenced entities first).
   static const all = [
@@ -37,6 +41,10 @@ abstract final class SyncEntity {
     contentPillars,
     contentItems,
     contentPosts,
+    habits,
+    habitLogs,
+    assets,
+    assetTrades,
   ];
 
   /// Notes module (`docs/notes.md`): a pull carrying [noteLabels] comes from a
@@ -50,4 +58,10 @@ abstract final class SyncEntity {
     contentItems,
     contentPosts,
   ];
+
+  /// Habits (`docs/habits.md`).
+  static const habitsModule = [habits, habitLogs];
+
+  /// Investments (`docs/investments.md`).
+  static const investmentsModule = [assets, assetTrades];
 }

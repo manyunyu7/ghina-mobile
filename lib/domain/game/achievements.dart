@@ -62,6 +62,23 @@ enum AchievementMetric {
 
   /// Content items with a paid sponsor.
   contentSponsorsPaid,
+
+  /// Habits with any activity (a check-in, an urge, a clean day…).
+  habitsStarted,
+
+  /// Longest build-habit streak reached, in days (milestones 7/30/100; a
+  /// perWeek streak counts 7 days per week).
+  habitBestBuildStreak,
+
+  /// Longest clean run of a quit habit reached (quit milestones).
+  habitBestCleanDays,
+
+  /// Urges resisted in total (all quit habits).
+  habitUrgesResisted,
+
+  /// Longest run of consecutive days with at least
+  /// [AchievementStats.habitsAllMetMin] build habits met.
+  habitBestAllMetRun,
 }
 
 class AchievementDef {
@@ -435,6 +452,51 @@ const List<AchievementDef> achievementDefs = [
     target: 1,
   ),
   AchievementDef(
+    id: 'first_habit',
+    title: 'Teman Streak',
+    description: 'Mulai kebiasaan pertamamu dan catat harinya.',
+    icon: 'stars',
+    tier: AchievementTier.bronze,
+    metric: AchievementMetric.habitsStarted,
+    target: 1,
+  ),
+  AchievementDef(
+    id: 'habit_build_streak_7',
+    title: 'Seminggu Rajin',
+    description: 'Streak 7 hari untuk satu kebiasaan baik.',
+    icon: 'local_fire_department',
+    tier: AchievementTier.silver,
+    metric: AchievementMetric.habitBestBuildStreak,
+    target: 7,
+  ),
+  AchievementDef(
+    id: 'habit_clean_30',
+    title: '30 Hari Bersih',
+    description: 'Bersih 30 hari dari kebiasaan yang ingin kamu hentikan.',
+    icon: 'shield',
+    tier: AchievementTier.gold,
+    metric: AchievementMetric.habitBestCleanDays,
+    target: 30,
+  ),
+  AchievementDef(
+    id: 'habit_urges_100',
+    title: 'Tahan Godaan',
+    description: 'Berhasil menahan rasa pengen 100 kali.',
+    icon: 'military_tech',
+    tier: AchievementTier.gold,
+    metric: AchievementMetric.habitUrgesResisted,
+    target: 100,
+  ),
+  AchievementDef(
+    id: 'habit_trio_7',
+    title: 'Trio Konsisten',
+    description: '3 kebiasaan tercapai semua, 7 hari berturut-turut.',
+    icon: 'workspace_premium',
+    tier: AchievementTier.gold,
+    metric: AchievementMetric.habitBestAllMetRun,
+    target: 7,
+  ),
+  AchievementDef(
     id: 'goal_7_days',
     title: 'Pemburu Target',
     description: 'Capai target harian di 7 hari berbeda.',
@@ -471,6 +533,10 @@ class AchievementStats {
 
   int operator [](AchievementMetric m) => values[m] ?? 0;
 
+  /// Build habits that must all be met on a day for
+  /// [AchievementMetric.habitBestAllMetRun].
+  static const habitsAllMetMin = 3;
+
   /// Minimum savings rate for a month to count (ignore months without income).
   static int savingsRatePct(double income, double expense) {
     if (income <= 0) return 0;
@@ -501,9 +567,12 @@ class AchievementStats {
     final income = <GameMonth, double>{};
     final expense = <GameMonth, double>{};
     final seenIds = <String>{};
+    final habitIds = <String>{};
+    var bestBuild = 0, bestClean = 0, urges = 0;
+    final habitsMetByDay = <GameDate, Set<String>>{};
 
     for (final e in events) {
-      if (e.id != null && !seenIds.add('${e.kind.name}:${e.id}')) continue;
+      if (e.id != null && !seenIds.add(XpCalculator.dedupeKey(e))) continue;
       switch (e.kind) {
         case ActivityKind.transaction:
           transactions++;
@@ -537,6 +606,28 @@ class AchievementStats {
           }
         case ActivityKind.lesson:
           break;
+        case ActivityKind.habit:
+          final id = e.habitId;
+          if (id != null) habitIds.add(id);
+          switch (e.habitType) {
+            case HabitEventType.buildDayMet:
+              if (id != null) {
+                habitsMetByDay.putIfAbsent(e.occurredDay, () => {}).add(id);
+              }
+            case HabitEventType.urgeResisted:
+              urges += (e.habitValue ?? 0).floor();
+            case HabitEventType.milestone:
+              final m = e.habitMilestone ?? 0;
+              if (e.habitKind == 'quit') {
+                if (m > bestClean) bestClean = m;
+              } else {
+                final days = e.habitStreakUnit == 'week' ? m * 7 : m;
+                if (days > bestBuild) bestBuild = days;
+              }
+            case HabitEventType.quitCleanCheckIn:
+            case null:
+              break;
+          }
         case ActivityKind.content:
           switch (e.contentType) {
             case ContentEventType.posted:
@@ -562,6 +653,11 @@ class AchievementStats {
       if (n != null) seriesCounts[id] = n + 1;
     }
     final bestSeries = seriesCounts.values.fold(0, (a, b) => a > b ? a : b);
+    final bestAllMet = bestDailyRun(
+      habitsMetByDay.entries
+          .where((e) => e.value.length >= habitsAllMetMin)
+          .map((e) => e.key),
+    );
     var bestWeekRun = 0;
     for (final weeks in targetWeeks.values) {
       final run = bestWeeklyRun(weeks);
@@ -627,7 +723,25 @@ class AchievementStats {
       AchievementMetric.contentPosts: contentPosts,
       AchievementMetric.contentBestWeekRun: bestWeekRun,
       AchievementMetric.contentSponsorsPaid: sponsorsPaid,
+      AchievementMetric.habitsStarted: habitIds.length,
+      AchievementMetric.habitBestBuildStreak: bestBuild,
+      AchievementMetric.habitBestCleanDays: bestClean,
+      AchievementMetric.habitUrgesResisted: urges,
+      AchievementMetric.habitBestAllMetRun: bestAllMet,
     });
+  }
+
+  /// Longest run of consecutive days in [days].
+  static int bestDailyRun(Iterable<GameDate> days) {
+    final sorted = days.toSet().toList()..sort();
+    var best = 0, run = 0;
+    GameDate? prev;
+    for (final d in sorted) {
+      run = (prev != null && d.difference(prev) == 1) ? run + 1 : 1;
+      if (run > best) best = run;
+      prev = d;
+    }
+    return best;
   }
 
   /// Longest run of consecutive weeks (Mondays 7 days apart) in [weekStarts].

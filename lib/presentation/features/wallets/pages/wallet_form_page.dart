@@ -287,11 +287,14 @@ class _WalletFormPageState extends ConsumerState<WalletFormPage> {
                                       .copyWith(color: g.textSecondary),
                                 ),
                               ),
-                              MoneyText(
-                                amount: live.balance,
-                                currency: live.currency,
-                                tone: MoneyTone.neutral,
-                                style: GhinaType.moneyM,
+                              // Form: keep visible even when hidden.
+                              MoneyVisibility.reveal(
+                                child: MoneyText(
+                                  amount: live.balance,
+                                  currency: live.currency,
+                                  tone: MoneyTone.neutral,
+                                  style: GhinaType.moneyM,
+                                ),
                               ),
                             ],
                           ),

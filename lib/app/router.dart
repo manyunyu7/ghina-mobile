@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../presentation/design_system/design_system.dart';
+import '../presentation/features/analytics/pages/analytics_page.dart';
+import '../presentation/features/analytics/pages/category_analytics_page.dart';
 import '../presentation/features/auth/pages/login_page.dart';
 import '../presentation/features/auth/pages/onboarding_page.dart';
 import '../presentation/features/auth/pages/register_page.dart';
@@ -16,6 +18,12 @@ import '../presentation/features/forecast/pages/forecast_page.dart';
 import '../presentation/features/forecast/pages/planned_form_page.dart';
 import '../presentation/features/health/pages/health_form_page.dart';
 import '../presentation/features/health/pages/health_page.dart';
+import '../presentation/features/investments/pages/asset_detail_page.dart';
+import '../presentation/features/investments/pages/asset_form_page.dart';
+import '../presentation/features/investments/pages/investment_cash_page.dart';
+import '../presentation/features/investments/pages/portfolio_page.dart';
+import '../presentation/features/investments/pages/trade_form_page.dart';
+import '../presentation/features/habits/pages/habit_routes.dart';
 import '../presentation/features/home/pages/home_page.dart';
 import '../presentation/features/learn/pages/learn_page.dart';
 import '../presentation/features/learn/pages/lesson_page.dart';
@@ -171,6 +179,45 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Belajar is no longer a tab; reachable from home and profile.
       GoRoute(path: '/learn', builder: (_, _) => const LearnPage()),
       GoRoute(path: '/reports', builder: (_, _) => const ReportsPage()),
+      // Investasi (docs/investments.md).
+      GoRoute(path: '/investments', builder: (_, _) => const PortfolioPage()),
+      GoRoute(
+        path: '/investments/new',
+        builder: (_, _) => const AssetFormPage(),
+      ),
+      GoRoute(
+        path: '/investments/cash/:txId',
+        builder: (_, s) =>
+            InvestmentCashPage(transactionId: s.pathParameters['txId']!),
+      ),
+      GoRoute(
+        path: '/investments/:id',
+        builder: (_, s) => AssetDetailPage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/investments/:id/edit',
+        builder: (_, s) => AssetFormPage(id: s.pathParameters['id']),
+      ),
+      GoRoute(
+        path: '/investments/:id/trade',
+        builder: (_, s) => TradeFormPage(
+          assetId: s.pathParameters['id']!,
+          initialType: s.uri.queryParameters['type'],
+        ),
+      ),
+      GoRoute(
+        path: '/investments/:id/trade/:tradeId',
+        builder: (_, s) => TradeFormPage(
+          assetId: s.pathParameters['id']!,
+          tradeId: s.pathParameters['tradeId'],
+        ),
+      ),
+      GoRoute(path: '/analytics', builder: (_, _) => const AnalyticsPage()),
+      GoRoute(
+        path: '/analytics/category/:id',
+        builder: (_, s) =>
+            CategoryAnalyticsPage(categoryKey: s.pathParameters['id']!),
+      ),
       // Notes & content (docs/notes.md, docs/content.md).
       GoRoute(path: '/notes', builder: (_, _) => const NotesPage()),
       GoRoute(path: '/notes/labels', builder: (_, _) => const NoteLabelsPage()),
@@ -197,6 +244,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/content/:id',
         builder: (_, s) => ContentItemPage(id: s.pathParameters['id']),
       ),
+      // Kebiasaan (docs/habits.md).
+      ...habitRoutes,
       GoRoute(path: '/prayers', builder: (_, _) => const PrayersPage()),
       GoRoute(
         path: '/prayers/report',

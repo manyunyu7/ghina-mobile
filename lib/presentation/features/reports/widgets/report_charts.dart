@@ -42,9 +42,14 @@ AxisTitles _leftMoney(GhinaTokens g, double interval, String currency) =>
           return SideTitleWidget(
             meta: meta,
             space: 6,
-            child: Text(
-              GhinaMoney.format(v, currency: currency, compact: true),
-              style: _axis(g),
+            // Balance privacy: no axis amounts while hidden.
+            child: Builder(
+              builder: (context) => context.moneyHidden
+                  ? const SizedBox.shrink()
+                  : Text(
+                      GhinaMoney.format(v, currency: currency, compact: true),
+                      style: _axis(g),
+                    ),
             ),
           );
         },
@@ -126,7 +131,7 @@ class IncomeExpenseChart extends StatelessWidget {
               GhinaType.caption.copyWith(color: Colors.white70),
               children: [
                 TextSpan(
-                  text: GhinaMoney.format(r.toY, currency: currency),
+                  text: context.money(r.toY, currency: currency),
                   style: GhinaType.moneyS.copyWith(color: Colors.white),
                 ),
               ],
@@ -195,7 +200,7 @@ class CashflowChart extends StatelessWidget {
               GhinaType.caption.copyWith(color: Colors.white70),
               children: [
                 TextSpan(
-                  text: GhinaMoney.format(
+                  text: context.money(
                     r.toY,
                     currency: currency,
                     showSign: true,
@@ -320,7 +325,7 @@ class _CategoryDonutState extends State<CategoryDonut> {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(
-                        GhinaMoney.format(
+                        context.money(
                           focus?.value ?? total,
                           currency: widget.currency,
                           compact: true,
@@ -373,7 +378,7 @@ class _CategoryDonutState extends State<CategoryDonut> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    GhinaMoney.format(
+                    context.money(
                       slices[i].value,
                       currency: widget.currency,
                       compact: true,

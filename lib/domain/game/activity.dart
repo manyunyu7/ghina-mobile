@@ -7,7 +7,35 @@ import 'game_date.dart';
 /// [content] = a content-planner milestone (`docs/content.md`, see
 /// [ContentEventType]): stage XP, on-schedule bonus, weekly target and sponsor
 /// XP plus the content achievements (see `XpRules` / README → Content).
-enum ActivityKind { transaction, prayer, health, food, lesson, task, content }
+/// [habit] = a habits milestone (`docs/habits.md`, see [HabitEventType]):
+/// plumbing only — the engine gives them no XP/achievements until rules are
+/// added (README → Habits).
+enum ActivityKind {
+  transaction,
+  prayer,
+  health,
+  food,
+  lesson,
+  task,
+  content,
+  habit,
+}
+
+/// What a [ActivityKind.habit] event records (README → Habits).
+enum HabitEventType {
+  /// A build habit's day met (value ≥ goal / check done).
+  buildDayMet,
+
+  /// A quit habit's explicit clean check-in ("Hari ini bersih ✅").
+  quitCleanCheckIn,
+
+  /// Urges resisted on one day of a quit habit (`habitValue` = count).
+  urgeResisted,
+
+  /// A streak milestone reached in one run (quit: 1, 3, 7, …; build: 7, 30,
+  /// 100 in the streak unit).
+  milestone,
+}
 
 /// What a [ActivityKind.content] event records.
 enum ContentEventType {
@@ -83,6 +111,12 @@ class ActivityEvent {
     this.contentOnSchedule = false,
     this.contentWeekStart,
     this.contentTarget,
+    this.habitType,
+    this.habitId,
+    this.habitKind,
+    this.habitValue,
+    this.habitMilestone,
+    this.habitStreakUnit,
   });
 
   /// A transaction. [createdAt] drives streak/XP; [date] drives monthly stats.
@@ -252,6 +286,85 @@ class ActivityEvent {
     contentItemId: itemId,
   );
 
+  /// A build habit's day met. [at] = when that `done` row was logged (its
+  /// `createdAt` — so `day` is the logging day, like every other event, and
+  /// backfilling can't farm XP); [date] = the log's day (`occurredDay`).
+  /// `id` = `<habitId>:<date>`.
+  factory ActivityEvent.habitDayMet({
+    required String habitId,
+    required GameDate date,
+    required DateTime at,
+    double value = 1,
+  }) => ActivityEvent(
+    kind: ActivityKind.habit,
+    id: '$habitId:$date',
+    at: at,
+    occurredAt: date.toLocalDateTime(),
+    habitType: HabitEventType.buildDayMet,
+    habitId: habitId,
+    habitKind: 'build',
+    habitValue: value,
+  );
+
+  /// A quit habit's clean check-in on [date]. `id` = `<habitId>:<date>`.
+  factory ActivityEvent.habitCleanCheckIn({
+    required String habitId,
+    required GameDate date,
+    required DateTime at,
+  }) => ActivityEvent(
+    kind: ActivityKind.habit,
+    id: '$habitId:$date',
+    at: at,
+    occurredAt: date.toLocalDateTime(),
+    habitType: HabitEventType.quitCleanCheckIn,
+    habitId: habitId,
+    habitKind: 'quit',
+    habitValue: 1,
+  );
+
+  /// [count] urges resisted on [date] (one event per day row; cap per day in
+  /// the rules). `id` = `<habitId>:<date>`.
+  factory ActivityEvent.habitUrgeResisted({
+    required String habitId,
+    required GameDate date,
+    required DateTime at,
+    required int count,
+  }) => ActivityEvent(
+    kind: ActivityKind.habit,
+    id: '$habitId:$date',
+    at: at,
+    occurredAt: date.toLocalDateTime(),
+    habitType: HabitEventType.urgeResisted,
+    habitId: habitId,
+    habitKind: 'quit',
+    habitValue: count.toDouble(),
+  );
+
+  /// Streak [milestone] reached on [date] in the run that started
+  /// [runStart]. `id` = `<habitId>:<milestone>:<runStart>` (a later relapse
+  /// or miss never removes it; a new run reaching it again is a new event —
+  /// dedupe by `habitId` + `habitMilestone` in the rules if once-ever is
+  /// wanted). [kind] `build | quit`; [unit] `day | week`.
+  factory ActivityEvent.habitMilestone({
+    required String habitId,
+    required String kind,
+    required int milestone,
+    required GameDate date,
+    required GameDate runStart,
+    String unit = 'day',
+  }) => ActivityEvent(
+    kind: ActivityKind.habit,
+    id: '$habitId:$milestone:$runStart',
+    at: date.toLocalDateTime(),
+    dayOverride: date,
+    occurredAt: runStart.toLocalDateTime(),
+    habitType: HabitEventType.milestone,
+    habitId: habitId,
+    habitKind: kind,
+    habitMilestone: milestone,
+    habitStreakUnit: unit,
+  );
+
   final ActivityKind kind;
 
   /// When it was logged (local or UTC; converted to the local day).
@@ -317,6 +430,22 @@ class ActivityEvent {
 
   /// The account's target per week (weekly target events).
   final int? contentTarget;
+
+  /// Habit events only (see the `ActivityEvent.habit*` factories).
+  final HabitEventType? habitType;
+  final String? habitId;
+
+  /// `build | quit`.
+  final String? habitKind;
+
+  /// Day met: the day's value; urges: the count; clean check-in: 1.
+  final double? habitValue;
+
+  /// Milestone events: the milestone (7, 30, …).
+  final int? habitMilestone;
+
+  /// Milestone events: `day | week`.
+  final String? habitStreakUnit;
 
   /// Local day the activity counts for (XP, streak, daily goal).
   GameDate get day => dayOverride ?? GameDate.fromDateTime(at);

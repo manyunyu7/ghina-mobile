@@ -10,7 +10,7 @@ ChunkySwatch txSwatch(TxType t) => switch (t) {
   TxType.expense => GhinaColors.expense,
   TxType.income => GhinaColors.income,
   TxType.transfer => GhinaColors.transfer,
-  TxType.adjustment => GhinaColors.gray,
+  TxType.adjustment || TxType.investment => GhinaColors.gray,
 };
 
 IconData txTypeIcon(TxType t) => switch (t) {
@@ -18,13 +18,14 @@ IconData txTypeIcon(TxType t) => switch (t) {
   TxType.income => Icons.arrow_downward_rounded,
   TxType.transfer => Icons.swap_horiz_rounded,
   TxType.adjustment => Icons.tune_rounded,
+  TxType.investment => Icons.trending_up_rounded,
 };
 
 MoneyTone txTone(TxType t) => switch (t) {
   TxType.expense => MoneyTone.expense,
   TxType.income => MoneyTone.income,
   TxType.transfer => MoneyTone.transfer,
-  TxType.adjustment => MoneyTone.neutral,
+  TxType.adjustment || TxType.investment => MoneyTone.neutral,
 };
 
 /// Amount of a transaction in its tone. Adjustments are neutral (theme text
@@ -45,7 +46,7 @@ class TxAmount extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (type == TxType.adjustment) {
+    if (type.isSigned) {
       return MoneyText(
         text: GhinaMoney.format(amount, currency: currency, showSign: true),
         tone: MoneyTone.neutral,
@@ -81,6 +82,14 @@ class TxAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (view.type == TxType.investment) {
+      return CategoryAvatar(
+        icon: Icons.trending_up_rounded,
+        color: GhinaColors.purple.base,
+        size: size,
+        soft: true,
+      );
+    }
     if (view.type == TxType.adjustment) {
       return CategoryAvatar(
         icon: Icons.tune_rounded,
@@ -134,6 +143,9 @@ class TransactionRow extends StatelessWidget {
       parts.add('Dari ${view.wallet?.name ?? 'dompet terhapus'}');
     } else if (view.type == TxType.adjustment) {
       if (adjustmentDetail(view.transaction) case final d?) parts.add(d);
+      parts.add(view.wallet?.name ?? 'Dompet terhapus');
+    } else if (view.type == TxType.investment) {
+      parts.add('Investasi');
       parts.add(view.wallet?.name ?? 'Dompet terhapus');
     } else {
       if (note != null && note.isNotEmpty && view.category != null) {
@@ -254,3 +266,11 @@ class LastWalletNotifier extends Notifier<String?> {
 final lastUsedWalletProvider = NotifierProvider<LastWalletNotifier, String?>(
   LastWalletNotifier.new,
 );
+
+// ---------------------------------------------------------------- investments
+
+/// Where a transaction row opens: the cash effect of a trade (`investment`)
+/// is managed from the portfolio (its trade), never from the transaction form.
+String txRoute(TransactionView v) => v.type == TxType.investment
+    ? '/investments/cash/${v.id}'
+    : '/transactions/${v.id}';

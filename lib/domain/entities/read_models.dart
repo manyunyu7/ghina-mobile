@@ -83,7 +83,9 @@ final class TransactionView {
   DateTime get date => transaction.date;
 
   /// Display title: note, else category name, else a type label. Adjustments
-  /// are always "Penyesuaian saldo" (their note is shown as detail).
+  /// are always "Penyesuaian saldo" (their note is shown as detail);
+  /// investment rows show their note (`Beli BBCA 2 lot @ 9.250`) or
+  /// "Investasi".
   String get title {
     if (transaction.isAdjustment) return TxType.adjustment.label;
     final note = transaction.note?.trim();
@@ -232,12 +234,20 @@ final class DashboardSummary {
     required this.spendingByCategory,
     required this.trend,
     required this.recent,
+    this.investmentsValue = 0,
   });
 
   final YearMonth month;
 
-  /// Sum of displayed balances of non-archived wallets.
+  /// Sum of displayed balances of non-archived wallets (investments are not
+  /// in here — wallet balances are unchanged by market prices).
   final double totalBalance;
+
+  /// Portfolio market value (`docs/investments.md`).
+  final double investmentsValue;
+
+  /// Net worth = wallets + investments.
+  double get netWorth => totalBalance + investmentsValue;
   final List<Wallet> wallets;
   final double monthIncome;
   final double monthExpense;
@@ -291,8 +301,9 @@ final class ReportData {
     required this.months,
     required this.spending,
     required this.income,
-    required this.netWorth,
+    required this.walletsTotal,
     required this.wallets,
+    this.investmentsValue = 0,
   });
 
   final ReportPeriod period;
@@ -310,7 +321,13 @@ final class ReportData {
   final List<CategoryTotal> income;
 
   /// Sum of current displayed balances of non-archived wallets.
-  final double netWorth;
+  final double walletsTotal;
+
+  /// Portfolio market value (`docs/investments.md`).
+  final double investmentsValue;
+
+  /// Net worth = wallets + investments (market value).
+  double get netWorth => walletsTotal + investmentsValue;
 
   /// Non-archived wallets, highest balance first.
   final List<Wallet> wallets;

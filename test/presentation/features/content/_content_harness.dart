@@ -30,6 +30,7 @@ import '../../../domain/fakes.dart';
 import '../profile/_harness.dart'
     show FakeFoodRepository, FakeHealthRepository, FakePrayerRepository;
 import '../tasks/_tasks_harness.dart' show FakeSyncService;
+import '../../../di/habits_investments_test_overrides.dart';
 
 export '../tasks/_tasks_harness.dart' show loadFonts;
 
@@ -215,6 +216,7 @@ class ContentHarness {
   }
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     ...buildGameOverrides(store: gameStore),
     gameTickProvider.overrideWith((ref) => const Stream.empty()),
     clockProvider.overrideWithValue(clock),

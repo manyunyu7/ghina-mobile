@@ -13,6 +13,7 @@ import '../domain/entities/entities.dart';
 import '../domain/usecases/usecases.dart';
 import '../presentation/state/session_controller.dart' show currencyProvider;
 import 'core_providers.dart';
+import 'habits_investments_providers.dart' show watchPortfolioUseCaseProvider;
 
 // ---------------------------------------------------------------- Wallets
 
@@ -455,6 +456,12 @@ final watchForecastUseCaseProvider = Provider(
     ref.watch(clockProvider),
   ),
 );
+
+/// Portfolio market value (net worth = wallets + this).
+final investmentsValueSourceProvider = Provider<InvestmentsValueSource>((ref) {
+  final portfolio = ref.watch(watchPortfolioUseCaseProvider);
+  return () => portfolio().map((p) => p.marketValue).distinct();
+});
 final watchDashboardUseCaseProvider = Provider(
   (ref) => WatchDashboard(
     ref.watch(transactionRepositoryProvider),
@@ -462,6 +469,7 @@ final watchDashboardUseCaseProvider = Provider(
     ref.watch(categoryRepositoryProvider),
     ref.watch(budgetRepositoryProvider),
     ref.watch(clockProvider),
+    investments: ref.watch(investmentsValueSourceProvider),
   ),
 );
 final watchReportUseCaseProvider = Provider(
@@ -470,6 +478,7 @@ final watchReportUseCaseProvider = Provider(
     ref.watch(categoryRepositoryProvider),
     ref.watch(walletRepositoryProvider),
     ref.watch(clockProvider),
+    investments: ref.watch(investmentsValueSourceProvider),
   ),
 );
 final watchTasksUseCaseProvider = Provider(
@@ -487,7 +496,7 @@ final watchTaskBoardUseCaseProvider = Provider(
   ),
 );
 
-/// Task reminders merged with content post reminders (≤ 60 total).
+/// Task reminders merged with content post and habit reminders (≤ 60 total).
 final watchRemindersUseCaseProvider = Provider(
   (ref) => WatchReminders(
     ref.watch(taskRepositoryProvider),
@@ -496,6 +505,8 @@ final watchRemindersUseCaseProvider = Provider(
     posts: ref.watch(contentPostRepositoryProvider),
     items: ref.watch(contentItemRepositoryProvider),
     accounts: ref.watch(socialAccountRepositoryProvider),
+    habits: ref.watch(habitRepositoryProvider),
+    habitLogs: ref.watch(habitLogRepositoryProvider),
   ),
 );
 final watchSyncStatusUseCaseProvider = Provider(
@@ -686,7 +697,8 @@ final watchTaskHomeProvider = StreamProvider.autoDispose<TaskHome>(
   )(),
 );
 
-/// The reminders to schedule — tasks + content posts (`[IG-TAYANG] …`), ≤ 60,
+/// The reminders to schedule — tasks + content posts (`[IG-TAYANG] …`) +
+/// habits (private ones masked), ≤ 60,
 /// soonest first; emits only on change.
 /// Feed to `ReminderScheduler.replaceAll`.
 final watchRemindersProvider = StreamProvider.autoDispose<List<Reminder>>(

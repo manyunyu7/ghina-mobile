@@ -1,14 +1,19 @@
 import '../../core/dates.dart';
 
-/// Transaction type. Wire values: `expense | income | transfer | adjustment`.
+/// Transaction type. Wire values:
+/// `expense | income | transfer | adjustment | investment`.
 ///
 /// `adjustment` (balance adjustment, `docs/balance-adjustment.md`) carries a
 /// **signed** amount (new balance − old balance) and is not income or expense.
+/// `investment` (the cash effect of a buy/sell/fee trade, `docs/investments.md`)
+/// is signed too and behaves exactly like `adjustment`: no category, no
+/// destination wallet, never income/expense/budget/forecast/XP, only balances.
 enum TxType {
   expense('expense', 'Pengeluaran'),
   income('income', 'Pemasukan'),
   transfer('transfer', 'Transfer'),
-  adjustment('adjustment', 'Penyesuaian saldo');
+  adjustment('adjustment', 'Penyesuaian saldo'),
+  investment('investment', 'Investasi');
 
   const TxType(this.wire, this.label);
   final String wire;
@@ -17,6 +22,10 @@ enum TxType {
   /// Types a user picks when logging a transaction (adjustments are made from
   /// the wallet screen).
   static const loggable = [expense, income, transfer];
+
+  /// Signed, balance-only types (no category, no destination wallet, never
+  /// income/expense): [adjustment] and [investment].
+  bool get isSigned => this == adjustment || this == investment;
 
   /// Unknown values → expense. Prefer [tryFromWire] for data from the server.
   static TxType fromWire(String? v) => tryFromWire(v) ?? TxType.expense;

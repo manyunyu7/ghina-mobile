@@ -51,6 +51,11 @@ abstract final class GhinaMoney {
     return body;
   }
 
+  /// Privacy mask shown while balances are hidden: `Rp •••••` (compact:
+  /// `Rp •••`). Roughly the width of a typical amount to avoid layout jumps.
+  static String masked(String currency, {bool compact = false}) =>
+      '${symbolFor(currency)} ${compact ? '•••' : '•••••'}';
+
   /// Plain grouped number without symbol: `25.000` (IDR) / `1,234.50`.
   static String number(num amount, {String currency = 'IDR'}) {
     final c = currency.toUpperCase();

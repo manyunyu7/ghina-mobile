@@ -150,6 +150,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
   }
 
   Future<void> _actions(TransactionView v, String currency) async {
+    if (v.type == TxType.investment) return _investmentActions(v);
     final action = await showChunkyBottomSheet<String>(
       context,
       title: v.title,
@@ -247,6 +248,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         ),
         centerTitle: false,
         actions: [
+          IconButton(
+            key: const ValueKey('tx-analytics'),
+            tooltip: 'Analitik',
+            icon: const Icon(Icons.insights_rounded),
+            onPressed: () => context.push('/analytics'),
+          ),
           IconButton(
             key: const ValueKey('tx-search-toggle'),
             tooltip: 'Cari',
@@ -450,7 +457,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
               group: data[i],
               currency: currency,
               now: now,
-              onTap: (v) => context.push('/transactions/${v.id}'),
+              onTap: (v) => context.push(txRoute(v)),
               onLongPress: (v) => _actions(v, currency),
               onDismiss: _confirmDeleteDismiss,
             ),
@@ -460,7 +467,45 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
     ];
   }
 
+  /// Investment rows (a trade's cash effect) are edited/deleted from the
+  /// portfolio: the sheet only offers to open the trade.
+  Future<void> _investmentActions(TransactionView v) async {
+    final open = await showChunkyBottomSheet<bool>(
+      context,
+      title: v.title,
+      builder: (c) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Transaksi ini dicatat dari portofolio investasi. Ubah atau hapus lewat transaksi asetnya, ya.',
+            textAlign: TextAlign.center,
+            style: GhinaType.bodyS.copyWith(color: c.ghina.textSecondary),
+          ),
+          const SizedBox(height: GhinaSpace.lg),
+          ChunkyButton(
+            key: const ValueKey('tx-open-investment'),
+            label: 'Buka di portofolio',
+            icon: Icons.trending_up_rounded,
+            color: GhinaColors.purple,
+            onPressed: () => Navigator.of(c).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (open == true && mounted) context.push(txRoute(v));
+  }
+
   Future<bool> _confirmDeleteDismiss(TransactionView v) async {
+    if (v.type == TxType.investment) {
+      showToastBadge(
+        context,
+        message: 'Hapus lewat portofolio ya, biar kepemilikannya ikut benar',
+        icon: Icons.trending_up_rounded,
+        color: GhinaColors.purple,
+      );
+      return false;
+    }
     final ok = await showChunkyConfirm(
       context,
       title: 'Hapus transaksi?',

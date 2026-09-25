@@ -108,7 +108,7 @@ class _TaskTileState extends State<TaskTile> {
         ),
       if (t.hasMoneyLink)
         ChunkyPill(
-          label: GhinaMoney.format(t.amount!, currency: widget.currency),
+          label: context.money(t.amount!, currency: widget.currency),
           color: t.transactionId != null
               ? GhinaColors.green
               : GhinaColors.yellow,

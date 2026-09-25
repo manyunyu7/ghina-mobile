@@ -10,6 +10,8 @@
 	<string>Ghina memakai mikrofon untuk merekam catatan suara dan dikte.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Ghina mengubah ucapanmu menjadi teks catatan (dikte) memakai pengenalan suara di perangkat.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Ghina memakai Face ID untuk membuka Kunci Kebiasaan.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -8,8 +8,9 @@ import '../entities/entities.dart';
 import '../repositories/repositories.dart';
 import 'validation.dart';
 
-/// Form data for a transaction. For [TxType.adjustment] the [amount] is signed
-/// (non-zero); every other type needs a positive amount.
+/// Form data for a transaction. For [TxType.adjustment] and
+/// [TxType.investment] the [amount] is signed (non-zero); every other type
+/// needs a positive amount.
 final class TransactionInput {
   const TransactionInput({
     required this.type,
@@ -85,8 +86,8 @@ Future<({String? toWalletId, String? categoryId})> _validateRefs(
     }
     return (toWalletId: to, categoryId: null); // transfers carry no category
   }
-  if (p.type == TxType.adjustment) {
-    // Adjustments carry neither a category nor a destination wallet.
+  if (p.type.isSigned) {
+    // Adjustments/investments carry neither a category nor a destination wallet.
     return (toWalletId: null, categoryId: null);
   }
   final cat = optionalId(p.categoryId);
@@ -105,7 +106,7 @@ Future<Transaction> _build(
   CategoryRepository categories, {
   List<TransactionPhoto> photos = const [],
 }) async {
-  final amount = input.type == TxType.adjustment
+  final amount = input.type.isSigned
       ? requireNonZeroAmount(input.amount)
       : requirePositiveAmount(input.amount);
   final refs = await _validateRefs(input, wallets, categories);

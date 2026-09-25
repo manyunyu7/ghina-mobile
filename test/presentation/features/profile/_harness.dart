@@ -22,6 +22,7 @@ import 'package:ghina/presentation/state/session_controller.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/fakes.dart';
+import '../../../di/habits_investments_test_overrides.dart';
 
 /// Wednesday noon.
 final harnessNow = DateTime(2026, 9, 23, 12);
@@ -201,6 +202,7 @@ class Harness {
   }
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     ...buildGameOverrides(store: gameStore),
     gameTickProvider.overrideWith((ref) => const Stream.empty()),
     clockProvider.overrideWithValue(clock),

@@ -114,6 +114,19 @@ class AcknowledgeCelebrations {
   }
 }
 
+/// Remember a celebration shown outside [GameCelebrations] (e.g. a habit
+/// milestone, key `habit:<YYYY-MM-DD>:<habitId>:<milestone>` — the date part
+/// lets [AcknowledgeCelebrations] prune it after 30 days). Returns the same
+/// instance when the key is already there.
+class MarkCelebrated {
+  const MarkCelebrated();
+
+  GameLocalState call(GameLocalState state, String key) =>
+      state.celebrated.contains(key)
+      ? state
+      : state.copyWith(celebrated: {...state.celebrated, key});
+}
+
 /// Record the "FIRE kosong" snapshot of [day] (see `fire_clear.dart`).
 /// Add-only; returns the same instance when nothing changes.
 class RecordFireClearDay {

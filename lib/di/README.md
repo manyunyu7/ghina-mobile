@@ -32,14 +32,14 @@ runApp(ProviderScope(
 | `watchTransactionsProvider(TransactionFilter)` | `List<TransactionView>` (tx + wallet + toWallet + category, `.title`), newest first |
 | `watchTransactionsByDayProvider(TransactionFilter)` | `List<DayGroup>` (`day`, `items`, `income`, `expense`, `net`) |
 | `watchTransactionProvider(id)` | `TransactionView?` |
-| `watchDashboardProvider` | `DashboardSummary`: `totalBalance`, `wallets`, `monthIncome`/`monthExpense`/`monthNet`, `todayExpense`/`todayIncome`, `monthBudgeted`, `spendingByCategory`, `trend` (6 × `MonthTotals`), `recent` (8) |
+| `watchDashboardProvider` | `DashboardSummary`: `totalBalance` (wallets only), `investmentsValue` (portfolio value), `netWorth` (= both; the web's "Total Balance"), `wallets`, `monthIncome`/`monthExpense`/`monthNet`, `todayExpense`/`todayIncome`, `monthBudgeted`, `spendingByCategory`, `trend` (6 × `MonthTotals`), `recent` (8) |
 | `watchBudgetMonthProvider(YearMonth)` | `BudgetMonth`: `items` (`BudgetView`: `budget`, `category`, `spent`, `remaining`, `pct`, `over`, `transactions`), plus `totalBudgeted/Spent/Remaining/Pct`, `overCount` and `unbudgetedCategories` |
 | `watchBudgetProvider(id)` | `Budget?` |
 | `watchSubscriptionsProvider` | `SubscriptionSummary`: `items` (active first, by next billing), `monthlyTotal`, `yearlyTotal`. Each `Subscription` has `nextOccurrence(now)`, `daysUntilNext(now)` and `monthlyAmount`. |
 | `watchSubscriptionProvider(id)` | `Subscription?` |
 | `watchForecastProvider(YearMonth?)` | `Forecast` (`null` = next month): `planned`, `subscriptionItems`, `averages`, `totals(ForecastSources(manual, subscriptions, history))` → `projectedExpense/Income/net`. History is off by default, as on the web. |
 | `watchPlannedProvider(id)` | `PlannedTransaction?` |
-| `watchReportProvider(ReportPeriod)` | `ReportData`: `months` (income vs expense, cashflow `net`), `spending`/`income` (`CategoryTotal`: name, color, total, pct), `totalIncome/Expense`, `netSavings`, `savingsRate`, `netWorth`, `wallets`, `label`, `hasData`. Periods: `ReportPeriod.thisMonth`, `.last6Months`, `.last12Months`, `ReportPeriod.year(2026)`. |
+| `watchReportProvider(ReportPeriod)` | `ReportData`: `months` (income vs expense, cashflow `net`), `spending`/`income` (`CategoryTotal`: name, color, total, pct), `totalIncome/Expense`, `netSavings`, `savingsRate`, `netWorth` (= `walletsTotal` + `investmentsValue`), `wallets`, `label`, `hasData`. Periods: `ReportPeriod.thisMonth`, `.last6Months`, `.last12Months`, `ReportPeriod.year(2026)`. |
 | `watchPrayersProvider((from: d1, to: d2))` | `List<PrayerEntry>` (fardhu + daily sunnah, each with `status`, rawatib, `rakaat`, `prayedAt`, `note`). `prayerEntriesByDate(list)` → `Map<'YYYY-MM-DD', Map<Prayer, PrayerEntry>>`; `prayersByDate(list)` → prayed fardhu per day. |
 | `watchPrayerReportProvider((from: d1, to: d2))` | `PrayerReport` (docs/prayer-quality.md): `score`, `pct(status)`, `jamaahPct`, `completeDays`, `breakdown`, `weakest`/`strongest`, `sunnahCounts`, `rawatibCount`, `days` (color-map rows, newest first). Ranges: `PrayerRangePreset.resolve(today)`, `customPrayerRange(a, b)`. |
 | `watchHealthEntriesProvider` / `watchHealthEntryProvider(id)` | newest first. `entry.bpCategory` gives the AHA level, Indonesian label and color. |
@@ -49,7 +49,7 @@ runApp(ProviderScope(
 | `currentUserProvider` / `currencyProvider` | `AppUser?` / `'IDR'` … |
 
 `TransactionFilter(month: YearMonth(2026, 9), type: TxType.expense, walletId:, categoryId:, search: 'kopi', limit:)`.
-All fields are optional. `walletId` matches both sides of a transfer (the wallet "Riwayat"). `TxType.adjustment` rows have a signed amount and are never income/expense; `TxType.loggable` = the types a user logs. Rows of unknown future types are skipped. `search` matches the note, category name and wallet name.
+All fields are optional. `walletId` matches both sides of a transfer (the wallet "Riwayat"). `TxType.adjustment` and `TxType.investment` (a trade's cash effect) rows have a signed amount and are never income/expense/budget/XP (`type.isSigned`, `transaction.isBalanceOnly`) — show them like adjustments, don't let the transaction form edit an `investment` row (edit the trade instead); `TxType.loggable` = the types a user logs. Rows of unknown future types are skipped. `search` matches the note, category name and wallet name.
 
 ## Writing data: `await ref.read(provider)(args)` → `Result<T>`
 
@@ -302,3 +302,172 @@ Tests that override the game's source repositories must also override
 `contentItemRepositoryProvider`, `contentPostRepositoryProvider` and
 `socialAccountRepositoryProvider` (e.g. with the fakes in `test/domain/fakes.dart`) —
 the activity stream and the reminders read them.
+
+## Habits & investments API (`docs/habits.md`, `docs/investments.md`)
+
+Offline-first like everything else. Providers live in
+`di/habits_investments_providers.dart` (exported by `di/di.dart`); types come from
+`domain/entities/entities.dart` (`habit.dart`, `habit_views.dart`, `investment.dart`,
+`investment_views.dart`), rules/inputs from `domain/usecases/usecases.dart`
+(`habit_rules.dart`, `habit_usecases.dart`, `investment_rules.dart`,
+`investment_usecases.dart`). The rules are ports of the server's `src/lib/habits.ts`,
+`src/lib/investments.ts` and the cache rules of `src/lib/prices.ts` (same constants,
+algorithms and Indonesian messages; parity tests mirror `scripts/test-habits.mjs` /
+`scripts/test-investments.mjs`). Dates of habit rows are local `'YYYY-MM-DD'` keys.
+
+### Habit entities
+
+- `Habit`: `id, name` (1–60), `emoji?`, `color` (`#rrggbb`), `kind`
+  (`HabitKind.build|quit`, `.label`), `schedule` (`HabitSchedule.daily`,
+  `HabitSchedule.weekdays([1,3,5])` ISO days, `HabitSchedule.perWeek(3)`; `.label`
+  `Sen, Rab, Jum` / `3× seminggu`, `isPerWeek`…), `target` (`HabitTarget.check`,
+  `HabitTarget.count(8, unit: 'gelas')` (unit default `kali`),
+  `HabitTarget.duration(30)` whole minutes; `.label` `8 gelas` / `30 menit`),
+  `reminders` (`['07:00']` ≤ 5), `isPrivate` (wire `private`), `why?` (≤ 500, the
+  emergency screen's "alasan"), `startDate` (`'YYYY-MM-DD'`), `archived`, `sortOrder`.
+  Quit habits are always daily + check. **Outside the Habits screen use
+  `habit.publicTitle`** (`Kebiasaan pribadi` when private; `maskedHabitName(h)` = name
+  only) — home cards, widgets, anything shareable.
+- `HabitLog` (one row per habit/day/type): `date`, `type` (`HabitLogType.done|skip|
+  relapse|urge`, `.label`), `value` (done: progress / 1 for check & the quit clean
+  check-in; relapse/urge: count; skip: null), `note?` (journal ≤ 1000), `triggers`
+  (≤ 10 tags, relapse/urge only; presets `habitTriggerPresets`), `at?` (time of day).
+- `HabitToday` (a board row): `habit`, `date`, `cell` (`HabitDayCell`), `streak`,
+  `scheduled` (something to do today), `progress`/`goal`/`fraction`, `met`, `isDue`,
+  `skipped`, `canSkip` + `skipsLeft` (≤ 2 per rolling 7 days), `week` (perWeek:
+  `HabitWeek(met, need, state)`), quit: `urges`, `relapses`, `relapsedToday`,
+  `cleanCheckIn`; the day's rows `doneLog/skipLog/relapseLog/urgeLog`; `publicTitle`.
+- `HabitBoard`: `items` (non-archived, in order), `build`, `quit`, `dueCount`,
+  `metCount`, `allMet`, `isEmpty`.
+- `HabitStreak`: `current`, `longest`, `unit` (`HabitStreakUnit.day|week`, `.label`
+  `hari`/`minggu`), `label` (`12 hari`), `periodMet` (build: today / this week met),
+  quit: `lastRelapse`, `relapsedToday`, `cleanSince`, `segments` (`CleanSegment(start,
+  end, days, ongoing)`). Milestones: `quitMilestones` (1…365, then every 100),
+  `nextQuitMilestone(n)`, `isQuitMilestone(n)`, `buildMilestones` (7/30/100),
+  `nextHabitMilestone(kind, n)`.
+- `HabitDayCell` (heatmap): `date`, `state` (`HabitDayState.met|partial|missed|skip|
+  pending|off|clean|relapse|before|future`), `value`, `goal`, `fraction`, `urges`,
+  `relapses`, `cleanCheckIn`, `hasNote`.
+- `HabitInsights` (range): `completion` (`HabitCompletion(met, total, rate?)` — build:
+  met ÷ judged periods, quit: clean days ÷ days), `heatmap`, `weeks` (perWeek),
+  `relapses` / `urges` (`HabitEventStats`: `total`, `days`, `byWeekday` (index 0 =
+  Senin), `byHour` (0–23 local), `unknownHour`; weighted by value; "urges resisted" =
+  `urges.total`), `topTriggers` (`(tag, count)`), `journal` (`HabitJournalEntry(date,
+  type, note, logId)` newest first), `segments`, `streakHistory` (`(date, streak)` per
+  day, for the chart). `HabitDetail(today, insights, logs)`.
+- Emergency screen helpers: `urgeEncouragements`, `urgeQuickActions`,
+  `urgeBreathingSeconds` (60). XP constants for the rules: `HabitXp`.
+
+### Habit reads (`ref.watch` → `AsyncValue`)
+
+| Provider | Value |
+|---|---|
+| `watchHabitsProvider` / `watchAllHabitsProvider` | `List<Habit>` in order (unarchived first) without / with archived |
+| `watchHabitBoardProvider` | `HabitBoard` for today (re-evaluated at midnight) — home card "Kebiasaan hari ini" (mask with `publicTitle`!) and the habit list |
+| `watchHabitTodayProvider(id)` | `HabitToday?` |
+| `watchHabitDetailProvider((id: id, range: habitRangeLastDays(now, 30)))` | `HabitDetail?`; ranges: `habitRangeLastDays(now, n)`, `habitRangeOfMonth(YearMonth(y, m))` |
+| `watchRemindersProvider` | now also habit reminders (below) |
+
+### Habit writes (`await ref.read(provider)(…)` → `Result<T>`)
+
+| Provider → call | Notes |
+|---|---|
+| `createHabitProvider(HabitInput(name:, emoji:, color:, kind:, schedule:, target:, reminders:, isPrivate:, why:, startDate: DateTime?))` → `Habit` | startDate null = today (quit: "sudah bersih sejak…"). `ValidationFailure(field:)`: name, emoji, color, schedule, target, reminders, why, startDate. Added at the end. |
+| `updateHabitProvider(id, HabitInput)` | keeps archived/order; startDate null = unchanged; changing kind keeps the logs |
+| `reorderHabitsProvider([ids])`, `setHabitArchivedProvider(id, bool)`, `deleteHabitProvider(id)` | delete removes all logs (confirm; archive is the soft option) |
+| `checkInHabitProvider(habitId, day:, value:, add: true, note:)` → `HabitLog?` | build only. check: sets the done row; count: `+value` (default +1); duration: `+value` minutes (default the goal; a timer passes its minutes, rounded); `add: false` sets the value (0 removes the row). Future days refused (`field: 'date'`). |
+| `undoHabitCheckInProvider(habitId, day)` | removes the day's done row |
+| `skipHabitDayProvider(habitId, day:, note:)` → `HabitLog` | build only; `ValidationFailure(field: 'skip', 'Maksimal 2 hari libur dalam 7 hari')` — use `today.canSkip` to disable the button |
+| `unskipHabitDayProvider(habitId, day)` | |
+| `confirmCleanDayProvider(habitId, day:, note:)` / `undoCleanDayProvider(habitId, day)` | quit: "Hari ini bersih ✅" (a done row, value 1); refused on a relapse day |
+| `logUrgeProvider(habitId, at:, triggers:, note:)` → `HabitLog` | quit: "Lagi pengen, tapi tahan" (+1, triggers merged) |
+| `logRelapseProvider(habitId, RelapseInput(day:, at:, triggers:, note:, count: 1))` → `(log:, previousStreak:)` | no shaming: show `previousStreak` ("Kamu sempat bersih 12 hari — itu nyata") |
+| `convertUrgeToRelapseProvider(habitId, RelapseInput(...))` → same | emergency screen "Aku kalah kali ini": the urge just logged −1, relapse +1, atomic |
+| `setHabitJournalProvider(habitId, day, note, type:)` → `HabitLog` | note on the day's row (type null: relapse → done → skip → urge); no row → `ValidationFailure(field: 'note')` (log the day first) |
+| `deleteHabitLogProvider(logId)` | undo a row from the journal |
+
+Reminders: `computeHabitReminders` is merged into `watchRemindersProvider` (tasks + posts
++ habits, ≤ 60 total, soonest first): at each `reminders` time on the next 3 days,
+build habits when there is something to do (weekdays: scheduled; perWeek: week not met)
+and it isn't met/skipped yet — body `Target hari ini: 8 gelas` / `Baru 3/8 gelas —
+sedikit lagi!`; quit habits a check-in nudge unless checked in clean / relapsed —
+`Hari bersih ke-12 — cek in yuk…`. Private habits: title `Waktunya cek kebiasaanmu ✨`,
+body `Ketuk untuk check-in ✨`. Key `habit-<id>-<YYYYMMDD>-<HHmm>`, route
+`habitRoute(id)` = `/habits/<id>` (add this route; for private habits open behind the
+"Kunci Kebiasaan" lock).
+
+### Investment entities
+
+- `Asset`: `kind` (`AssetKind.stock|fund|gold|crypto|bond|other`, `.label`,
+  `.defaultUnit`, `.supportsAutoPrice` (stock/crypto), `.usesLots` (stock)), `symbol`
+  (stock `BBCA`, crypto `BTC`, others free code — case kept), `name?`, `currency`
+  (3 letters), `priceMode` (`PriceMode.auto|manual`; non stock/crypto always manual),
+  `manualPrice?` + `manualPriceAt?`, `unit`, `walletId?` (RDN), `archived`,
+  `sortOrder`, `priceKey` (`stock:BBCA`), `displayName`.
+- `AssetTrade`: `type` (`TradeType.buy|sell|dividend|split|fee`, `.label`), `date`
+  (send real times: same-date trades order by it), `quantity` (**units/shares**, never
+  lots — `lotsToShares(lots)`, `sharesToLots`, `isWholeLots`, `sharesPerLot` = 100),
+  `price`, `fee`, `amount` (dividend/fee rows), `ratio` (split, ≠ 1), `note`,
+  `cashTransactionId?` (the linked wallet transaction), `gross`.
+- `Holding` (derived, average cost): `shares`, `cost`, `avgPrice?`, `realized`,
+  `dividends`, `fees`, `invested`, `proceeds`, `tradeCount`, `issues` (oversells,
+  clamped — show `issue.sequenceError` as a warning), `isOpen`.
+- `PriceQuote`: `price?`, `prevClose?`, `asOf`, `updatedAt` ("terakhir diperbarui …";
+  manual: "harga manual per …"), `stale` (auto: older than the cache rules or flagged
+  by the server — still used), `source` (`PriceSource.auto|manual`, null = no price),
+  `isManual`, `hasPrice`.
+- `Valuation`: `price?`, `marketValue?` (null without a price), `unrealized?`,
+  `unrealizedPct?`, `dayChange?`, `dayChangePct?`, `totalReturn`.
+- `HoldingView` (a holdings row): `asset`, `holding`, `quote`, `valuation`, `value`
+  (market value, else **cost basis** when no price is known — what totals use),
+  `marketValue?`, `unrealized?`, `unrealizedPct?`, `dayChange?`, `dayChangePct?`,
+  `totalReturn`, `lots`, `weight` (% of the portfolio), `unpriced`.
+- `PortfolioSummary`: `holdings` (non-archived assets in order, closed ones included —
+  filter with `open`), `marketValue`, `cost`, `unrealized`, `unrealizedPct?`,
+  `dayChange`, `dayChangePct?`, `realized`, `dividends`, `totalReturn`,
+  `unpricedCount`, `staleCount`/`stale`, `pricesAsOf`, `byAsset` / `byKind`
+  (`AllocationSlice(key, label, value, pct)` for the donut), `holding(assetId)`.
+- `AssetDetail`: `view` (`HoldingView`), `asset`, `holding`, `trades` (newest first,
+  `TradeView(trade, transaction?)`), `dividends`, `price` (`SecurityPrice?`: `price`,
+  `prevClose`, `change`, `changePct`, `name`, `asOf`, `fetchedAt`, `cachedAt`,
+  `serverStale`).
+- `PortfolioPoint(date, value, cost, pnl)`, `NetWorth(wallets, investments, total)`.
+- Helpers: `FeePreset(buy: 0.0015, sell: 0.0025)` / `FeePreset.standard.feeFor(type,
+  gross)` (keep user overrides as a local preference), `tradeCashEffect(trade)`,
+  `tradeTransactionNote`, `sharesHeldAt(trades, date)` ("maks jual"),
+  `isIdxSessionOpen(now)`, `requireAssetSymbol(kind, raw)`.
+
+### Investment reads
+
+| Provider | Value |
+|---|---|
+| `watchPortfolioProvider` | `PortfolioSummary` (cached prices; **watching it keeps prices fresh**: refresh on open, then every 15 min during IDX hours Mon–Fri 09:00–16:15 WIB — crypto-only portfolios around the clock; failures/offline are silent, cached prices stay) |
+| `watchAssetsProvider` / `watchAllAssetsProvider` | `List<Asset>` without / with archived |
+| `watchAssetDetailProvider(id)` | `AssetDetail?` (also keeps prices fresh) |
+| `watchPortfolioHistoryProvider((from: 'YYYY-MM-DD', to: …))` | `List<PortfolioPoint>` — device-side daily snapshots (stored on every price refresh; days the app wasn't opened have no point) with today live |
+| `watchNetWorthProvider` | `NetWorth` (wallets + portfolio value; archived assets excluded) |
+| `priceAutoRefreshProvider` | `PriceAutoRefresher` — watch it from a screen that shows values without the portfolio provider |
+
+### Investment writes
+
+| Provider → call | Notes |
+|---|---|
+| `lookupSymbolProvider(kind, symbol)` → `SymbolInfo?` | online "cek kode" for stock/crypto: `name` to auto-fill, `price`; null = unknown ticker; `NetworkFailure` offline → let the user add it anyway |
+| `createAssetProvider(AssetInput(kind:, symbol:, name:, currency:, priceMode:, manualPrice:, manualPriceAt:, unit:, walletId:))` → `Asset` | duplicate kind+symbol (case-insensitive, archived too) → `ValidationFailure(field: 'symbol')`; `field:` symbol, name, unit, currency, manualPrice |
+| `updateAssetProvider(id, AssetInput)`, `updateManualPriceProvider(id, price, at:)`, `setAssetArchivedProvider(id, bool)`, `reorderAssetsProvider([ids])` | manual price null in an update keeps the current one |
+| `deleteAssetProvider(id)` | deletes the asset, its trades **and their wallet transactions** (balances move back) — say so and offer archive instead |
+| `createTradeProvider(TradeInput(assetId:, type:, date:, quantity:, price:, fee:, amount:, ratio:, note:, cashEffect:, walletId:))` → `TradeView` | cash effect (default ON when the input or the asset has a wallet): buy → `investment −(q·p + fee)`, sell → `+(q·p − fee)`, fee row → `−amount`, dividend → `income +amount` in "Dividen" (created as `category-dividen-<userId>` if missing), split → none; created through the transaction use cases, all-or-nothing. Sells beyond the holding (date order) → `ValidationFailure(field: 'quantity', 'Jumlah jual (X) melebihi kepemilikan (Y) per YYYY-MM-DD')`; `cashEffect: true` without a wallet → `field: 'walletId'`; also `price`, `fee`, `amount`, `ratio`, `note`. |
+| `updateTradeProvider(id, TradeInput)` → `TradeView` | the linked transaction is updated / created / deleted to match (`cashEffect` null keeps the current state); the asset can't change |
+| `deleteTradeProvider(id)` | also deletes its linked transaction (never refused) |
+| `refreshPricesProvider()` → `PriceRefreshResult(updated, notFound, at)` | pull-to-refresh; `NetworkFailure` offline |
+
+Deleting a linked transaction from the transactions screen keeps the trade (its
+`cashTransactionId` becomes null, holding unchanged). A trade the server refuses (e.g.
+an oversell after another device's edit) is reverted on the next sync with its cash
+transaction, and the server's Indonesian message shows in `syncStatusProvider.lastError`.
+Amounts are moved into the wallet as-is (no FX): prefer a wallet with the asset's
+currency.
+
+Tests that override repositories with fakes must also override the habits/investments
+ones: `...habitsInvestmentsFakeOverrides()` (`test/di/habits_investments_test_overrides.dart`)
+— the dashboard/report net worth, the reminders and the game's activity stream read them.

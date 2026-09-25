@@ -199,6 +199,127 @@ void main() {
     await tearDownApp(tester, c);
   });
 
+  testWidgets('unreadable gallery photo says so (not "check permission")', (
+    tester,
+  ) async {
+    final picker = FakePhotoPicker()
+      ..willThrow(
+        const PhotoPickerException(
+          PhotoSource.gallery,
+          denied: false,
+          code: 'no_valid_image_uri',
+          detail: 'Cannot find the selected image.',
+        ),
+      )
+      ..willThrow(
+        const PhotoPickerException(
+          PhotoSource.gallery,
+          denied: false,
+          code: 'already_active',
+        ),
+      )
+      ..willThrow(
+        const PhotoPickerException(
+          PhotoSource.gallery,
+          denied: false,
+          code: 'weird_error',
+        ),
+      )
+      ..willReturn(1);
+    final c = makeContainer(
+      overrides: [photoPickerProvider.overrideWithValue(picker)],
+    );
+    final w = await seedWallet(tester, c);
+    await pumpApp(tester, c, '/transactions/new');
+    await openSheet(tester);
+    await pickFrom(tester, PhotoSource.gallery);
+    expect(
+      find.textContaining('nggak bisa dibaca dari galeri'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('izin'), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    // A second tap while the picker is open: silent.
+    await pickFrom(tester, PhotoSource.gallery);
+    expect(find.textContaining('Nggak bisa'), findsNothing);
+    // Unknown failure: the platform code is in the toast for bug reports.
+    await pickFrom(tester, PhotoSource.gallery);
+    expect(find.textContaining('(weird_error)'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    // Retrying works and the transaction saves with the photo.
+    await pickFrom(tester, PhotoSource.gallery);
+    expect(find.text('1/5'), findsOneWidget);
+    await closeSheet(tester);
+    await tapKeys(tester, ['7', '000']);
+    await saveAndWait(tester, 'SIMPAN');
+    final tx = (await allTx(tester, c)).single;
+    expect(tx.walletId, w.cash);
+    expect(tx.photos, const [TransactionPhoto.local('/tmp/pick_0.jpg')]);
+    await tearDownApp(tester, c);
+  });
+
+  testWidgets('note field is visible; Enter saves amount + note + photo', (
+    tester,
+  ) async {
+    final picker = FakePhotoPicker()..willReturn(1);
+    final c = makeContainer(
+      overrides: [photoPickerProvider.overrideWithValue(picker)],
+    );
+    await seedWallet(tester, c);
+    await pumpApp(tester, c, '/transactions/new');
+    final note = find.byKey(const ValueKey('tx-note'));
+    expect(note, findsOneWidget);
+    expect(find.textContaining('Catatan (opsional)'), findsOneWidget);
+
+    await openSheet(tester);
+    await pickFrom(tester, PhotoSource.gallery);
+    await closeSheet(tester);
+    await tapKeys(tester, ['2', '5', '000']);
+
+    await tester.tap(note);
+    await tester.pump();
+    // While typing, a slim save bar replaces the keypad.
+    expect(find.byKey(const ValueKey('tx-note-save')), findsOneWidget);
+    expect(find.byType(AmountKeypad), findsNothing);
+    await tester.enterText(
+      find.descendant(of: note, matching: find.byType(EditableText)),
+      '  Kopi susu gula aren  ',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    for (var i = 0; i < 8; i++) {
+      await settle(tester, 2);
+    }
+    final tx = (await allTx(tester, c)).single;
+    expect(tx.amount, 25000);
+    expect(tx.note, 'Kopi susu gula aren');
+    expect(tx.photos, hasLength(1));
+    await tearDownApp(tester, c);
+  });
+
+  testWidgets('save bar without an amount brings the keypad back', (
+    tester,
+  ) async {
+    final c = makeContainer();
+    await seedWallet(tester, c);
+    await pumpApp(tester, c, '/transactions/new');
+    final note = find.byKey(const ValueKey('tx-note'));
+    await tester.tap(note);
+    await tester.pump();
+    expect(find.byType(AmountKeypad), findsNothing);
+    await tester.enterText(
+      find.descendant(of: note, matching: find.byType(EditableText)),
+      'Parkir',
+    );
+    await tester.tap(find.byKey(const ValueKey('tx-note-save')));
+    await settle(tester, 2);
+    // Refused (no amount): the keypad is back so the amount can be typed.
+    expect(await allTx(tester, c), isEmpty);
+    expect(find.byType(AmountKeypad), findsOneWidget);
+    await tapKeys(tester, ['2', '000']);
+    expect(find.byKey(const ValueKey('tx-note-save')), findsNothing);
+    await tearDownApp(tester, c);
+  });
+
   testWidgets('adjustments can carry photos too (edit applies on save)', (
     tester,
   ) async {
@@ -246,6 +367,9 @@ void main() {
     await openSheet(tester);
     await pickFrom(tester, PhotoSource.gallery);
     await closeSheet(tester);
+    // The note field sits above the wallets: scroll them into view first.
+    await tester.ensureVisible(find.byKey(const ValueKey('tx-to-wallet')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('tx-to-wallet')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 800));

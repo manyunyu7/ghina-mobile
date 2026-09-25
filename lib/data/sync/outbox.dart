@@ -278,7 +278,9 @@ class Outbox {
               SyncEntity.taskAreas => 2,
               SyncEntity.noteLabels ||
               SyncEntity.budgets ||
-              SyncEntity.prayers => 4,
+              SyncEntity.prayers ||
+              SyncEntity.habitLogs ||
+              SyncEntity.assets => 4,
               SyncEntity.contentPillars => 8,
               // Everything else last: the server's delete cascades (nulling
               // links, a pillar, a sponsor's transaction) bump the affected
@@ -296,6 +298,8 @@ class Outbox {
             // Notes link tasks/transactions/labels; items link notes; posts
             // need their item and account (hard reference).
             SyncEntity.notes => 5,
+            // Logs need their habit; trades their asset and cash transaction.
+            SyncEntity.habitLogs || SyncEntity.assetTrades => 5,
             SyncEntity.contentItems => 6,
             SyncEntity.contentPosts => 7,
             // After the items: a rename renames the pillar on the server's

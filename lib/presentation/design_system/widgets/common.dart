@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../format/money_format.dart';
+import '../format/money_visibility.dart';
 import '../icons/ghina_icons.dart';
 import '../mascot/mascot_view.dart';
 import '../theme/ghina_tokens.dart';
@@ -254,6 +255,24 @@ class MoneyText extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final base = style ?? GhinaType.moneyM;
+    if (MoneyVisibility.hiddenOf(context)) {
+      // Balance privacy: keep the tone color and the expense/income sign
+      // (not secret), mask the digits.
+      final sign = switch (tone) {
+        MoneyTone.expense => '-',
+        MoneyTone.income => '+',
+        _ => '',
+      };
+      return Text(
+        '$sign${GhinaMoney.masked(currency, compact: compact)}',
+        textAlign: textAlign,
+        maxLines: 1,
+        overflow: TextOverflow.fade,
+        softWrap: false,
+        semanticsLabel: 'Nominal disembunyikan',
+        style: base.copyWith(color: _color(g, amount ?? 0)),
+      );
+    }
     if (amount == null) {
       return Text(
         text!,

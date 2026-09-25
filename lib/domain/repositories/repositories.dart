@@ -225,6 +225,81 @@ abstract interface class ContentPillarRepository {
   Future<void> delete(String id);
 }
 
+// ---------------------------------------------------------------- habits & investments
+
+abstract interface class HabitRepository {
+  /// Every habit incl. archived, sorted by `sortOrder`, then `createdAt`.
+  Stream<List<Habit>> watchAll();
+  Future<List<Habit>> getAll();
+  Stream<Habit?> watchById(String id);
+  Future<Habit?> getById(String id);
+  Future<void> save(Habit habit);
+
+  /// Deletes the habit and (cascade, like the server) its logs.
+  Future<void> delete(String id);
+}
+
+abstract interface class HabitLogRepository {
+  /// Rows (known types only), optionally of one habit and within
+  /// [from]…[to] (`YYYY-MM-DD`, inclusive), sorted by date.
+  Stream<List<HabitLog>> watch({String? habitId, String? from, String? to});
+  Future<List<HabitLog>> getAll({String? habitId, String? from, String? to});
+  Future<HabitLog?> getById(String id);
+
+  /// The row of the unique key (habitId, date, type).
+  Future<HabitLog?> findByKey(String habitId, String date, HabitLogType type);
+  Future<void> save(HabitLog log);
+  Future<void> delete(String id);
+}
+
+abstract interface class AssetRepository {
+  /// Every asset incl. archived, sorted by `sortOrder`, then symbol.
+  Stream<List<Asset>> watchAll();
+  Future<List<Asset>> getAll();
+  Stream<Asset?> watchById(String id);
+  Future<Asset?> getById(String id);
+  Future<Asset?> findBySymbol(AssetKind kind, String symbol);
+  Future<void> save(Asset asset);
+
+  /// Deletes the asset and (cascade, like the server) its trades. Linked
+  /// cash transactions are not touched (use cases delete them first).
+  Future<void> delete(String id);
+}
+
+abstract interface class AssetTradeRepository {
+  /// Trades (known types only), optionally of one asset, in processing
+  /// order (date, createdAt).
+  Stream<List<AssetTrade>> watch({String? assetId});
+  Future<List<AssetTrade>> getAll({String? assetId});
+  Stream<AssetTrade?> watchById(String id);
+  Future<AssetTrade?> getById(String id);
+  Future<void> save(AssetTrade trade);
+  Future<void> delete(String id);
+}
+
+/// Market prices: `GET /api/mobile/prices`, cached on the device.
+abstract interface class PriceRepository {
+  /// Cached prices by key (`stock:BBCA`); emits on every refresh.
+  Stream<Map<String, SecurityPrice>> watchCached();
+  Future<Map<String, SecurityPrice>> getCached();
+
+  /// Fetches [keys] from the server and caches them. Throws a `Failure`
+  /// (e.g. `NetworkFailure` offline); the cache is kept on failure.
+  Future<PriceRefreshResult> refresh(List<String> keys);
+
+  /// Validates a symbol on add (name auto-fill): the server's price for it,
+  /// or null when the server doesn't know it. Throws `NetworkFailure`
+  /// offline.
+  Future<SymbolInfo?> lookup(AssetKind kind, String symbol);
+}
+
+/// Device-only daily portfolio value history.
+abstract interface class PortfolioSnapshotRepository {
+  /// Points with `date` in [from]…[to] (`YYYY-MM-DD`), oldest first.
+  Stream<List<PortfolioPoint>> watchRange(String from, String to);
+  Future<void> put(PortfolioPoint point, DateTime at);
+}
+
 /// Whether the server already owns seeding the notes/content defaults (a pull
 /// from a notes/content-aware server succeeded). Before that, the app may seed
 /// them locally as an offline fallback (same deterministic ids).

@@ -516,3 +516,174 @@ class FakeContentPillarRepository implements ContentPillarRepository {
   @override
   Future<void> delete(String id) async => s.remove(id);
 }
+
+// ---------------------------------------------------------------- habits & investments
+
+class FakeHabitRepository implements HabitRepository {
+  final s = _Store<Habit>((h) => h.id);
+
+  List<Habit> _all() => s.items.values.toList()
+    ..sort((a, b) {
+      final c = a.sortOrder.compareTo(b.sortOrder);
+      return c != 0 ? c : a.createdAt.compareTo(b.createdAt);
+    });
+
+  @override
+  Stream<List<Habit>> watchAll() => s.watch(_all);
+  @override
+  Future<List<Habit>> getAll() async => _all();
+  @override
+  Stream<Habit?> watchById(String id) => s.watch(() => s.items[id]);
+  @override
+  Future<Habit?> getById(String id) async => s.items[id];
+  @override
+  Future<void> save(Habit habit) async => s.put(habit);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+class FakeHabitLogRepository implements HabitLogRepository {
+  final s = _Store<HabitLog>((l) => l.id);
+
+  List<HabitLog> _q(String? habitId, String? from, String? to) =>
+      s.items.values
+          .where(
+            (l) =>
+                (habitId == null || l.habitId == habitId) &&
+                (from == null || l.date.compareTo(from) >= 0) &&
+                (to == null || l.date.compareTo(to) <= 0),
+          )
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
+  @override
+  Stream<List<HabitLog>> watch({String? habitId, String? from, String? to}) =>
+      s.watch(() => _q(habitId, from, to));
+  @override
+  Future<List<HabitLog>> getAll({
+    String? habitId,
+    String? from,
+    String? to,
+  }) async => _q(habitId, from, to);
+  @override
+  Future<HabitLog?> getById(String id) async => s.items[id];
+  @override
+  Future<HabitLog?> findByKey(
+    String habitId,
+    String date,
+    HabitLogType type,
+  ) async => s.items.values
+      .where((l) => l.habitId == habitId && l.date == date && l.type == type)
+      .firstOrNull;
+  @override
+  Future<void> save(HabitLog log) async => s.put(log);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+class FakeAssetRepository implements AssetRepository {
+  final s = _Store<Asset>((a) => a.id);
+
+  List<Asset> _all() =>
+      s.items.values.toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  @override
+  Stream<List<Asset>> watchAll() => s.watch(_all);
+  @override
+  Future<List<Asset>> getAll() async => _all();
+  @override
+  Stream<Asset?> watchById(String id) => s.watch(() => s.items[id]);
+  @override
+  Future<Asset?> getById(String id) async => s.items[id];
+  @override
+  Future<Asset?> findBySymbol(AssetKind kind, String symbol) async => s
+      .items
+      .values
+      .where(
+        (a) => a.kind == kind && a.symbol.toUpperCase() == symbol.toUpperCase(),
+      )
+      .firstOrNull;
+  @override
+  Future<void> save(Asset asset) async => s.put(asset);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+class FakeAssetTradeRepository implements AssetTradeRepository {
+  final s = _Store<AssetTrade>((t) => t.id);
+
+  List<AssetTrade> _q(String? assetId) =>
+      s.items.values
+          .where((t) => assetId == null || t.assetId == assetId)
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
+  @override
+  Stream<List<AssetTrade>> watch({String? assetId}) =>
+      s.watch(() => _q(assetId));
+  @override
+  Future<List<AssetTrade>> getAll({String? assetId}) async => _q(assetId);
+  @override
+  Stream<AssetTrade?> watchById(String id) => s.watch(() => s.items[id]);
+  @override
+  Future<AssetTrade?> getById(String id) async => s.items[id];
+  @override
+  Future<void> save(AssetTrade trade) async => s.put(trade);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+/// Serves [prices] (by key) on refresh; [online] false → offline.
+class FakePriceRepository implements PriceRepository {
+  final s = _Store<SecurityPrice>((p) => p.key);
+  final server = <String, SecurityPrice>{};
+  bool online = true;
+  int refreshCount = 0;
+
+  Map<String, SecurityPrice> _map() => Map.of(s.items);
+
+  @override
+  Stream<Map<String, SecurityPrice>> watchCached() => s.watch(_map);
+  @override
+  Future<Map<String, SecurityPrice>> getCached() async => _map();
+  @override
+  Future<PriceRefreshResult> refresh(List<String> keys) async {
+    refreshCount++;
+    if (!online) throw StateError('offline');
+    final updated = <String>[];
+    for (final k in keys) {
+      final p = server[k];
+      if (p != null) {
+        s.put(p);
+        updated.add(k);
+      }
+    }
+    return PriceRefreshResult(updated: updated);
+  }
+
+  @override
+  Future<SymbolInfo?> lookup(AssetKind kind, String symbol) async {
+    final p = server[priceKeyOf(kind, symbol)];
+    return p == null
+        ? null
+        : SymbolInfo(kind: kind, symbol: symbol, name: p.name, price: p);
+  }
+}
+
+class FakePortfolioSnapshotRepository implements PortfolioSnapshotRepository {
+  final s = _Store<PortfolioPoint>((p) => p.date);
+
+  @override
+  Stream<List<PortfolioPoint>> watchRange(String from, String to) => s.watch(
+    () =>
+        s.items.values
+            .where(
+              (p) => p.date.compareTo(from) >= 0 && p.date.compareTo(to) <= 0,
+            )
+            .toList()
+          ..sort((a, b) => a.date.compareTo(b.date)),
+  );
+  @override
+  Future<void> put(PortfolioPoint point, DateTime at) async => s.put(point);
+}

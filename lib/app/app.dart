@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/design_system/design_system.dart';
 import '../presentation/features/shell/notification_navigation.dart';
+import '../presentation/state/balance_privacy_provider.dart';
 import '../presentation/state/session_controller.dart';
 import 'router.dart';
 
@@ -27,14 +28,17 @@ class GhinaApp extends ConsumerWidget {
       routerConfig: router,
       // Reminder taps open `/tasks/<id>` (cold start included: waits until
       // signed in and past splash/onboarding).
-      builder: (context, child) => NotificationRouteGate(
-        router: router,
-        canOpen: () =>
-            ref.read(sessionControllerProvider) is SignedIn &&
-            !_notReadyPaths.contains(
-              router.routerDelegate.currentConfiguration.uri.path,
-            ),
-        child: child ?? const SizedBox.shrink(),
+      // Balance privacy wraps the navigator so dialogs/sheets are masked too.
+      builder: (context, child) => BalancePrivacyScope(
+        child: NotificationRouteGate(
+          router: router,
+          canOpen: () =>
+              ref.read(sessionControllerProvider) is SignedIn &&
+              !_notReadyPaths.contains(
+                router.routerDelegate.currentConfiguration.uri.path,
+              ),
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

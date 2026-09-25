@@ -93,7 +93,7 @@ Future<String?> showWalletPickerSheet(
           selected: w.id == selectedId,
           leading: WalletAvatar(wallet: w, size: 40),
           title: w.name,
-          subtitle: GhinaMoney.format(
+          subtitle: context.money(
             w.balance,
             currency: w.currency.isEmpty ? currency : w.currency,
           ),

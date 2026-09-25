@@ -9,6 +9,7 @@ export 'feedback/celebration.dart';
 export 'feedback/dialogs.dart';
 export 'feedback/toast_badge.dart';
 export 'format/money_format.dart';
+export 'format/money_visibility.dart';
 export 'icons/ghina_icons.dart';
 export 'mascot/mascot_painter.dart';
 export 'mascot/mascot_view.dart';

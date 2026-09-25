@@ -3,6 +3,8 @@ import 'package:ghina/core/clock.dart';
 import 'package:ghina/data/datasources/local/app_database.dart';
 import 'package:ghina/data/repositories/content_repositories.dart';
 import 'package:ghina/data/repositories/finance_repositories.dart';
+import 'package:ghina/data/repositories/habit_repositories.dart';
+import 'package:ghina/data/repositories/investment_repositories.dart';
 import 'package:ghina/data/repositories/life_repositories.dart';
 import 'package:ghina/data/repositories/local_store.dart';
 import 'package:ghina/data/repositories/notes_repositories.dart';
@@ -13,6 +15,7 @@ import 'package:ghina/data/sync/sync_engine.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/usecases/usecases.dart';
 
+import 'fake_prices_api.dart';
 import 'fake_server.dart';
 
 /// Real drift (in memory) + real repositories/use cases + [FakeServer].
@@ -151,6 +154,42 @@ class Harness {
     clock,
   );
   late final removePhoto = RemoveTransactionPhoto(transactions, clock);
+
+  // --- habits & investments (docs/habits.md, docs/investments.md)
+  late final habits = DriftHabitRepository(store);
+  late final habitLogs = DriftHabitLogRepository(store);
+  late final assets = DriftAssetRepository(store);
+  late final trades = DriftAssetTradeRepository(store);
+  late final pricesApi = FakePricesApi(() => clock.now());
+  late final prices = DriftPriceRepository(db, pricesApi, clock);
+  late final snapshots = DriftPortfolioSnapshotRepository(db);
+
+  late final createHabit = CreateHabit(habits, clock);
+  late final deleteHabit = DeleteHabit(habits);
+  late final checkIn = CheckInHabit(habits, habitLogs, clock);
+  late final skipDay = SkipHabitDay(habits, habitLogs, clock);
+  late final logUrge = LogUrge(habits, habitLogs, clock);
+  late final logRelapse = LogRelapse(habits, habitLogs, clock);
+  late final createAsset = CreateAsset(assets, wallets, clock);
+  late final deleteAsset = DeleteAsset(
+    assets,
+    trades,
+    deleteTx,
+    transactions,
+    uow,
+  );
+  late final tradeUc = tradeUseCases(
+    assets: assets,
+    trades: trades,
+    transactions: transactions,
+    createTx: createTx,
+    updateTx: updateTx,
+    deleteTx: deleteTx,
+    dividendCategory: EnsureDividendCategory(categories, clock, userId: 'u1'),
+    uow: uow,
+    clock: clock,
+  );
+  late final portfolio = WatchPortfolio(assets, trades, prices, ticks, clock);
 
   /// Emits the client clock once (tests drive time by re-subscribing).
   Stream<DateTime> ticks() => Stream.value(clock.now());

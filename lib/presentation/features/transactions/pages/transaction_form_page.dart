@@ -20,7 +20,8 @@ import '../widgets/tx_visuals.dart';
 /// Fast add/edit transaction screen (also opened by the center "+").
 ///
 /// Big amount + keypad first; type segmented; category grid (recently used first);
-/// wallet / date / note chips. After saving a new transaction the user gets an XP
+/// wallet / date / photo chips and an always-visible, optional note field (Enter
+/// saves). After saving a new transaction the user gets an XP
 /// toast or a full celebration.
 class TransactionFormPage extends ConsumerStatefulWidget {
   const TransactionFormPage({super.key, this.id});
@@ -42,7 +43,10 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
   String? _toWalletId;
   String? _categoryId;
   late DateTime _date;
-  String _note = '';
+
+  /// Optional note ("Catatan"), always visible under the chips.
+  final _noteCtrl = TextEditingController();
+  final _noteFocus = FocusNode();
 
   /// Attached photos (receipts, proofs). On edit, [_initialPhotos] is what the
   /// transaction had; untouched lists follow the live data (sync may swap a
@@ -65,6 +69,9 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
   void initState() {
     super.initState();
     _amount = AmountController(currency: ref.read(currencyProvider));
+    _noteFocus.addListener(() {
+      if (mounted) setState(() {}); // swap the keypad for a slim save bar
+    });
     _date = ref.read(clockProvider).now();
     if (!_isEdit) {
       _loaded = true;
@@ -83,6 +90,8 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
   @override
   void dispose() {
     _amount.dispose();
+    _noteCtrl.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -93,7 +102,7 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
     _toWalletId = t.toWalletId;
     _categoryId = t.categoryId;
     _date = t.date;
-    _note = t.note ?? '';
+    _noteCtrl.text = t.note ?? '';
     _initialPhotos = t.photos;
     _photos = viewerPhotos(t.photos);
     _adjSign = t.amount < 0 ? -1 : 1;
@@ -211,37 +220,6 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
     );
   }
 
-  Future<void> _editNote() async {
-    final ctrl = TextEditingController(text: _note);
-    final r = await showChunkyBottomSheet<String>(
-      context,
-      title: 'Catatan',
-      builder: (c) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ChunkyTextField(
-            controller: ctrl,
-            hint: 'Contoh: makan siang bareng tim',
-            autofocus: true,
-            maxLines: 3,
-            minLines: 1,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (v) => Navigator.of(c).pop(v),
-          ),
-          const SizedBox(height: GhinaSpace.lg),
-          ChunkyButton(
-            label: 'Simpan catatan',
-            onPressed: () => Navigator.of(c).pop(ctrl.text),
-          ),
-          SizedBox(height: MediaQuery.viewInsetsOf(c).bottom),
-        ],
-      ),
-    );
-    ctrl.dispose();
-    if (r != null && mounted) setState(() => _note = r.trim());
-  }
-
   void _setPhotos(List<ViewerPhoto> photos) => setState(() {
     _photos = photos;
     _photosTouched = true;
@@ -329,7 +307,7 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
       categoryId: _type == TxType.transfer || _isAdjustment
           ? null
           : _categoryId,
-      note: _note,
+      note: _noteCtrl.text,
       date: _date,
       photos: _photosForSave(),
     );
@@ -382,6 +360,9 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
     }
   }
 
+  /// An `investment` row was opened: on its way to the linked trade.
+  bool _redirecting = false;
+
   // ------------------------------------------------------------------ build
 
   @override
@@ -392,6 +373,15 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
     if (_isEdit && !_loaded) {
       final tx = ref.watch(watchTransactionProvider(widget.id!));
       switch (tx) {
+        case AsyncData(:final value?) when value.type == TxType.investment:
+          // A trade's cash effect: managed from the portfolio, not here.
+          if (!_redirecting) {
+            _redirecting = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.pushReplacement(txRoute(value));
+            });
+          }
+          return _scaffold(const _FormSkeleton());
         case AsyncData(:final value?):
           _loadFrom(value);
         case AsyncData():
@@ -585,18 +575,26 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
                           muted: _photos.isEmpty,
                           onTap: _openPhotos,
                         ),
-                        _InfoChip(
-                          key: const ValueKey('tx-note-chip'),
-                          leading: const Icon(
-                            Icons.edit_note_rounded,
-                            size: 22,
-                          ),
-                          label: _note.isEmpty ? 'Tambah catatan' : _note,
-                          muted: _note.isEmpty,
-                          onTap: _editNote,
-                        ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: GhinaSpace.sm),
+                  ChunkyTextField(
+                    key: const ValueKey('tx-note'),
+                    controller: _noteCtrl,
+                    focusNode: _noteFocus,
+                    hint: 'Catatan (opsional), misal: makan siang tim',
+                    prefixIcon: Icons.edit_note_rounded,
+                    maxLines: 3,
+                    minLines: 1,
+                    textInputAction: TextInputAction.done,
+                    // Leaving the note brings the amount keypad back (it is
+                    // swapped for a slim save bar while the note has focus).
+                    onTapOutside: (_) => _noteFocus.unfocus(),
+                    onSubmitted: (_) {
+                      _noteFocus.unfocus();
+                      if (!_saving) _save(walletId);
+                    },
                   ),
                   if (_photos.isNotEmpty) ...[
                     const SizedBox(height: GhinaSpace.md),
@@ -681,22 +679,42 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(15, 8, 15, 10),
-                child: MediaQuery.withClampedTextScaling(
-                  maxScaleFactor: 1,
-                  child: AmountKeypad(
-                    controller: _amount,
-                    keyHeight: keyHeight,
-                    submitLabel: _saving
-                        ? 'Menyimpan…'
-                        : (_isEdit ? 'Simpan perubahan' : 'Simpan'),
-                    submitColor: sw,
-                    quickAmounts:
-                        height >= 860 && _amount.currency == 'IDR' && !_isEdit
-                        ? const [10000, 20000, 50000, 100000]
-                        : const [],
-                    onSubmit: _saving ? null : () => _save(walletId),
-                  ),
-                ),
+                child: _noteFocus.hasFocus
+                    // Typing the note: the system keyboard is up, so a slim save
+                    // bar replaces the keypad (Enter saves too).
+                    ? ChunkyButton(
+                        key: const ValueKey('tx-note-save'),
+                        label: _saving
+                            ? 'Menyimpan…'
+                            : (_isEdit ? 'Simpan perubahan' : 'Simpan'),
+                        color: sw,
+                        onPressed: _saving
+                            ? null
+                            : () {
+                                // Back to the keypad, so a refused save (e.g.
+                                // no amount yet) can be fixed right away.
+                                _noteFocus.unfocus();
+                                _save(walletId);
+                              },
+                      )
+                    : MediaQuery.withClampedTextScaling(
+                        maxScaleFactor: 1,
+                        child: AmountKeypad(
+                          controller: _amount,
+                          keyHeight: keyHeight,
+                          submitLabel: _saving
+                              ? 'Menyimpan…'
+                              : (_isEdit ? 'Simpan perubahan' : 'Simpan'),
+                          submitColor: sw,
+                          quickAmounts:
+                              height >= 860 &&
+                                  _amount.currency == 'IDR' &&
+                                  !_isEdit
+                              ? const [10000, 20000, 50000, 100000]
+                              : const [],
+                          onSubmit: _saving ? null : () => _save(walletId),
+                        ),
+                      ),
               ),
             ),
           ),

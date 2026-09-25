@@ -81,14 +81,15 @@ class BalanceChart extends StatelessWidget {
               reservedSize: 58,
               interval: interval,
               getTitlesWidget: (v, meta) {
-                if (v == meta.min || v == meta.max) {
+                // Balance privacy: no axis amounts while hidden.
+                if (v == meta.min || v == meta.max || context.moneyHidden) {
                   return const SizedBox.shrink();
                 }
                 return SideTitleWidget(
                   meta: meta,
                   space: 6,
                   child: Text(
-                    GhinaMoney.format(v, currency: currency, compact: true),
+                    context.money(v, currency: currency, compact: true),
                     style: labelStyle,
                   ),
                 );
@@ -133,7 +134,7 @@ class BalanceChart extends StatelessWidget {
                   GhinaType.caption.copyWith(color: Colors.white70),
                   children: [
                     TextSpan(
-                      text: GhinaMoney.format(s.y, currency: currency),
+                      text: context.money(s.y, currency: currency),
                       style: GhinaType.moneyS.copyWith(color: Colors.white),
                     ),
                   ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/formatters.dart';
 import '../../../../core/result.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
@@ -116,6 +117,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
       appBar: AppBar(
         title: const Text('Dompet'),
         actions: [
+          const MoneyVisibilityToggle(key: ValueKey('wallet-privacy')),
           IconButton(
             key: const ValueKey('wallet-add'),
             tooltip: 'Tambah dompet',
@@ -165,6 +167,13 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
     }
     final total = active.fold<double>(0, (s, w) => s + w.balance);
     final pending = active.where((w) => w.hasPendingChanges).length;
+    // Portfolio value per investment wallet (RDN): "+ portofolio Rp X".
+    final portfolio = ref.watch(watchPortfolioProvider).value;
+    final byWallet = <String, double>{};
+    for (final h in portfolio?.open ?? const <HoldingView>[]) {
+      final id = h.asset.walletId;
+      if (id != null) byWallet[id] = (byWallet[id] ?? 0) + h.value;
+    }
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
@@ -181,6 +190,8 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
           pending: pending,
           onTransfer: active.length >= 2 ? () => _transfer() : null,
         ),
+        const SizedBox(height: GhinaSpace.md),
+        PortfolioEntryTile(summary: portfolio, currency: currency),
         const SizedBox(height: GhinaSpace.xl),
         if (active.isEmpty)
           const EmptyState(
@@ -197,6 +208,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
               slideY: 10,
               child: WalletCard(
                 wallet: active[i],
+                portfolioValue: byWallet[active[i].id],
                 onHistory: () =>
                     context.push('/wallets/${active[i].id}/history'),
                 onTap: () => context.push('/wallets/${active[i].id}'),
@@ -258,77 +270,83 @@ class _TotalHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const sw = GhinaColors.green;
-    return ChunkyCard(
-      color: sw,
-      depth: GhinaDepth.lg,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'TOTAL SALDO',
-                  style: GhinaType.overline.copyWith(
-                    color: Colors.white.withValues(alpha: 0.85),
+    // Long-press the total to peek while balances are hidden.
+    return MoneyPeek(
+      child: ChunkyCard(
+        color: sw,
+        depth: GhinaDepth.lg,
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'TOTAL SALDO',
+                    style: GhinaType.overline.copyWith(
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
                   ),
                 ),
-              ),
-              const Icon(
-                Icons.account_balance_wallet_rounded,
+                const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: MoneyText(
+                key: const ValueKey('wallet-total'),
+                amount: total,
+                currency: currency,
+                tone: MoneyTone.neutral,
                 color: Colors.white,
-                size: 26,
+                countUp: true,
+                style: GhinaType.moneyXL,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              pending > 0
+                  ? '$count dompet aktif · $pending belum tersinkron'
+                  : '$count dompet aktif',
+              style: GhinaType.bodyS
+                  .w(800)
+                  .copyWith(color: Colors.white.withValues(alpha: 0.9)),
+            ),
+            if (onTransfer != null) ...[
+              const SizedBox(height: GhinaSpace.md),
+              ChunkySurface(
+                color: Colors.white,
+                edgeColor: sw.edge,
+                depth: GhinaDepth.sm,
+                borderRadius: GhinaRadii.rMd,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+                onTap: onTransfer,
+                semanticLabel: 'Transfer antar dompet',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.swap_horiz_rounded, color: sw.edge, size: 20),
+                    const SizedBox(width: 6),
+                    Text(
+                      'TRANSFER',
+                      style: GhinaType.button.copyWith(color: sw.edge),
+                    ),
+                  ],
+                ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: MoneyText(
-              key: const ValueKey('wallet-total'),
-              amount: total,
-              currency: currency,
-              tone: MoneyTone.neutral,
-              color: Colors.white,
-              countUp: true,
-              style: GhinaType.moneyXL,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            pending > 0
-                ? '$count dompet aktif · $pending belum tersinkron'
-                : '$count dompet aktif',
-            style: GhinaType.bodyS
-                .w(800)
-                .copyWith(color: Colors.white.withValues(alpha: 0.9)),
-          ),
-          if (onTransfer != null) ...[
-            const SizedBox(height: GhinaSpace.md),
-            ChunkySurface(
-              color: Colors.white,
-              edgeColor: sw.edge,
-              depth: GhinaDepth.sm,
-              borderRadius: GhinaRadii.rMd,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              onTap: onTransfer,
-              semanticLabel: 'Transfer antar dompet',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.swap_horiz_rounded, color: sw.edge, size: 20),
-                  const SizedBox(width: 6),
-                  Text(
-                    'TRANSFER',
-                    style: GhinaType.button.copyWith(color: sw.edge),
-                  ),
-                ],
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -342,9 +360,14 @@ class WalletCard extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.onHistory,
+    this.portfolioValue,
   });
 
   final Wallet wallet;
+
+  /// Value of the portfolio assets held in this wallet (RDN), shown as
+  /// "+ portofolio Rp X" next to the cash balance.
+  final double? portfolioValue;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
@@ -447,6 +470,33 @@ class WalletCard extends StatelessWidget {
               ],
             ],
           ),
+          if (portfolioValue case final v? when v > 0) ...[
+            const SizedBox(height: 6),
+            Row(
+              key: ValueKey('wallet-portfolio-${w.id}'),
+              children: [
+                Icon(Icons.trending_up_rounded, color: on, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  '+ portofolio ',
+                  style: GhinaType.bodyS.w(800).copyWith(color: soft),
+                ),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: MoneyText(
+                      amount: v,
+                      currency: w.currency,
+                      tone: MoneyTone.neutral,
+                      color: on,
+                      style: GhinaType.moneyS,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (w.hasPendingChanges) ...[
             const SizedBox(height: 8),
             Container(
@@ -463,7 +513,7 @@ class WalletCard extends StatelessWidget {
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      'Menunggu sinkron · di server ${GhinaMoney.format(w.syncedBalance, currency: w.currency)}',
+                      'Menunggu sinkron · di server ${context.money(w.syncedBalance, currency: w.currency)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GhinaType.caption.copyWith(color: on),
@@ -473,6 +523,92 @@ class WalletCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Entry to the portfolio from the wallets page: value + today's change, or
+/// an invitation to start.
+class PortfolioEntryTile extends StatelessWidget {
+  const PortfolioEntryTile({
+    super.key,
+    required this.summary,
+    required this.currency,
+  });
+
+  final PortfolioSummary? summary;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    final s = summary;
+    final has = s != null && !s.isEmpty;
+    final pct = s?.dayChangePct;
+    return ChunkyCard(
+      key: const ValueKey('wallets-portfolio'),
+      tinted: GhinaColors.purple,
+      onTap: () => context.push('/investments'),
+      semanticLabel: 'Portofolio investasi',
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      child: Row(
+        children: [
+          CategoryAvatar(
+            icon: Icons.trending_up_rounded,
+            color: GhinaColors.purple.base,
+            size: 42,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Portofolio investasi',
+                  style: GhinaType.body.w(900).copyWith(color: g.textPrimary),
+                ),
+                if (has)
+                  Row(
+                    children: [
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: MoneyText(
+                            amount: s.marketValue,
+                            currency: currency,
+                            tone: MoneyTone.neutral,
+                            style: GhinaType.moneyS,
+                          ),
+                        ),
+                      ),
+                      if (pct != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '${pct >= 0 ? '+' : '−'}${Fmt.number(pct.abs(), decimals: 2)}% hari ini',
+                          style: GhinaType.caption
+                              .w(900)
+                              .copyWith(
+                                color: pct >= 0
+                                    ? GhinaColors.income.base
+                                    : GhinaColors.expense.base,
+                              ),
+                        ),
+                      ],
+                    ],
+                  )
+                else
+                  Text(
+                    'Saham, reksa dana, emas, kripto — pantau di sini',
+                    maxLines: 2,
+                    style: GhinaType.caption.copyWith(color: g.textSecondary),
+                  ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: g.textMuted, size: 28),
         ],
       ),
     );

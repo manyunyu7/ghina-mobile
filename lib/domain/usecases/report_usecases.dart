@@ -101,6 +101,7 @@ ReportData buildReport({
   required List<Transaction> transactions,
   required List<TxCategory> categories,
   required List<Wallet> wallets,
+  double investmentsValue = 0,
 }) {
   final p = resolvePeriod(period, now);
   final active = wallets.where((w) => !w.archived).toList()
@@ -123,33 +124,48 @@ ReportData buildReport({
       from: p.start,
       to: p.end,
     ),
-    netWorth: active.fold(0, (s, w) => s + w.balance),
+    walletsTotal: active.fold(0, (s, w) => s + w.balance),
     wallets: active,
+    investmentsValue: investmentsValue,
   );
 }
 
-/// Reports: income vs expense over time, by category, savings rate, cashflow, net worth.
+/// Portfolio market value over time (`WatchPortfolio` → `marketValue`).
+typedef InvestmentsValueSource = Stream<double> Function();
+
+/// Reports: income vs expense over time, by category, savings rate, cashflow,
+/// net worth (wallets + [investments] market value).
 final class WatchReport {
-  const WatchReport(this._tx, this._categories, this._wallets, this._clock);
+  const WatchReport(
+    this._tx,
+    this._categories,
+    this._wallets,
+    this._clock, {
+    this.investments,
+  });
   final TransactionRepository _tx;
   final CategoryRepository _categories;
   final WalletRepository _wallets;
   final Clock _clock;
+  final InvestmentsValueSource? investments;
 
   Stream<ReportData> call([ReportPeriod period = ReportPeriod.last6Months]) {
     final now = _clock.now();
     final p = resolvePeriod(period, now);
-    return combineLatest3(
+    return combineLatest4(
       _tx.watch(from: p.start, to: p.end),
       _categories.watchAll(),
       _wallets.watchAll(includeArchived: false),
-      (List<Transaction> t, List<TxCategory> c, List<Wallet> w) => buildReport(
-        period: period,
-        now: now,
-        transactions: t,
-        categories: c,
-        wallets: w,
-      ),
+      investments?.call() ?? Stream.value(0.0),
+      (List<Transaction> t, List<TxCategory> c, List<Wallet> w, double inv) =>
+          buildReport(
+            period: period,
+            now: now,
+            transactions: t,
+            categories: c,
+            wallets: w,
+            investmentsValue: inv,
+          ),
     );
   }
 }
@@ -162,6 +178,7 @@ DashboardSummary buildDashboard({
   required List<Transaction> transactions,
   required List<Budget> monthBudgets,
   required List<TransactionView> recent,
+  double investmentsValue = 0,
 }) {
   final month = YearMonth.of(now);
   final active = wallets.where((w) => !w.archived).toList();
@@ -189,6 +206,7 @@ DashboardSummary buildDashboard({
     ),
     trend: trend,
     recent: recent,
+    investmentsValue: investmentsValue,
   );
 }
 
@@ -200,30 +218,36 @@ final class WatchDashboard {
     this._wallets,
     this._categories,
     this._budgets,
-    this._clock,
-  );
+    this._clock, {
+    this.investments,
+  });
   final TransactionRepository _tx;
   final WalletRepository _wallets;
   final CategoryRepository _categories;
   final BudgetRepository _budgets;
   final Clock _clock;
 
+  /// Portfolio value for `netWorth` (null = 0).
+  final InvestmentsValueSource? investments;
+
   Stream<DashboardSummary> call() {
     final now = _clock.now();
     final months = lastMonths(now, 6);
-    return combineLatest5(
-      _wallets.watchAll(),
-      _categories.watchAll(),
-      _tx.watch(from: months.first.start, to: months.last.end),
-      _budgets.watchByMonth(YearMonth.of(now)),
-      _tx.watch(limit: 8),
-      (
-        List<Wallet> w,
-        List<TxCategory> c,
-        List<Transaction> t,
-        List<Budget> b,
-        List<Transaction> recent,
-      ) {
+    return combineLatestList(
+      [
+        _wallets.watchAll(),
+        _categories.watchAll(),
+        _tx.watch(from: months.first.start, to: months.last.end),
+        _budgets.watchByMonth(YearMonth.of(now)),
+        _tx.watch(limit: 8),
+        investments?.call() ?? Stream.value(0.0),
+      ],
+      (v) {
+        final w = v[0] as List<Wallet>;
+        final c = v[1] as List<TxCategory>;
+        final t = v[2] as List<Transaction>;
+        final b = v[3] as List<Budget>;
+        final recent = v[4] as List<Transaction>;
         final wm = {for (final x in w) x.id: x};
         final cm = {for (final x in c) x.id: x};
         return buildDashboard(
@@ -232,6 +256,7 @@ final class WatchDashboard {
           categories: c,
           transactions: t,
           monthBudgets: b,
+          investmentsValue: v[5] as double,
           recent: [
             for (final r in recent)
               TransactionView(

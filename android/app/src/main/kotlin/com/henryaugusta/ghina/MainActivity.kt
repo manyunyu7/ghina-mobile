@@ -13,7 +13,7 @@ import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.webkit.MimeTypeMap
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -29,8 +29,13 @@ import java.util.concurrent.Executors
  *    share EventChannel, so none is lost.
  *  - App settings shortcut + "should show rationale" for the mic permission.
  *  - Offline speech support query / model download (Android 13+ RecognitionSupport).
+ *
+ * A FlutterFragmentActivity (not FlutterActivity) because local_auth ("Kunci
+ * Kebiasaan") shows the BiometricPrompt as a fragment. The share / settings / speech
+ * bridge above is unchanged: onCreate, onNewIntent and configureFlutterEngine behave
+ * the same on both base classes.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private var shareSink: EventChannel.EventSink? = null

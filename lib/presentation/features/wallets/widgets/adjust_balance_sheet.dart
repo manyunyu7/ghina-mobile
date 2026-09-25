@@ -20,7 +20,9 @@ Future<bool> showAdjustBalanceSheet(
     context,
     title: 'Sesuaikan saldo',
     showClose: true,
-    builder: (c) => AdjustBalanceSheet(wallet: wallet),
+    // A balance-correction form: amounts stay visible even when hidden.
+    builder: (c) =>
+        MoneyVisibility.reveal(child: AdjustBalanceSheet(wallet: wallet)),
   );
   return ok ?? false;
 }

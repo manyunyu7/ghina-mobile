@@ -13,11 +13,24 @@ enum PhotoSource { camera, gallery }
 
 /// Why picking failed.
 final class PhotoPickerException implements Exception {
-  const PhotoPickerException(this.source, {required this.denied});
+  const PhotoPickerException(
+    this.source, {
+    required this.denied,
+    this.code,
+    this.detail,
+  });
   final PhotoSource source;
 
   /// The user refused the camera/photos permission.
   final bool denied;
+
+  /// Platform error code (`no_valid_image_uri`, `no_available_camera`, …) — shown
+  /// in the toast so a report says exactly what failed.
+  final String? code;
+  final String? detail;
+
+  @override
+  String toString() => 'PhotoPickerException(${source.name}, $code: $detail)';
 }
 
 /// Picks compressed photos (≤ 1600 px wide, JPEG ~80, the server takes ≤ 5 MB)
@@ -58,9 +71,22 @@ final class ImagePickerPhotoPicker implements PhotoPicker {
       );
       return [for (final x in xs) x.path];
     } on PlatformException catch (e) {
+      debugPrint('photo picker failed: ${e.code} ${e.message}');
       throw PhotoPickerException(
         source,
         denied: e.code.contains('denied') || e.code.contains('permission'),
+        code: e.code,
+        detail: e.message,
+      );
+    } catch (e) {
+      // Anything else (e.g. an invalid argument on an unusual device) must still
+      // reach the user as a toast instead of vanishing in the zone.
+      debugPrint('photo picker failed: $e');
+      throw PhotoPickerException(
+        source,
+        denied: false,
+        code: e.runtimeType.toString(),
+        detail: '$e',
       );
     }
   }
@@ -71,6 +97,8 @@ final photoPickerProvider = Provider<PhotoPicker>(
 );
 
 /// Friendly message for a picker failure (with how to enable the permission).
+/// Unknown failures carry the platform code in brackets so a bug report says
+/// exactly what failed.
 String photoPickerErrorMessage(PhotoPickerException e) {
   final cam = e.source == PhotoSource.camera;
   if (e.denied) {
@@ -78,9 +106,20 @@ String photoPickerErrorMessage(PhotoPickerException e) {
         ? 'Izin kamera ditolak. Aktifkan di Pengaturan HP → Ghina → Kamera, ya.'
         : 'Izin foto ditolak. Aktifkan di Pengaturan HP → Ghina → Foto, ya.';
   }
+  final code = e.code;
+  if (code == 'no_available_camera') {
+    return 'Nggak ada aplikasi kamera yang bisa dipakai. Coba pilih dari Galeri, ya.';
+  }
+  if (code != null && code.contains('valid')) {
+    // no_valid_image_uri / missing_valid_image_uri: the gallery handed over a
+    // photo the phone can't read (often a cloud-only Google Photos item).
+    return 'Foto itu nggak bisa dibaca dari galeri (mungkin masih di cloud). '
+        'Coba foto lain, atau unduh dulu ke HP.';
+  }
+  final suffix = code == null ? '' : ' ($code)';
   return cam
-      ? 'Nggak bisa buka kamera. Cek izin kamera di pengaturan HP, ya.'
-      : 'Nggak bisa buka galeri. Cek izin foto di pengaturan HP, ya.';
+      ? 'Nggak bisa ambil foto dari kamera$suffix. Coba lagi, ya.'
+      : 'Nggak bisa ambil foto dari galeri$suffix. Coba lagi, ya.';
 }
 
 String maxPhotosMessage(int max) =>
@@ -114,6 +153,8 @@ Future<List<String>> pickPhotosFrom(
     }
     return paths;
   } on PhotoPickerException catch (e) {
+    // A second tap while the picker is still open: nothing to report.
+    if (e.code == 'already_active') return const [];
     if (context.mounted) showErrorToast(context, photoPickerErrorMessage(e));
     return const [];
   }

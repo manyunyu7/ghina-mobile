@@ -80,6 +80,47 @@ abstract final class XpRules {
   /// earn XP — dummy accounts / barter sponsors can't farm XP either.
   static const contentBonusDailyCap = 3;
 
+  // --- Habits (`docs/habits.md` → Gamification) ------------------------------
+  // Mirrors `HabitXp` in `domain/usecases/habit_rules.dart` (server `HABIT_XP`);
+  // `test/domain/game/habit_xp_test.dart` keeps them in sync.
+
+  /// A build habit's day met (by the local day the row was logged).
+  static const habitBuildMet = 5;
+
+  /// Max build habits per day that earn [habitBuildMet].
+  static const habitBuildDailyCap = 10;
+
+  /// A quit habit's "Hari ini bersih ✅" check-in (once per habit per day).
+  static const habitCleanCheckIn = 3;
+
+  /// Max clean check-ins per day that earn XP (same bound as build habits).
+  static const habitCleanDailyCap = 10;
+
+  /// Each urge resisted ("Lagi pengen, tapi tahan").
+  static const habitUrgeResisted = 5;
+
+  /// Max urges per day (all habits) that earn [habitUrgeResisted].
+  static const habitUrgeDailyCap = 5;
+
+  /// Quit: clean-day milestone → bonus (once per habit and milestone).
+  static const habitQuitMilestoneBonus = <int, int>{
+    7: 20,
+    30: 50,
+    90: 100,
+    365: 365,
+  };
+
+  /// Build: streak length (days, or weeks for perWeek) → bonus (once per habit
+  /// and milestone).
+  static const habitBuildStreakBonus = <int, int>{7: 20, 30: 50, 100: 100};
+
+  /// Bonus of a habit milestone event (`build | quit`), 0 when none.
+  static int habitMilestoneBonus(String? kind, int? milestone) =>
+      (kind == 'quit'
+          ? habitQuitMilestoneBonus
+          : habitBuildStreakBonus)[milestone] ??
+      0;
+
   // --- Lessons --------------------------------------------------------------
   static const lessonBase = 15;
   static const lessonPerfectBonus = 5;

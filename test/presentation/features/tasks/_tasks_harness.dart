@@ -25,6 +25,7 @@ import 'package:ghina/presentation/state/session_controller.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../domain/fakes.dart';
+import '../../../di/habits_investments_test_overrides.dart';
 import '../profile/_harness.dart'
     show FakeFoodRepository, FakeHealthRepository, FakePrayerRepository;
 
@@ -219,6 +220,7 @@ class TasksHarness {
   }
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     ...buildGameOverrides(store: gameStore),
     gameTickProvider.overrideWith((ref) => const Stream.empty()),
     clockProvider.overrideWithValue(clock),

@@ -48,6 +48,7 @@ class ChunkyTextField extends StatefulWidget {
     this.maxLength,
     this.focusNode,
     this.onTap,
+    this.onTapOutside,
     this.textCapitalization = TextCapitalization.sentences,
     this.autofillHints,
   });
@@ -79,6 +80,9 @@ class ChunkyTextField extends StatefulWidget {
 
   /// For picker-like fields (date, wallet) combine with [readOnly].
   final VoidCallback? onTap;
+
+  /// A tap outside the field (null = the platform default).
+  final TapRegionCallback? onTapOutside;
   final TextCapitalization textCapitalization;
   final Iterable<String>? autofillHints;
 
@@ -121,6 +125,7 @@ class _ChunkyTextFieldState extends State<ChunkyTextField> {
       maxLength: widget.maxLength,
       focusNode: widget.focusNode,
       onTap: widget.onTap,
+      onTapOutside: widget.onTapOutside,
       textCapitalization: widget.obscureText
           ? TextCapitalization.none
           : widget.textCapitalization,

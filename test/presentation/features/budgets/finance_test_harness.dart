@@ -30,6 +30,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../domain/fakes.dart';
 import '../../design_system/_helpers.dart';
+import '../../../di/habits_investments_test_overrides.dart';
 
 export '../../../domain/fakes.dart';
 export '../../design_system/_helpers.dart'
@@ -69,6 +70,7 @@ class FinanceHarness {
   final clock = FixedClock(testNow);
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     walletRepositoryProvider.overrideWithValue(wallets),
     categoryRepositoryProvider.overrideWithValue(categories),
     transactionRepositoryProvider.overrideWithValue(transactions),

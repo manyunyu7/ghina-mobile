@@ -36,6 +36,18 @@ enum XpSource {
 
   /// Sponsor paid.
   contentSponsor,
+
+  /// Build habit days met (`docs/habits.md`).
+  habitBuild,
+
+  /// Quit habit "Hari ini bersih ✅" check-ins.
+  habitClean,
+
+  /// Urges resisted (quit habits).
+  habitUrge,
+
+  /// Habit streak milestone bonuses (quit clean days / build streaks).
+  habitMilestone,
   dailyGoal,
   streakMilestone,
 }
@@ -75,6 +87,12 @@ class DayXp {
   /// Content bonuses (weekly target / sponsor) that earned XP (≤
   /// [XpRules.contentBonusDailyCap]).
   int contentBonuses = 0;
+
+  /// Habit rows that earned XP this day (caps: [XpRules.habitBuildDailyCap],
+  /// [XpRules.habitCleanDailyCap], [XpRules.habitUrgeDailyCap] urges).
+  int habitBuildCounted = 0;
+  int habitCleanCounted = 0;
+  int habitUrgesCounted = 0;
 
   int get total => breakdown.values.fold(0, (a, b) => a + b);
   bool get goalMet => activities >= goal.target;
@@ -126,8 +144,10 @@ abstract final class XpCalculator {
     final seenIds = <String>{};
     final sorted = [
       for (final e in events)
-        if (e.id == null || seenIds.add('${e.kind.name}:${e.id}')) e,
+        if (e.id == null || seenIds.add(dedupeKey(e))) e,
     ]..sort((a, b) => a.at.compareTo(b.at));
+    // Habit milestone bonuses are once per habit + milestone (earliest run).
+    final habitMilestones = <String>{};
 
     for (final e in sorted) {
       final date = e.day;
@@ -178,6 +198,8 @@ abstract final class XpCalculator {
           break;
         case ActivityKind.content:
           _content(day, e);
+        case ActivityKind.habit:
+          _habit(day, e, habitMilestones);
         case ActivityKind.task:
           // By doneAt's local day; never part of the (transaction) streak.
           day.tasksTotal++;
@@ -217,6 +239,51 @@ abstract final class XpCalculator {
     dayOf(today).goal = goalLevelOn(today, goalHistory);
 
     return XpLedger(today: today, days: days);
+  }
+
+  /// Identity of an event for de-duplication. Habit events of different
+  /// types share `<habitId>:<date>` ids, so their type is part of the key.
+  static String dedupeKey(ActivityEvent e) => e.kind == ActivityKind.habit
+      ? 'habit:${e.habitType?.name}:${e.id}'
+      : '${e.kind.name}:${e.id}';
+
+  /// Habit rules (`docs/habits.md` → Gamification, README → Habits): build
+  /// day met +5 (≤ 10 a day) and quit clean check-in +3 (≤ 10 a day) count
+  /// toward the daily goal; urges resisted +5 each (≤ 5 a day, one daily-goal
+  /// activity per habit/day that earned XP); milestone bonuses once per habit
+  /// and milestone (a relapse never takes XP back — a later run reaching the
+  /// same milestone just doesn't pay again).
+  static void _habit(DayXp day, ActivityEvent e, Set<String> milestones) {
+    switch (e.habitType) {
+      case HabitEventType.buildDayMet:
+        if (day.habitBuildCounted >= XpRules.habitBuildDailyCap) return;
+        day.habitBuildCounted++;
+        day.activities++;
+        day.add(XpSource.habitBuild, XpRules.habitBuildMet);
+      case HabitEventType.quitCleanCheckIn:
+        if (day.habitCleanCounted >= XpRules.habitCleanDailyCap) return;
+        day.habitCleanCounted++;
+        day.activities++;
+        day.add(XpSource.habitClean, XpRules.habitCleanCheckIn);
+      case HabitEventType.urgeResisted:
+        final count = (e.habitValue ?? 0).floor();
+        final left = XpRules.habitUrgeDailyCap - day.habitUrgesCounted;
+        final n = count < left ? count : left;
+        if (n <= 0) return;
+        day.habitUrgesCounted += n;
+        day.activities++;
+        day.add(XpSource.habitUrge, n * XpRules.habitUrgeResisted);
+      case HabitEventType.milestone:
+        final bonus = XpRules.habitMilestoneBonus(
+          e.habitKind,
+          e.habitMilestone,
+        );
+        if (bonus <= 0) return;
+        if (!milestones.add('${e.habitId}:${e.habitMilestone}')) return;
+        day.add(XpSource.habitMilestone, bonus);
+      case null:
+        break;
+    }
   }
 
   /// Content planner rules (`docs/content.md` → Gamification): stage reached =

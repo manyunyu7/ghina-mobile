@@ -11,9 +11,11 @@ import '../../../../domain/game/game.dart' show DailyGoalLevel;
 import '../../../../domain/usecases/usecases.dart' show supportedCurrencies;
 import '../../../design_system/design_system.dart';
 import '../../../design_system/gallery/ui_gallery_screen.dart';
+import '../../../state/balance_privacy_provider.dart';
 import '../../../state/game/game_providers.dart';
 import '../../../state/session_controller.dart';
 import '../../../state/sync_status_provider.dart';
+import '../../habits/lock/habit_lock_gate.dart' show HabitLockSettingTile;
 import '../../shell/sync_indicator.dart';
 import '../widgets/daily_goal_picker.dart';
 
@@ -247,6 +249,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             DailyGoalPicker(selected: goal, onChanged: _setGoal),
             GhinaSpace.gapXl,
+            const SectionHeader(title: 'Privasi'),
+            const _BalancePrivacyCard(),
+            GhinaSpace.gapMd,
+            const ChunkyCard(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: HabitLockSettingTile(),
+            ),
+            GhinaSpace.gapXl,
             const SectionHeader(title: 'Data & sinkronisasi'),
             ChunkyCard(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -328,6 +338,60 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Sembunyikan saldo" now + "start hidden on every launch".
+class _BalancePrivacyCard extends ConsumerWidget {
+  const _BalancePrivacyCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final p = ref.watch(balancePrivacyProvider);
+    final ctl = ref.read(balancePrivacyProvider.notifier);
+    Widget row({
+      required Key key,
+      required IconData icon,
+      required ChunkySwatch color,
+      required String title,
+      required String subtitle,
+      required bool value,
+      required ValueChanged<bool> onChanged,
+    }) => ChunkyTile(
+      framed: false,
+      title: title,
+      subtitle: subtitle,
+      leading: CategoryAvatar(icon: icon, color: color.base, size: 40),
+      trailing: Switch(key: key, value: value, onChanged: onChanged),
+      onTap: () => onChanged(!value),
+    );
+    return ChunkyCard(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          row(
+            key: const ValueKey('settings-hide-balance'),
+            icon: p.hidden
+                ? Icons.visibility_off_rounded
+                : Icons.visibility_rounded,
+            color: GhinaColors.blue,
+            title: 'Sembunyikan saldo',
+            subtitle: 'Nominal jadi Rp •••••. Tekan lama saldo buat ngintip.',
+            value: p.hidden,
+            onChanged: ctl.setHidden,
+          ),
+          row(
+            key: const ValueKey('settings-hide-on-launch'),
+            icon: Icons.lock_rounded,
+            color: GhinaColors.purple,
+            title: 'Sembunyikan saldo saat membuka app',
+            subtitle: 'Selalu mulai dalam mode tersembunyi',
+            value: p.hideOnLaunch,
+            onChanged: ctl.setHideOnLaunch,
+          ),
+        ],
       ),
     );
   }

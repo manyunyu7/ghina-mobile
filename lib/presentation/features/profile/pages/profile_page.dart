@@ -606,6 +606,13 @@ class _Menu extends StatelessWidget {
       '/reports',
     ),
     (
+      Icons.self_improvement_rounded,
+      Color(0xFF58CC02),
+      'Kebiasaan',
+      'Bangun yang baik, tinggalkan yang kurang baik',
+      '/habits',
+    ),
+    (
       Icons.mosque_rounded,
       Color(0xFF14B8A6),
       'Salat',

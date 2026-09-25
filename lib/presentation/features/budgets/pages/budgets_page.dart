@@ -352,7 +352,7 @@ class _SummaryCard extends StatelessWidget {
                           const TextSpan(text: 'Jatah aman '),
                           TextSpan(
                             text:
-                                '${GhinaMoney.format(perDay, currency: currency)}/hari',
+                                '${context.money(perDay, currency: currency)}/hari',
                             style: GhinaType.bodyS
                                 .w(900)
                                 .copyWith(color: g.textPrimary),

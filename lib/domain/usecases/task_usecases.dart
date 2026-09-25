@@ -11,6 +11,7 @@ import '../entities/entities.dart';
 import '../repositories/repositories.dart';
 import 'category_usecases.dart' show categoryIcons;
 import 'content_rules.dart' show computeContentReminders, sortAndCapReminders;
+import 'habit_rules.dart' show computeHabitReminders;
 import 'task_rules.dart';
 import 'transaction_usecases.dart';
 import 'validation.dart';
@@ -855,7 +856,9 @@ final class WatchTaskHome {
 
 /// The reminders to schedule (≤ 60 in total, soonest first): task reminders
 /// merged with content post reminders (`[IG-TAYANG] …`, see
-/// `computeContentReminders`) when the content repositories are given.
+/// `computeContentReminders`) when the content repositories are given, and
+/// habit reminders (`computeHabitReminders`; private habits masked) when the
+/// habit repositories are given.
 /// Recomputed on every change and every minute; emits only when the list
 /// changes. Feed it to `ReminderScheduler.replaceAll`.
 final class WatchReminders {
@@ -866,6 +869,8 @@ final class WatchReminders {
     this._posts,
     this._items,
     this._accounts,
+    this._habits,
+    this._habitLogs,
   });
   final TaskRepository _tasks;
   final TaskAreaRepository _areas;
@@ -873,10 +878,15 @@ final class WatchReminders {
   final ContentPostRepository? _posts;
   final ContentItemRepository? _items;
   final SocialAccountRepository? _accounts;
+  final HabitRepository? _habits;
+  final HabitLogRepository? _habitLogs;
 
   Stream<List<Reminder>> call({String currency = 'IDR'}) {
     final posts = _posts, items = _items, accounts = _accounts;
+    final habits = _habits, habitLogs = _habitLogs;
     final content = posts != null && items != null && accounts != null;
+    final withHabits = habits != null && habitLogs != null;
+    final h = content ? 6 : 3;
     return combineLatestList(
       [
         _tasks.watchAll(),
@@ -887,6 +897,7 @@ final class WatchReminders {
           items.watchAll(),
           accounts.watchAll(),
         ],
+        if (withHabits) ...[habits.watchAll(), habitLogs.watch()],
       ],
       (v) {
         final now = v[2] as DateTime;
@@ -896,15 +907,22 @@ final class WatchReminders {
           now,
           currency: currency,
         );
-        if (!content) return tasks;
+        if (!content && !withHabits) return tasks;
         return sortAndCapReminders([
           ...tasks,
-          ...computeContentReminders(
-            v[3] as List<ContentPost>,
-            v[4] as List<ContentItem>,
-            v[5] as List<SocialAccount>,
-            now,
-          ),
+          if (content)
+            ...computeContentReminders(
+              v[3] as List<ContentPost>,
+              v[4] as List<ContentItem>,
+              v[5] as List<SocialAccount>,
+              now,
+            ),
+          if (withHabits)
+            ...computeHabitReminders(
+              v[h] as List<Habit>,
+              v[h + 1] as List<HabitLog>,
+              now,
+            ),
         ], maxTaskNotifications);
       },
     ).distinct(_listEq);

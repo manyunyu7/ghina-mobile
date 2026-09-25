@@ -2,8 +2,8 @@
 ///
 /// Screens should not need these directly — use the use-case providers in
 /// `usecase_providers.dart`. Tests override [appDatabaseProvider],
-/// [tokenStoreProvider], [syncApiProvider], [photoStoreProvider], [clockProvider] and
-/// [syncTriggersProvider].
+/// [tokenStoreProvider], [syncApiProvider], [pricesApiProvider],
+/// [photoStoreProvider], [clockProvider] and [syncTriggersProvider].
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,11 +13,14 @@ import '../core/config.dart';
 import '../data/datasources/local/app_database.dart';
 import '../data/datasources/remote/api_client.dart';
 import '../data/datasources/remote/auth_api.dart';
+import '../data/datasources/remote/prices_api.dart';
 import '../data/datasources/remote/sync_api.dart';
 import '../data/datasources/remote/token_store.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/content_repositories.dart';
 import '../data/repositories/finance_repositories.dart';
+import '../data/repositories/habit_repositories.dart';
+import '../data/repositories/investment_repositories.dart';
 import '../data/repositories/life_repositories.dart';
 import '../data/repositories/local_store.dart';
 import '../data/repositories/notes_repositories.dart';
@@ -64,6 +67,11 @@ final Provider<AuthApi> authApiProvider = Provider<AuthApi>(
 
 final syncApiProvider = Provider<SyncApi>(
   (ref) => DioSyncApi(ref.watch(apiClientProvider)),
+);
+
+/// `GET /api/mobile/prices` (tests override it with a fake).
+final pricesApiProvider = Provider<PricesApi>(
+  (ref) => DioPricesApi(ref.watch(apiClientProvider), ref.watch(clockProvider)),
 );
 
 final outboxProvider = Provider<Outbox>((ref) {
@@ -184,3 +192,26 @@ final contentPillarRepositoryProvider = Provider<ContentPillarRepository>(
 final defaultsSeedStateProvider = Provider<DefaultsSeedState>(
   (ref) => DriftDefaultsSeedState(ref.watch(appDatabaseProvider)),
 );
+final habitRepositoryProvider = Provider<HabitRepository>(
+  (ref) => DriftHabitRepository(ref.watch(localStoreProvider)),
+);
+final habitLogRepositoryProvider = Provider<HabitLogRepository>(
+  (ref) => DriftHabitLogRepository(ref.watch(localStoreProvider)),
+);
+final assetRepositoryProvider = Provider<AssetRepository>(
+  (ref) => DriftAssetRepository(ref.watch(localStoreProvider)),
+);
+final assetTradeRepositoryProvider = Provider<AssetTradeRepository>(
+  (ref) => DriftAssetTradeRepository(ref.watch(localStoreProvider)),
+);
+final priceRepositoryProvider = Provider<PriceRepository>(
+  (ref) => DriftPriceRepository(
+    ref.watch(appDatabaseProvider),
+    ref.watch(pricesApiProvider),
+    ref.watch(clockProvider),
+  ),
+);
+final portfolioSnapshotRepositoryProvider =
+    Provider<PortfolioSnapshotRepository>(
+      (ref) => DriftPortfolioSnapshotRepository(ref.watch(appDatabaseProvider)),
+    );

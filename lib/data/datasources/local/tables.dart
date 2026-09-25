@@ -386,6 +386,158 @@ class ContentPillars extends Table with Timestamps {
   Set<Column> get primaryKey => {id};
 }
 
+// --- schema v5: habits (`docs/habits.md`) and investments (`docs/investments.md`) ---
+
+@DataClassName('HabitRow')
+class Habits extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get emoji => text().nullable()();
+  TextColumn get color => text().withDefault(const Constant('#58CC02'))();
+
+  /// `build | quit`
+  TextColumn get kind => text().withDefault(const Constant('build'))();
+
+  /// JSON `{"type":"daily"}` | `{"type":"weekdays","days":[…]}` |
+  /// `{"type":"perWeek","times":n}`.
+  TextColumn get schedule =>
+      text().withDefault(const Constant('{"type":"daily"}'))();
+
+  /// JSON `{"type":"check"}` | `{"type":"count","goal":n,"unit":…}` |
+  /// `{"type":"duration","goal":minutes}`.
+  TextColumn get target =>
+      text().withDefault(const Constant('{"type":"check"}'))();
+
+  /// JSON array of local `HH:mm`.
+  TextColumn get reminders => text().withDefault(const Constant('[]'))();
+
+  /// Wire `private`.
+  BoolColumn get isPrivate => boolean().withDefault(const Constant(false))();
+  TextColumn get why => text().nullable()();
+
+  /// `YYYY-MM-DD`.
+  TextColumn get startDate => text()();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('HabitLogRow')
+@TableIndex(name: 'idx_habit_log_habit', columns: {#habitId, #date})
+@TableIndex(name: 'idx_habit_log_date', columns: {#date})
+class HabitLogs extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get habitId => text()();
+
+  /// Local `YYYY-MM-DD`.
+  TextColumn get date => text()();
+
+  /// `done | skip | relapse | urge`
+  TextColumn get type => text()();
+  RealColumn get value => real().nullable()();
+  TextColumn get note => text().nullable()();
+
+  /// JSON array of trigger tags.
+  TextColumn get triggers => text().withDefault(const Constant('[]'))();
+  IntColumn get at => integer().map(epochMs).nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {habitId, date, type},
+  ];
+}
+
+@DataClassName('AssetRow')
+@TableIndex(name: 'idx_asset_symbol', columns: {#kind, #symbol})
+class Assets extends Table with Timestamps {
+  TextColumn get id => text()();
+
+  /// `stock | fund | gold | crypto | bond | other`
+  TextColumn get kind => text()();
+  TextColumn get symbol => text()();
+  TextColumn get name => text().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('IDR'))();
+
+  /// `auto | manual`
+  TextColumn get priceMode => text().withDefault(const Constant('auto'))();
+  RealColumn get manualPrice => real().nullable()();
+  IntColumn get manualPriceAt => integer().map(epochMs).nullable()();
+  TextColumn get unit => text().withDefault(const Constant('lembar'))();
+  TextColumn get walletId => text().nullable()();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('AssetTradeRow')
+@TableIndex(name: 'idx_trade_asset', columns: {#assetId})
+@TableIndex(name: 'idx_trade_cash_tx', columns: {#cashTransactionId})
+class AssetTrades extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get assetId => text()();
+
+  /// `buy | sell | dividend | split | fee`
+  TextColumn get type => text()();
+  IntColumn get date => integer().map(epochMs)();
+  RealColumn get quantity => real().nullable()();
+  RealColumn get price => real().nullable()();
+  RealColumn get fee => real().withDefault(const Constant(0))();
+  RealColumn get amount => real().nullable()();
+  RealColumn get ratio => real().nullable()();
+  TextColumn get note => text().nullable()();
+  TextColumn get cashTransactionId => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Device-only cache of `GET /api/mobile/prices` (not synced, not user data).
+@DataClassName('CachedPriceRow')
+class CachedPrices extends Table {
+  /// `stock:BBCA`
+  TextColumn get key => text()();
+  TextColumn get kind => text()();
+  TextColumn get symbol => text()();
+  RealColumn get price => real()();
+  RealColumn get prevClose => real().nullable()();
+  RealColumn get change => real().nullable()();
+  RealColumn get changePct => real().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('IDR'))();
+  TextColumn get name => text().nullable()();
+  IntColumn get asOf => integer().map(epochMs).nullable()();
+  TextColumn get source => text().nullable()();
+  IntColumn get fetchedAt => integer().map(epochMs).nullable()();
+
+  /// The server marked it stale (kept its last price).
+  BoolColumn get stale => boolean().withDefault(const Constant(false))();
+
+  /// When this device received it.
+  IntColumn get cachedAt => integer().map(epochMs)();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
+/// Device-only daily portfolio value history (one row per local day).
+@DataClassName('PortfolioSnapshotRow')
+class PortfolioSnapshots extends Table {
+  /// `YYYY-MM-DD`
+  TextColumn get date => text()();
+  RealColumn get value => real()();
+  RealColumn get cost => real()();
+  IntColumn get updatedAt => integer().map(epochMs)();
+
+  @override
+  Set<Column> get primaryKey => {date};
+}
+
 /// Pending local mutations, pushed in [seq] order.
 @DataClassName('OutboxRow')
 @TableIndex(name: 'idx_outbox_entity', columns: {#entity, #entityId})

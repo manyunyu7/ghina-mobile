@@ -464,11 +464,11 @@ class _ContentReportPageState extends ConsumerState<ContentReportPage> {
                   key: const ValueKey('sponsor-months'),
                   height: 160,
                   color: GhinaColors.green,
-                  formatAxis: (v) => GhinaMoney.format(
-                    v,
-                    currency: currency,
-                    compact: true,
-                  ).replaceFirst('Rp ', ''),
+                  formatAxis: (v) => context.moneyHidden
+                      ? ''
+                      : context
+                            .money(v, currency: currency, compact: true)
+                            .replaceFirst('Rp ', ''),
                   data: [
                     for (final m in months)
                       (
@@ -476,7 +476,7 @@ class _ContentReportPageState extends ConsumerState<ContentReportPage> {
                         value: m.amount,
                         tooltip:
                             '${Fmt.monthShort(int.parse(m.month.substring(5)))} ${m.month.substring(0, 4)}: '
-                            '${GhinaMoney.format(m.amount, currency: currency)}',
+                            '${context.money(m.amount, currency: currency)}',
                       ),
                   ],
                 ),
@@ -545,7 +545,7 @@ class _ContentReportPageState extends ConsumerState<ContentReportPage> {
                     : Text(
                         d.sponsor.amount == 0
                             ? 'Barter'
-                            : GhinaMoney.format(
+                            : context.money(
                                 d.sponsor.amount,
                                 currency: d.sponsor.currency,
                                 compact: true,

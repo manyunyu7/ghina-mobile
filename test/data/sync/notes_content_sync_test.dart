@@ -192,23 +192,27 @@ void main() {
       },
     );
 
-    test('a 5xx keeps the clip pending and retries', () async {
-      h.server.uploadErrors['/tmp/a.m4a'] = const UnknownFailure(
-        'Server bermasalah (500)',
-      );
-      final n = await note(
-        const NoteInput(
-          body: 'x',
-          audio: [NoteAudio.local('/tmp/a.m4a', durationSec: 1)],
-        ),
-      );
-      await expectLater(h.engine.syncNow(), throwsA(isA<UnknownFailure>()));
-      expect((await h.notes.getById(n.id))!.audio.single.isPending, isTrue);
-      expect(h.server.pushed, isEmpty);
-      h.server.uploadErrors.clear();
-      await h.engine.syncNow();
-      expect(row(SyncEntity.notes, n.id)['audio'], hasLength(1));
-    });
+    test(
+      'a 5xx keeps the clip pending, the note still syncs, retried later',
+      () async {
+        h.server.uploadErrors['/tmp/a.m4a'] = const UnknownFailure(
+          'Server bermasalah (500)',
+        );
+        final n = await note(
+          const NoteInput(
+            body: 'x',
+            audio: [NoteAudio.local('/tmp/a.m4a', durationSec: 1)],
+          ),
+        );
+        await h.engine.syncNow(); // server trouble never blocks the push
+        expect((await h.notes.getById(n.id))!.audio.single.isPending, isTrue);
+        expect(row(SyncEntity.notes, n.id)['audio'], isEmpty);
+        expect((await h.db.getMeta()).lastError, contains('dicoba lagi nanti'));
+        h.server.uploadErrors.clear();
+        await h.engine.syncNow();
+        expect(row(SyncEntity.notes, n.id)['audio'], hasLength(1));
+      },
+    );
 
     test('pull keeps pending clips/photos of the local row', () async {
       final n = await note(const NoteInput(body: 'x'));

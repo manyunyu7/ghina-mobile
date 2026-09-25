@@ -127,6 +127,30 @@ and several stages skipped at once share one time. Once recorded, a stage's time
 changes (moving back and forth can't re-farm XP); moving an item back hides the later
 stage events until it reaches them again (with their original time).
 
+**Habits** (`docs/habits.md` → Gamification) come in through
+`activityEventsSourceProvider` (mapped by `habitActivityEventsFrom` in
+`lib/di/game_overrides.dart`), `kind == ActivityKind.habit`. **Plumbing only**: `XpCalculator`
+and the achievements ignore them (`case ActivityKind.habit: break`) until the habits UI
+agent adds the rules (constants: `HabitXp` in `habit_rules.dart` — build met +5 (≤ 10
+habits/day), quit clean check-in +3, urge resisted +5 (≤ 5/day), quit milestone bonus
+7→20, 30→50, 90→100, 365→365, build streak bonus 7→20, 30→50, 100→100). Everything is
+derived; archived habits keep their events, deleting a habit removes them. `habitType`
+(`HabitEventType`) tells them apart; every event has `habitId`, `habitKind`
+(`build|quit`):
+
+| `habitType` | One event per | `id` | `at` / `day` | `occurredAt` | Other fields |
+|---|---|---|---|---|---|
+| `buildDayMet` | build `done` row that meets the goal (check: exists; count/duration: value ≥ goal) | `<habitId>:<YYYY-MM-DD>` | the row's `createdAt` (logging day — backfill can't farm) | the log's date | `habitValue` = the day's value |
+| `quitCleanCheckIn` | quit `done` row ("Hari ini bersih ✅") | `<habitId>:<date>` | row `createdAt` | log date | `habitValue` 1 |
+| `urgeResisted` | quit `urge` row (one per day, counts aggregated) | `<habitId>:<date>` | row `createdAt` (first urge of the day) | log date | `habitValue` = urges that day (apply the ≤ 5/day cap on it) |
+| `milestone` | milestone reached in one streak run (quit clean run: 1, 3, 7, 14, …, 365, then every 100; build run: 7, 30, 100 in the streak unit) | `<habitId>:<milestone>:<runStart>` | local midnight of the day it was reached | the run's first day | `habitMilestone`, `habitStreakUnit` (`day|week`) |
+
+A relapse/miss never removes a milestone of an earlier run (XP never decreases visibly);
+a later run reaching the same milestone is a new event — dedupe by `habitId` +
+`habitMilestone` in the rules if a bonus should be once-ever. "3 habits all met for 7
+days" can be derived from `buildDayMet` events (`occurredDay`). Balance-only
+transactions (`adjustment`, `investment`) are never activity.
+
 The source streams should emit their current value on subscribe (drift `watch()` streams
 do this). Exclude soft-deleted rows. XP, the streak and the daily goal are counted on the
 **local day of `createdAt`**, not the transaction `date`, so backfilled history can't farm
@@ -181,7 +205,8 @@ can't be failed: mistakes only reduce XP.
 **XP per activity:**
 - Transaction: +10 XP, counting at most 15 per day.
 - Prayer (docs/prayer-quality.md): each fardhu = its status points (masjid 10, jamaah 8, ontime 6, late 3, qadha 1, missed/excused 0); each rawatib +2; each daily sunnah (dhuha/tahajud/witir) +3; +15 bonus when all 5 fardhu of a day are prayed. Missed/excused rows don't count toward the daily goal.
-- Balance adjustments are not activity (no XP, streak or daily goal).
+- Balance adjustments and investment cash effects are not activity (no XP, streak or daily goal).
+- Habits: events only (see Habits above) — no XP yet.
 - Health: +5 XP, at most 3 per day.
 - Food: +5 XP, at most 6 per day.
 - Task: fire 10 / want 8 / should 5 XP by `doneAt` day, at most 20 per day.

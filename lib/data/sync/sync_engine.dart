@@ -23,6 +23,7 @@ import '../models/notes_content_mappers.dart';
 import '../models/notes_content_wire.dart';
 import '../models/wire.dart';
 import '../repositories/photo_store.dart';
+import 'habits_investments_sync.dart';
 import 'local_cascades.dart';
 import 'outbox.dart';
 
@@ -48,7 +49,9 @@ class SyncEngine implements SyncService {
     this.batchSize = 500,
   }) : _db = db,
        _outbox = outbox,
-       _cascades = LocalCascades(db, outbox);
+       _cascades = LocalCascades(db, outbox) {
+    _hi = HabitsInvestmentsSync(db, outbox, _cascades, _clock);
+  }
 
   final AppDatabase _db;
   final Outbox _outbox;
@@ -57,6 +60,10 @@ class SyncEngine implements SyncService {
   final Clock _clock;
   final SyncTriggerSource? _triggers;
   final LocalCascades _cascades;
+
+  /// Hooks of the habits/investments entities (duplicates, remaps, rejected
+  /// trades' cash effect).
+  late final HabitsInvestmentsSync _hi;
 
   /// Delay between a local write and the sync it triggers.
   final Duration debounce;
@@ -340,6 +347,7 @@ class SyncEngine implements SyncService {
             )..where((l) => l.id.equals(entry.entityId))).getSingleOrNull();
             if (label != null) await _rememberLabelRemap(label.id, label.name);
           }
+          await _hi.onDuplicate(entry);
           await _deleteRow(entry.entity, entry.entityId);
         case PushStatus.rejected
             when entry.entity == SyncEntity.tasks &&
@@ -347,8 +355,13 @@ class SyncEngine implements SyncService {
           // Its area was a duplicate: re-queued after the pull (see above).
           await _outbox.complete(entry, applied: false);
           await _outbox.dropQueued(entry.entity, entry.entityId);
+        case PushStatus.rejected when await _hi.isRemappedTrade(entry):
+          // Its asset was a duplicate: moved + re-queued after the pull.
+          await _outbox.complete(entry, applied: false);
+          await _outbox.dropQueued(entry.entity, entry.entityId);
         case PushStatus.rejected:
           rejections.add(r.error ?? 'Perubahan ditolak server');
+          await _hi.onRejected(entry);
           await _outbox.complete(entry, applied: false);
           await _outbox.dropQueued(entry.entity, entry.entityId);
           await _deleteRow(entry.entity, entry.entityId);
@@ -585,14 +598,32 @@ class SyncEngine implements SyncService {
 
   /// A failed upload the server refused (bad/too large image): the photo is
   /// dropped. Anything else (offline, 5xx, expired session) is retried with backoff.
+  ///
+  /// 413 (a proxy's body-size limit, e.g. nginx `client_max_body_size`) and 429
+  /// are not the file's fault: they are fixable server-side, so they are retried.
   static bool _isRejection(Failure f) => switch (f) {
     ValidationFailure() || NotFoundFailure() || ConflictFailure() => true,
-    UnknownFailure(:final cause) =>
-      cause is DioException &&
-          (cause.response?.statusCode ?? 0) >= 400 &&
-          (cause.response?.statusCode ?? 0) < 500,
+    UnknownFailure(:final cause) => switch (_status(cause)) {
+      413 || 429 => false,
+      final s => s >= 400 && s < 500,
+    },
     _ => false,
   };
+
+  static int _status(Object? cause) =>
+      cause is DioException ? (cause.response?.statusCode ?? 0) : 0;
+
+  /// [_uploadOne] result: the file stays pending (server trouble — 5xx, 413, …)
+  /// and is retried on a later sync; the rest of the push goes on meanwhile.
+  static const _keepPending = '\u0000keep';
+
+  /// Why an upload was kept pending, in words for [SyncStatus.lastError].
+  static String _retryReason(Failure f) =>
+      switch (_status(f is UnknownFailure ? f.cause : null)) {
+        413 => 'file terlalu besar untuk server',
+        final s when s >= 500 => 'server bermasalah ($s)',
+        _ => f.message,
+      };
 
   /// Uploads photos taken offline (food logs, transactions) before the push, then
   /// points the rows and their queued upserts at the returned URLs.
@@ -611,6 +642,10 @@ class SyncEngine implements SyncService {
   /// [accept]: the returned path must match it (the server answers with the
   /// type it detected — e.g. an image sent as a voice clip comes back as
   /// `.jpg`); a mismatch is dropped too.
+  ///
+  /// A server-side failure that isn't the file's fault (5xx, 413, …) returns
+  /// [_keepPending]: the file stays pending for the next sync and the push goes
+  /// on (the row syncs without it). Offline / expired session still rethrow.
   Future<String?> _uploadOne(
     String path,
     String what,
@@ -628,8 +663,17 @@ class SyncEngine implements SyncService {
         return null;
       }
       return url;
+    } on NetworkFailure {
+      rethrow;
+    } on UnauthorizedFailure {
+      rethrow;
     } on Failure catch (f) {
-      if (!_isRejection(f)) rethrow;
+      if (!_isRejection(f)) {
+        rejections.add(
+          '$what belum terunggah (${_retryReason(f)}), dicoba lagi nanti',
+        );
+        return _keepPending;
+      }
       rejections.add('$what gagal diunggah: ${f.message}');
       return null;
     }
@@ -660,7 +704,8 @@ class SyncEngine implements SyncService {
       final done = <String, String?>{};
       try {
         for (final (path, what, accept) in pending) {
-          done[path] = await _uploadOne(path, what, rejections, accept: accept);
+          final url = await _uploadOne(path, what, rejections, accept: accept);
+          if (url != _keepPending) done[path] = url;
         }
       } finally {
         if (done.isNotEmpty) await _applyUploadedNoteMedia(row.id, done);
@@ -747,12 +792,13 @@ class SyncEngine implements SyncService {
       final done = <String, String?>{};
       try {
         for (final path in pending) {
-          done[path] = await _uploadOne(
+          final url = await _uploadOne(
             path,
             'Foto konten',
             rejections,
             accept: uploadImageRe,
           );
+          if (url != _keepPending) done[path] = url;
         }
       } finally {
         if (done.isNotEmpty) await _applyUploadedContentPhotos(row.id, done);
@@ -865,7 +911,8 @@ class SyncEngine implements SyncService {
       final done = <String, String?>{}; // local path → url (null = dropped)
       try {
         for (final path in pending) {
-          done[path] = await _uploadOne(path, 'Foto transaksi', rejections);
+          final url = await _uploadOne(path, 'Foto transaksi', rejections);
+          if (url != _keepPending) done[path] = url;
         }
       } finally {
         if (done.isNotEmpty) await _applyUploadedTxPhotos(row.id, done);
@@ -952,6 +999,7 @@ class SyncEngine implements SyncService {
       await _applyLabelRemaps();
     }
     await _reconcileStages();
+    await _hi.afterPull();
     // A notes/content-aware server seeds the default label and pillars itself
     // (once — never again after the user deleted them), so from now on the app
     // must not seed them locally (see SeedDefaultNoteLabel).
@@ -1022,6 +1070,7 @@ class SyncEngine implements SyncService {
               _db.tasks,
             )..where((t) => t.areaId.isIn(_areaRemaps.keys))).get())
               t.id,
+          ...await _hi.keepOnFullPull(entity),
         };
         for (final id in await _localIds(entity)) {
           if (!keep.contains(id)) await _deleteRow(entity, id);
@@ -1069,6 +1118,7 @@ class SyncEngine implements SyncService {
         await _cascades.socialAccountDeleted(t.id);
       }
       if (pillarName != null) await _cascades.pillarDeleted(pillarName);
+      await _hi.onTombstone(t.entity, t.id);
     }
 
     for (final entity in SyncEntity.all) {
@@ -1254,7 +1304,8 @@ class SyncEngine implements SyncService {
             .into(_db.contentPosts)
             .insertOnConflictUpdate(post.toCompanion());
       default:
-        break; // unknown entity from a newer server: ignore
+        // Habits/investments, else an unknown entity (newer server): ignore.
+        await _hi.upsertPulled(entity, j);
     }
   }
 
@@ -1288,7 +1339,7 @@ class SyncEngine implements SyncService {
     SyncEntity.contentPillars => _db.contentPillars,
     SyncEntity.contentItems => _db.contentItems,
     SyncEntity.contentPosts => _db.contentPosts,
-    _ => null,
+    _ => _hi.table(entity),
   };
 
   /// Deletes one local row without queuing anything. Returns rows deleted.

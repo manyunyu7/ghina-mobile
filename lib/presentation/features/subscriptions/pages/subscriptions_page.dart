@@ -143,7 +143,7 @@ class _SubscriptionsBody extends ConsumerWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '≈ ${GhinaMoney.format(summary.yearlyTotal, currency: currency)} setahun · ${active.length} dari ${summary.items.length} aktif',
+                      '≈ ${context.money(summary.yearlyTotal, currency: currency)} setahun · ${active.length} dari ${summary.items.length} aktif',
                       style: GhinaType.bodyS
                           .w(700)
                           .copyWith(
@@ -235,7 +235,7 @@ class _SubscriptionCardState extends ConsumerState<_SubscriptionCard> {
       context,
       title: 'Bayar ${s.name}?',
       message:
-          'Ghina catat pengeluaran ${GhinaMoney.format(s.amount, currency: _cur)} dari $walletName hari ini, lalu tagihan berikutnya maju ke ${Fmt.date(s.cycle.advance(next))}.',
+          'Ghina catat pengeluaran ${context.money(s.amount, currency: _cur)} dari $walletName hari ini, lalu tagihan berikutnya maju ke ${Fmt.date(s.cycle.advance(next))}.',
       confirmLabel: 'Bayar',
       mood: MascotMood.happy,
     );
@@ -370,7 +370,7 @@ class _SubscriptionCardState extends ConsumerState<_SubscriptionCard> {
                       TextSpan(
                         children: [
                           TextSpan(
-                            text: GhinaMoney.format(s.amount, currency: _cur),
+                            text: context.money(s.amount, currency: _cur),
                             style: GhinaType.moneyM.copyWith(
                               color: g.textPrimary,
                             ),

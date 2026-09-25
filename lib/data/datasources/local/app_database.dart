@@ -27,6 +27,12 @@ part 'app_database.g.dart';
     ContentItems,
     ContentPosts,
     ContentPillars,
+    Habits,
+    HabitLogs,
+    Assets,
+    AssetTrades,
+    CachedPrices,
+    PortfolioSnapshots,
     Outbox,
     SyncMeta,
   ],
@@ -43,13 +49,15 @@ class AppDatabase extends _$AppDatabase {
   /// v1: initial schema. v2: prayer quality columns on `prayers`.
   /// v3: `task_areas`, `tasks`, `transactions.photos`, `sync_meta.tasks_seeded`.
   /// v4: notes + content planner tables, `sync_meta.notes_seeded`/`content_seeded`.
+  /// v5: habits, habit logs, assets, asset trades (synced) + cached prices and
+  /// portfolio snapshots (device-only).
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -99,6 +107,25 @@ class AppDatabase extends _$AppDatabase {
         // and only then decide whether to seed the default label/pillars.
         await customStatement('UPDATE sync_meta SET full_pull_required = 1');
       }
+      if (from < 5 && to >= 5) {
+        // Additive only: four synced tables + two device-only ones.
+        await m.createTable(habits);
+        await m.createTable(habitLogs);
+        await m.createTable(assets);
+        await m.createTable(assetTrades);
+        await m.createTable(cachedPrices);
+        await m.createTable(portfolioSnapshots);
+        await m.createIndex(idxHabitLogHabit);
+        await m.createIndex(idxHabitLogDate);
+        await m.createIndex(idxAssetSymbol);
+        await m.createIndex(idxTradeAsset);
+        await m.createIndex(idxTradeCashTx);
+        // The v4 app pulled past habits/assets/trades (and `investment`
+        // transactions, hidden as an unknown type — those rows were stored)
+        // without storing the new entities: re-download everything once
+        // (pending outbox rows still win).
+        await customStatement('UPDATE sync_meta SET full_pull_required = 1');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = OFF');
@@ -124,12 +151,22 @@ class AppDatabase extends _$AppDatabase {
     contentItems,
     contentPosts,
     contentPillars,
+    habits,
+    habitLogs,
+    assets,
+    assetTrades,
   ];
 
-  /// Deletes all synced rows and the outbox. With [includeMeta] the sync meta
-  /// (cursor, epoch, owner) is reset too.
+  /// Device-only tables derived from the user's data (wiped with it).
+  List<TableInfo<Table, dynamic>> get localDataTables => [
+    cachedPrices,
+    portfolioSnapshots,
+  ];
+
+  /// Deletes all synced rows, the device-only data tables and the outbox.
+  /// With [includeMeta] the sync meta (cursor, epoch, owner) is reset too.
   Future<void> wipe({bool includeMeta = false}) => transaction(() async {
-    for (final t in syncedTables) {
+    for (final t in [...syncedTables, ...localDataTables]) {
       await delete(t).go();
     }
     await delete(outbox).go();

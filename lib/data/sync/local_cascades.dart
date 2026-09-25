@@ -55,11 +55,31 @@ class LocalCascades {
       await transactionDeleted(t.id);
     }
     await _nullTaskRef(_db.tasks.walletId, 'walletId', walletId);
+    final assets = await (_db.select(
+      _db.assets,
+    )..where((a) => a.walletId.equals(walletId))).get();
+    for (final a in assets) {
+      await (_db.update(_db.assets)..where((x) => x.id.equals(a.id))).write(
+        const AssetsCompanion(walletId: Value(null)),
+      );
+      await _outbox.patchQueued(SyncEntity.assets, a.id, {'walletId': null});
+    }
   }
 
   /// Transaction deleted → tasks get `transactionId = null`, notes
-  /// `linkedTransactionId = null`, sponsors `transactionId = null`.
+  /// `linkedTransactionId = null`, sponsors `transactionId = null`, asset
+  /// trades `cashTransactionId = null`.
   Future<void> transactionDeleted(String transactionId) async {
+    final trades = await (_db.select(
+      _db.assetTrades,
+    )..where((t) => t.cashTransactionId.equals(transactionId))).get();
+    for (final t in trades) {
+      await (_db.update(_db.assetTrades)..where((x) => x.id.equals(t.id)))
+          .write(const AssetTradesCompanion(cashTransactionId: Value(null)));
+      await _outbox.patchQueued(SyncEntity.assetTrades, t.id, {
+        'cashTransactionId': null,
+      });
+    }
     await _nullTaskRef(_db.tasks.transactionId, 'transactionId', transactionId);
     await _nullNoteRef(
       _db.notes.linkedTransactionId,
@@ -98,6 +118,32 @@ class LocalCascades {
       await (_db.delete(_db.tasks)..where((x) => x.id.equals(t.id))).go();
       await _outbox.dropQueued(SyncEntity.tasks, t.id);
       await taskDeleted(t.id);
+    }
+  }
+
+  // ---------------------------------------------------------------- habits & investments
+
+  /// Habit deleted → its logs are deleted (the server tombstones them).
+  Future<void> habitDeleted(String habitId) async {
+    final logs = await (_db.select(
+      _db.habitLogs,
+    )..where((l) => l.habitId.equals(habitId))).get();
+    for (final l in logs) {
+      await (_db.delete(_db.habitLogs)..where((x) => x.id.equals(l.id))).go();
+      await _outbox.dropQueued(SyncEntity.habitLogs, l.id);
+    }
+  }
+
+  /// Asset deleted → its trades are deleted (the server tombstones them).
+  /// Their linked transactions stay (`DeleteAsset` removes them first when
+  /// asked to).
+  Future<void> assetDeleted(String assetId) async {
+    final trades = await (_db.select(
+      _db.assetTrades,
+    )..where((t) => t.assetId.equals(assetId))).get();
+    for (final t in trades) {
+      await (_db.delete(_db.assetTrades)..where((x) => x.id.equals(t.id))).go();
+      await _outbox.dropQueued(SyncEntity.assetTrades, t.id);
     }
   }
 

@@ -31,7 +31,18 @@ class ReportsPage extends ConsumerWidget {
     final period = ref.watch(reportPeriodProvider);
     final data = ref.watch(watchReportProvider(period));
     return Scaffold(
-      appBar: AppBar(title: const Text('Laporan')),
+      appBar: AppBar(
+        title: const Text('Laporan'),
+        actions: [
+          TextButton.icon(
+            key: const ValueKey('reports-analytics'),
+            onPressed: () => context.push('/analytics'),
+            icon: const Icon(Icons.insights_rounded),
+            label: const Text('Analitik'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () => pullToSync(context, ref),
         child: ListView(
@@ -617,10 +628,63 @@ class _NetWorth extends StatelessWidget {
           ),
         ),
         Text(
-          'Total saldo semua dompet aktif',
+          report.investmentsValue != 0
+              ? 'Dompet ${context.money(report.walletsTotal, currency: currency)} '
+                    '+ investasi ${context.money(report.investmentsValue, currency: currency)}'
+              : 'Total saldo semua dompet aktif',
+          key: const ValueKey('networth-caption'),
           style: GhinaType.caption.copyWith(color: g.textSecondary),
         ),
         const SizedBox(height: 14),
+        if (report.investmentsValue != 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              key: const ValueKey('networth-investments'),
+              borderRadius: GhinaRadii.rMd,
+              onTap: () => context.push('/investments'),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      CategoryAvatar(
+                        icon: Icons.trending_up_rounded,
+                        color: GhinaColors.purple.base,
+                        size: 34,
+                        soft: true,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Investasi (nilai pasar)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GhinaType.body
+                              .w(800)
+                              .copyWith(color: g.textPrimary),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      MoneyText(
+                        amount: report.investmentsValue,
+                        currency: currency,
+                        tone: MoneyTone.neutral,
+                        style: GhinaType.moneyS.copyWith(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ChunkyProgressBar(
+                    value: total > 0
+                        ? (report.investmentsValue / total).clamp(0.02, 1.0)
+                        : 0,
+                    color: GhinaColors.purple,
+                    height: 10,
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (report.wallets.isEmpty) const _NoRows('Belum ada dompet.'),
         for (final w in report.wallets)
           Padding(

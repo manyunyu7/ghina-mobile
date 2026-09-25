@@ -11,6 +11,7 @@ import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/data/datasources/local/app_database.dart';
+import 'package:ghina/data/models/habits_investments_mappers.dart';
 import 'package:ghina/data/models/mappers.dart';
 import 'package:ghina/data/models/notes_content_mappers.dart';
 import 'package:ghina/domain/entities/entities.dart';
@@ -19,6 +20,7 @@ import 'generated_migrations/schema.dart';
 import 'generated_migrations/schema_v1.dart' as v1;
 import 'generated_migrations/schema_v2.dart' as v2;
 import 'generated_migrations/schema_v3.dart' as v3;
+import 'generated_migrations/schema_v4.dart' as v4;
 
 void main() {
   late SchemaVerifier verifier;
@@ -69,6 +71,22 @@ void main() {
     final schema = await verifier.schemaAt(4);
     final db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, 4);
+    await db.close();
+  });
+
+  for (final from in [1, 2, 3, 4]) {
+    test('upgrade v$from → v5 yields exactly the v5 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 5);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v5 schema', () async {
+    final schema = await verifier.schemaAt(5);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 5);
     await db.close();
   });
 
@@ -149,7 +167,7 @@ void main() {
     );
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.read<int>('user_version'), 4);
+    expect(version.read<int>('user_version'), db.schemaVersion);
     // v3 columns on the migrated rows.
     expect((await db.select(db.transactions).getSingle()).photos, '[]');
     await db.close();
@@ -210,13 +228,13 @@ void main() {
     );
     await old.close();
 
-    // 2. Open with the current app → onUpgrade(2, 4).
+    // 2. Open with the current app → onUpgrade(2, current).
     final db = AppDatabase(NativeDatabase(file));
     expect(
       (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
         'user_version',
       ),
-      4,
+      db.schemaVersion,
     );
     expect(await db.select(db.wallets).get(), hasLength(2));
     expect((await db.select(db.categories).getSingle()).name, 'Makan');
@@ -349,13 +367,13 @@ void main() {
     );
     await old.close();
 
-    // 2. Open with the current app → onUpgrade(3, 4).
+    // 2. Open with the current app → onUpgrade(3, current).
     final db = AppDatabase(NativeDatabase(file));
     expect(
       (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
         'user_version',
       ),
-      4,
+      db.schemaVersion,
     );
     expect((await db.select(db.wallets).getSingle()).balance, 150000);
     final tx = (await db.select(db.transactions).getSingle()).toEntityOrNull()!;
@@ -441,6 +459,177 @@ void main() {
     final again = AppDatabase(NativeDatabase(file));
     expect(await again.select(again.notes).get(), hasLength(1));
     expect(await again.select(again.tasks).get(), hasLength(1));
+    expect((await again.getMeta()).fullPullRequired, isTrue);
+    await again.close();
+  });
+
+  test('v4 data (the installed app) survives v4 → v5 on a real file, '
+      'and forces one full re-pull', () async {
+    final dir = await Directory.systemTemp.createTemp('ghina_migration_v5');
+    final file = File('${dir.path}/ghina.sqlite');
+    addTearDown(() => dir.delete(recursive: true));
+
+    // 1. A v4 database like the one on the phone: wallets, an `investment`
+    //    transaction the v4 app stored but hid (unknown type), a note, tasks,
+    //    a pending outbox row, sync meta mid-life.
+    final old = v4.DatabaseAtV4(NativeDatabase(file));
+    for (final sql in [
+      "INSERT INTO wallets (id, name, type, balance, currency, color, icon, archived, created_at, updated_at) "
+          "VALUES ('w1', 'RDN', 'investment', 1000000, 'IDR', '#22c55e', 'wallet', 0, 1, 1)",
+      "INSERT INTO transactions (id, wallet_id, type, amount, note, date, photos, created_at, updated_at) "
+          "VALUES ('t1', 'w1', 'investment', -925000, 'Beli BBCA 1 lot @ 9.250', 1000, '[]', 1000, 1000)",
+      "INSERT INTO transactions (id, wallet_id, type, amount, note, date, photos, created_at, updated_at) "
+          "VALUES ('t2', 'w1', 'expense', 25000, 'Nasi', 1000, '[\"local:/data/b.jpg\"]', 1000, 1000)",
+      "INSERT INTO task_areas (id, name, code, color, icon, schedule, sort_order, archived, created_at, updated_at) "
+          "VALUES ('area-life-u1', 'Keseharian', 'LIFE', '#58CC02', 'home', NULL, 1, 0, 1, 1)",
+      "INSERT INTO notes (id, title, body, checklist, labels, color, pinned, archived, photos, audio, links, search_text, created_at, updated_at) "
+          "VALUES ('n1', 'Ide', 'isi', '[]', '[]', NULL, 1, 0, '[]', '[]', '[]', 'ide isi', 1, 1)",
+      "INSERT INTO outbox (mutation_id, entity, op, entity_id, data, base, is_create, in_flight, client_updated_at) "
+          "VALUES ('m1', 'notes', 'upsert', 'n1', '{\"title\":\"Ide\"}', NULL, 1, 0, 2000)",
+      "INSERT INTO sync_meta (id, cursor, epoch, user_id, last_sync_at, full_pull_required, tasks_seeded, notes_seeded, content_seeded) "
+          "VALUES (1, 1790000000000, 'epoch-1', 'u1', 1790000000001, 0, 1, 1, 1)",
+    ]) {
+      await old.customStatement(sql);
+    }
+    expect(
+      (await old.customSelect('PRAGMA user_version').getSingle()).read<int>(
+        'user_version',
+      ),
+      4,
+    );
+    await old.close();
+
+    // 2. Open with the current app → onUpgrade(4, 5).
+    final db = AppDatabase(NativeDatabase(file));
+    expect(
+      (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
+        'user_version',
+      ),
+      5,
+    );
+    expect((await db.select(db.wallets).getSingle()).balance, 1000000);
+    // The hidden v4 row is now a known `investment` transaction.
+    final txs = {
+      for (final r in await db.select(db.transactions).get())
+        r.id: r.toEntityOrNull(),
+    };
+    expect(txs['t1']!.type, TxType.investment);
+    expect(txs['t1']!.amount, -925000);
+    expect(txs['t1']!.balanceEffects, {'w1': -925000});
+    expect(txs['t2']!.photos.single.isPending, isTrue);
+    expect((await db.select(db.notes).getSingle()).pinned, isTrue);
+    expect((await db.select(db.taskAreas).getSingle()).code, 'LIFE');
+    expect((await db.select(db.outbox).getSingle()).entityId, 'n1');
+    final meta = await db.getMeta();
+    expect(meta.cursor, 1790000000000);
+    expect(meta.epoch, 'epoch-1');
+    expect(meta.userId, 'u1');
+    expect(meta.notesSeeded, isTrue);
+    expect(meta.contentSeeded, isTrue);
+    // The v4 app pulled past habits/assets/trades without storing them:
+    // re-download everything once.
+    expect(meta.fullPullRequired, isTrue);
+
+    // New tables exist, are empty and writable.
+    for (final t in <TableInfo<Table, dynamic>>[
+      db.habits,
+      db.habitLogs,
+      db.assets,
+      db.assetTrades,
+      db.cachedPrices,
+      db.portfolioSnapshots,
+    ]) {
+      expect(await db.select(t).get(), isEmpty);
+    }
+    final now = DateTime(2026, 9, 24, 10);
+    await db
+        .into(db.habits)
+        .insert(
+          Habit(
+            id: 'h1',
+            name: 'Minum air',
+            emoji: '💧',
+            schedule: HabitSchedule.weekdays(const [1, 3, 5]),
+            target: HabitTarget.count(8, unit: 'gelas'),
+            reminders: const ['07:00'],
+            isPrivate: true,
+            startDate: '2026-09-01',
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    final h = (await db.select(db.habits).getSingle()).toEntity();
+    expect(h.schedule, HabitSchedule.weekdays(const [1, 3, 5]));
+    expect(h.target.goal, 8);
+    expect(h.isPrivate, isTrue);
+    await db
+        .into(db.habitLogs)
+        .insert(
+          HabitLog(
+            id: 'l1',
+            habitId: 'h1',
+            date: '2026-09-24',
+            type: HabitLogType.done,
+            value: 3,
+            triggers: const ['stres'],
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    // Unique (habitId, date, type).
+    await expectLater(
+      db
+          .into(db.habitLogs)
+          .insert(
+            HabitLog(
+              id: 'l2',
+              habitId: 'h1',
+              date: '2026-09-24',
+              type: HabitLogType.done,
+              createdAt: now,
+              updatedAt: now,
+            ).toCompanion(),
+          ),
+      throwsA(isA<SqliteException>()),
+    );
+    await db
+        .into(db.assets)
+        .insert(
+          Asset(
+            id: 'a1',
+            kind: AssetKind.stock,
+            symbol: 'BBCA',
+            walletId: 'w1',
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.assetTrades)
+        .insert(
+          AssetTrade(
+            id: 'r1',
+            assetId: 'a1',
+            type: TradeType.buy,
+            date: now,
+            quantity: 100,
+            price: 9250,
+            cashTransactionId: 't1',
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    final trade = (await db.select(db.assetTrades).getSingle())
+        .toEntityOrNull()!;
+    expect(trade.gross, 925000);
+    expect(trade.cashTransactionId, 't1');
+    await db.close();
+
+    // 3. Re-opening is a no-op and keeps everything.
+    final again = AppDatabase(NativeDatabase(file));
+    expect(await again.select(again.habits).get(), hasLength(1));
+    expect(await again.select(again.assetTrades).get(), hasLength(1));
+    expect(await again.select(again.transactions).get(), hasLength(2));
     expect((await again.getMeta()).fullPullRequired, isTrue);
     await again.close();
   });

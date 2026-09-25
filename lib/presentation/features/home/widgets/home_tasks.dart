@@ -347,7 +347,7 @@ class _HomeTaskRowState extends State<HomeTaskRow> {
                         ),
                       if (t.hasMoneyLink)
                         Text(
-                          '· ${Fmt.money(t.amount!, currency: widget.meta.currency)}',
+                          '· ${context.money(t.amount!, currency: widget.meta.currency)}',
                           style: GhinaType.caption
                               .w(800)
                               .copyWith(color: GhinaColors.expense.base),

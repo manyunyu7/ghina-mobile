@@ -31,6 +31,7 @@ import '../../../domain/fakes.dart';
 import '../profile/_harness.dart'
     show FakeFoodRepository, FakeHealthRepository, FakePrayerRepository;
 import '../shell/test_utils.dart' show FakeSession;
+import '../../../di/habits_investments_test_overrides.dart';
 
 /// Wednesday 23 September 2026, 10:00.
 final notesNow = DateTime(2026, 9, 23, 10);
@@ -177,6 +178,7 @@ class NotesHarness {
   List<Note> get allNotes => notes.s.items.values.toList();
 
   List<Override> get overrides => [
+    ...habitsInvestmentsFakeOverrides(),
     ...buildGameOverrides(store: gameStore),
     gameTickProvider.overrideWith((ref) => const Stream.empty()),
     clockProvider.overrideWithValue(clock),

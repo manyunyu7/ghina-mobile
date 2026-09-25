@@ -166,6 +166,14 @@ class DriftTransactionRepository implements TransactionRepository {
       if (p.isPending) p.localPath!,
   };
 
+  Future<String> _storeOrKeep(String path, String id) async {
+    try {
+      return await _photos.ensureStored(path, id);
+    } catch (_) {
+      return path;
+    }
+  }
+
   SimpleSelectStatement<$TransactionsTable, TransactionRow> _q({
     DateTime? from,
     DateTime? to,
@@ -238,14 +246,14 @@ class DriftTransactionRepository implements TransactionRepository {
     final before = await getById(t.id);
     final oldLocal = _localPaths(before?.photos ?? const []);
     // Copy newly picked files into app storage (file IO, outside the DB transaction).
+    // A failed copy never blocks the transaction: the photo stays pending at its
+    // picked path and the sync engine uploads it from there (or reports it gone).
     var row = t;
     if (t.photos.any((p) => p.isPending && !oldLocal.contains(p.localPath))) {
       row = t.withPhotos([
         for (final p in t.photos)
           p.isPending && !oldLocal.contains(p.localPath)
-              ? TransactionPhoto.local(
-                  await _photos.ensureStored(p.localPath!, t.id),
-                )
+              ? TransactionPhoto.local(await _storeOrKeep(p.localPath!, t.id))
               : p,
       ]);
     }

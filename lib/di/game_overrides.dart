@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter_riverpod/misc.dart' show Override;
 
+import '../core/dates.dart';
 import '../core/streams.dart';
 import '../data/game/shared_prefs_game_store.dart';
 import '../domain/entities/entities.dart';
@@ -26,8 +27,9 @@ List<ActivityEvent> activityEventsFrom(
   List<FoodLog> food, {
   List<Task> tasks = const [],
 }) => [
-  // Balance adjustments are not "logging a transaction": no XP/streak/goal.
-  for (final x in transactions.where((t) => !t.isAdjustment))
+  // Balance adjustments and investment cash effects are not "logging a
+  // transaction": no XP/streak/goal.
+  for (final x in transactions.where((t) => !t.isBalanceOnly))
     ActivityEvent.transaction(
       id: x.id,
       createdAt: x.createdAt,
@@ -125,6 +127,79 @@ List<ActivityEvent> contentActivityEventsFrom(
   ];
 }
 
+/// Habit milestones as [ActivityEvent]s (`lib/domain/game/README.md` →
+/// Habits): build days met, quit clean check-ins, urges resisted (one event
+/// per day row) and streak milestones of every run up to [today] (only those
+/// earned after the habit's creation — [habitMilestoneEarned]).
+List<ActivityEvent> habitActivityEventsFrom(
+  List<Habit> habits,
+  List<HabitLog> logs,
+  DateTime today,
+) {
+  final byHabit = <String, List<HabitLog>>{};
+  for (final l in logs) {
+    byHabit.putIfAbsent(l.habitId, () => []).add(l);
+  }
+  final todayKey = dateKey(today);
+  final out = <ActivityEvent>[];
+  for (final h in habits) {
+    final rows = byHabit[h.id] ?? const <HabitLog>[];
+    for (final l in rows) {
+      final d = GameDate.tryParse(l.date);
+      if (d == null || l.date.compareTo(todayKey) > 0) continue;
+      switch (l.type) {
+        case HabitLogType.done when h.isBuild && isHabitDayMet(h, l):
+          out.add(
+            ActivityEvent.habitDayMet(
+              habitId: h.id,
+              date: d,
+              at: l.createdAt,
+              value: l.amount,
+            ),
+          );
+        case HabitLogType.done when h.isQuit:
+          out.add(
+            ActivityEvent.habitCleanCheckIn(
+              habitId: h.id,
+              date: d,
+              at: l.createdAt,
+            ),
+          );
+        case HabitLogType.urge when h.isQuit && l.amount >= 1:
+          out.add(
+            ActivityEvent.habitUrgeResisted(
+              habitId: h.id,
+              date: d,
+              at: l.createdAt,
+              count: l.amount.round(),
+            ),
+          );
+        default:
+          break;
+      }
+    }
+    final unit = h.isBuild && h.schedule.isPerWeek ? 'week' : 'day';
+    for (final m in habitMilestoneHits(h, rows, todayKey)) {
+      // Backdated start dates don't pay out the milestones already passed.
+      if (!habitMilestoneEarned(h, m)) continue;
+      final on = GameDate.tryParse(m.reachedOn);
+      final start = GameDate.tryParse(m.runStart);
+      if (on == null || start == null) continue;
+      out.add(
+        ActivityEvent.habitMilestone(
+          habitId: h.id,
+          kind: h.kind.wire,
+          milestone: m.milestone,
+          date: on,
+          runStart: start,
+          unit: unit,
+        ),
+      );
+    }
+  }
+  return out;
+}
+
 /// The production overrides (game progress in shared_preferences).
 List<Override> get gameOverrides => buildGameOverrides();
 
@@ -148,6 +223,8 @@ List<Override> buildGameOverrides({GameStore? store}) => [
         ref.watch(contentItemRepositoryProvider).watchAll(),
         ref.watch(contentPostRepositoryProvider).watchAll(),
         ref.watch(socialAccountRepositoryProvider).watchAll(),
+        ref.watch(habitRepositoryProvider).watchAll(),
+        ref.watch(habitLogRepositoryProvider).watch(),
       ],
       (v) {
         final t = v[0] as List<Transaction>;
@@ -164,6 +241,11 @@ List<Override> buildGameOverrides({GameStore? store}) => [
             v[6] as List<ContentPost>,
             v[7] as List<SocialAccount>,
             transactions: t,
+          ),
+          ...habitActivityEventsFrom(
+            v[8] as List<Habit>,
+            v[9] as List<HabitLog>,
+            ref.read(clockProvider).now(),
           ),
         ];
       },
