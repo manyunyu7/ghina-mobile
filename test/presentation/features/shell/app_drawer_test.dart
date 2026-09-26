@@ -213,7 +213,13 @@ void main() {
           ],
           ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan'],
           ['Tugas', 'Catatan', 'Konten'],
-          ['Belajar', 'Pencapaian', 'Sinkronisasi', 'Pengaturan'],
+          [
+            'Belajar',
+            'Pencapaian',
+            'Log Notifikasi',
+            'Sinkronisasi',
+            'Pengaturan',
+          ],
         ],
       );
     });

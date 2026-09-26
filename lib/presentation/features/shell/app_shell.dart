@@ -8,6 +8,7 @@ import '../../state/notifications/notification_providers.dart';
 import '../../state/notifications/reminder_sync_controller.dart';
 import '../../state/sync_status_provider.dart';
 import 'app_drawer.dart';
+import 'notification_capture_listener.dart';
 import 'share_intake_listener.dart';
 
 /// Bottom-navigation shell around the four tabs (Beranda, Transaksi, Tugas,
@@ -23,7 +24,9 @@ import 'share_intake_listener.dart';
 /// from the left.
 ///
 /// Hosts the Android share-target hook ([ShareIntakeListener]): shares become
-/// notes with the "Catatan dari share" sheet.
+/// notes with the "Catatan dari share" sheet, and the "Log Notifikasi" hook
+/// ([NotificationCaptureListener], Android): notifications matching a parsing
+/// rule become transactions.
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -62,9 +65,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     final location =
         shell.route.branches[shell.currentIndex].defaultRoute?.path ?? '';
     return ShareIntakeListener(
-      child: AppDrawerScope(
-        scaffoldKey: _scaffoldKey,
-        child: _scaffold(shell, location),
+      child: NotificationCaptureListener(
+        child: AppDrawerScope(
+          scaffoldKey: _scaffoldKey,
+          child: _scaffold(shell, location),
+        ),
       ),
     );
   }

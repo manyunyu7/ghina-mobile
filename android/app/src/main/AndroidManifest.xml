@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Task reminders (flutter_local_notifications). POST_NOTIFICATIONS is a runtime
@@ -16,6 +17,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Habits: optional "Kunci Kebiasaan" (local_auth, device biometrics / PIN). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Log Notifikasi (flutter_notification_listener): the listener runs as a plain
+         NotificationListenerService bound by the system, never as a foreground
+         service (no permanent notification), so the plugin's special-use FGS
+         permission is dropped (it would need a Play Console declaration). -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:node="remove" />
     <application
         android:label="Ghina"
         android:name="${applicationName}"
@@ -78,6 +86,18 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
+        <!-- Log Notifikasi: reads other apps' notifications once the user grants
+             Settings > Notification access (not a runtime permission). Captured rows go
+             to the local database only; see lib/data/platform/notification_listener_bridge.dart. -->
+        <service
+            android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
+            android:label="Ghina — Log Notifikasi"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -90,6 +110,12 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Log Notifikasi: list launchable apps (rule source picker) and resolve the
+             app names of captured notifications (Android 11+ package visibility). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <!-- speech_to_text: see the device's speech recognition service (Android 11+
              package visibility). -->
         <intent>

@@ -14,6 +14,7 @@ export 'health_entry.dart';
 export 'investment.dart';
 export 'investment_views.dart';
 export 'note.dart';
+export 'notification_capture.dart';
 export 'planned_transaction.dart';
 export 'prayer_entry.dart';
 export 'read_models.dart';

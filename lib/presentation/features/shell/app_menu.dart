@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../design_system/design_system.dart';
@@ -26,6 +27,7 @@ class AppMenuItem {
     this.synonyms = const [],
     this.isTab = false,
     this.longPressPath,
+    this.androidOnly = false,
   });
 
   final String label;
@@ -42,6 +44,10 @@ class AppMenuItem {
 
   /// Shortcut on long-press in the Beranda grid (Catatan → new note).
   final String? longPressPath;
+
+  /// Hidden on other platforms (Log Notifikasi: iOS can't read other apps'
+  /// notifications).
+  final bool androidOnly;
 }
 
 const kAppMenu = <AppMenuItem>[
@@ -216,6 +222,26 @@ const kAppMenu = <AppMenuItem>[
     synonyms: ['achievement', 'lencana', 'badge', 'trofi', 'xp', 'level'],
   ),
   AppMenuItem(
+    label: 'Log Notifikasi',
+    icon: Icons.notifications_active_rounded,
+    color: GhinaColors.orange,
+    path: '/notification-log',
+    group: AppMenuGroup.other,
+    androidOnly: true,
+    synonyms: [
+      'notifikasi',
+      'notif',
+      'notification',
+      'otomatis',
+      'auto',
+      'rule',
+      'aturan',
+      'mutasi',
+      'mbanking',
+      'e-wallet',
+    ],
+  ),
+  AppMenuItem(
     label: 'Sinkronisasi',
     icon: Icons.sync_rounded,
     color: GhinaColors.blue,
@@ -243,6 +269,12 @@ const kAppMenu = <AppMenuItem>[
   ),
 ];
 
+/// [kAppMenu] without the items this platform can't show ([AppMenuItem.androidOnly]).
+List<AppMenuItem> get visibleAppMenu => [
+  for (final i in kAppMenu)
+    if (!i.androidOnly || defaultTargetPlatform == TargetPlatform.android) i,
+];
+
 /// The menu item with [path] (throws for unknown paths — a programming error).
 AppMenuItem appMenuItem(String path) => kAppMenu.firstWhere(
   (i) => i.path == path,
@@ -258,11 +290,9 @@ String _norm(String s) => s
 /// Items matching [query] by label, group name or a synonym, ignoring case
 /// and punctuation. Words are matched by prefix ("lapor" → Laporan, "sa" →
 /// saldo/saham/salat); when nothing matches, any substring counts. An empty
-/// query returns every item.
-List<AppMenuItem> filterAppMenu(
-  String query, [
-  List<AppMenuItem> items = kAppMenu,
-]) {
+/// query returns every item. [items] defaults to [visibleAppMenu].
+List<AppMenuItem> filterAppMenu(String query, [List<AppMenuItem>? only]) {
+  final items = only ?? visibleAppMenu;
   final q = _norm(query);
   if (q.isEmpty) return items;
   List<AppMenuItem> where(bool Function(String) hit) => [

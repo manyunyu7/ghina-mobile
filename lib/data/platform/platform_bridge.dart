@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 /// * `mic.shouldShowRationale` → `bool`
 /// * `speech.support` `{locale}` → `Map` (see [SpeechSupportInfo])
 /// * `speech.downloadModel` `{locale}` → `bool`
+/// * `apps.list` → `List<Map>` `{package, label}` of launchable apps
+/// * `apps.label` `{package}` → `String?` (launcher label)
 ///
 /// Events on [shareEventChannelName]: every share map — the one that
 /// cold-started the app and those received while running. The activity queues
@@ -64,6 +66,23 @@ class PlatformBridge {
 
   Future<bool> downloadSpeechModel(String locale) async =>
       await _call<bool>('speech.downloadModel', {'locale': locale}) ?? false;
+
+  /// Launchable apps as `(package, label)` pairs, sorted by label.
+  Future<List<({String package, String label})>> launchableApps() async {
+    final list = await _call<List<Object?>>('apps.list') ?? const [];
+    return [
+      for (final e in list)
+        if (e is Map && e['package'] is String)
+          (
+            package: e['package'] as String,
+            label: (e['label'] as String?) ?? e['package'] as String,
+          ),
+    ];
+  }
+
+  /// The launcher label of [packageName], or null when it isn't visible.
+  Future<String?> appLabel(String packageName) =>
+      _call<String>('apps.label', {'package': packageName});
 }
 
 /// Raw result of `speech.support`. Language lists are BCP-47 tags as reported

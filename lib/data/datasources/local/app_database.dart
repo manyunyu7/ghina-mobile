@@ -33,6 +33,8 @@ part 'app_database.g.dart';
     AssetTrades,
     CachedPrices,
     PortfolioSnapshots,
+    CapturedNotifications,
+    NotificationRules,
     Outbox,
     SyncMeta,
   ],
@@ -41,7 +43,17 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   /// The on-device database (`ghina.sqlite` in the app documents directory).
-  factory AppDatabase.open() => AppDatabase(driftDatabase(name: 'ghina'));
+  ///
+  /// Shared across isolates: the notification listener's background isolate
+  /// (`lib/data/platform/notification_listener_bridge.dart`) opens it too and
+  /// connects to the same drift server isolate, so writes don't collide and
+  /// the UI's stream queries see its inserts.
+  factory AppDatabase.open() => AppDatabase(
+    driftDatabase(
+      name: 'ghina',
+      native: const DriftNativeOptions(shareAcrossIsolates: true),
+    ),
+  );
 
   /// In-memory database for tests.
   factory AppDatabase.memory() => AppDatabase(NativeDatabase.memory());
@@ -51,13 +63,15 @@ class AppDatabase extends _$AppDatabase {
   /// v4: notes + content planner tables, `sync_meta.notes_seeded`/`content_seeded`.
   /// v5: habits, habit logs, assets, asset trades (synced) + cached prices and
   /// portfolio snapshots (device-only).
+  /// v6: device-only `captured_notifications` + `notification_rules`
+  /// ("Log Notifikasi", Android).
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -126,6 +140,14 @@ class AppDatabase extends _$AppDatabase {
         // (pending outbox rows still win).
         await customStatement('UPDATE sync_meta SET full_pull_required = 1');
       }
+      if (from < 6 && to >= 6) {
+        // Additive only: two device-only tables, nothing to re-download.
+        await m.createTable(capturedNotifications);
+        await m.createTable(notificationRules);
+        await m.createIndex(idxNotifPosted);
+        await m.createIndex(idxNotifPackage);
+        await m.createIndex(idxNotifProcessed);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = OFF');
@@ -163,14 +185,28 @@ class AppDatabase extends _$AppDatabase {
     portfolioSnapshots,
   ];
 
+  /// Device-only tables that aren't re-downloadable server data but belong to
+  /// the signed-in user (the notification log and parsing rules): kept by
+  /// "Unduh ulang data", wiped on sign-out / account switch.
+  List<TableInfo<Table, dynamic>> get deviceUserTables => [
+    capturedNotifications,
+    notificationRules,
+  ];
+
   /// Deletes all synced rows, the device-only data tables and the outbox.
-  /// With [includeMeta] the sync meta (cursor, epoch, owner) is reset too.
+  /// With [includeMeta] (sign-out, another account) the sync meta (cursor,
+  /// epoch, owner) and [deviceUserTables] are wiped too.
   Future<void> wipe({bool includeMeta = false}) => transaction(() async {
     for (final t in [...syncedTables, ...localDataTables]) {
       await delete(t).go();
     }
     await delete(outbox).go();
-    if (includeMeta) await delete(syncMeta).go();
+    if (includeMeta) {
+      await delete(syncMeta).go();
+      for (final t in deviceUserTables) {
+        await delete(t).go();
+      }
+    }
   });
 
   // ---------------------------------------------------------------- meta

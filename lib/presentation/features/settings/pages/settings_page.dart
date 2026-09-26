@@ -256,6 +256,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               padding: EdgeInsets.symmetric(vertical: 6),
               child: HabitLockSettingTile(),
             ),
+            if (ref.watch(deviceNotificationListenerProvider).isSupported) ...[
+              GhinaSpace.gapMd,
+              ChunkyCard(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: ChunkyTile(
+                  key: const ValueKey('settings-notification-log'),
+                  framed: false,
+                  title: 'Log Notifikasi',
+                  subtitle:
+                      'Catat notifikasi m-banking & e-wallet jadi transaksi',
+                  leading: CategoryAvatar(
+                    icon: Icons.notifications_active_rounded,
+                    color: GhinaColors.orange.base,
+                    size: 40,
+                  ),
+                  showChevron: true,
+                  onTap: () => context.push('/notification-log'),
+                ),
+              ),
+            ],
             GhinaSpace.gapXl,
             const SectionHeader(title: 'Data & sinkronisasi'),
             ChunkyCard(

@@ -5,6 +5,7 @@ library;
 export 'app_shortcuts.dart';
 export 'audio_playback.dart';
 export 'microphone_permission.dart';
+export 'notification_listener.dart';
 export 'share_intake.dart';
 export 'speech_transcriber.dart';
 export 'voice_recorder.dart';

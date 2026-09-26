@@ -15166,6 +15166,1648 @@ class PortfolioSnapshotsCompanion
   }
 }
 
+class $CapturedNotificationsTable extends CapturedNotifications
+    with TableInfo<$CapturedNotificationsTable, CapturedNotificationRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CapturedNotificationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _packageNameMeta = const VerificationMeta(
+    'packageName',
+  );
+  @override
+  late final GeneratedColumn<String> packageName = GeneratedColumn<String>(
+    'package_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appNameMeta = const VerificationMeta(
+    'appName',
+  );
+  @override
+  late final GeneratedColumn<String> appName = GeneratedColumn<String>(
+    'app_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _bodyMeta = const VerificationMeta('body');
+  @override
+  late final GeneratedColumn<String> body = GeneratedColumn<String>(
+    'body',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _notificationKeyMeta = const VerificationMeta(
+    'notificationKey',
+  );
+  @override
+  late final GeneratedColumn<String> notificationKey = GeneratedColumn<String>(
+    'notification_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> postedAt =
+      GeneratedColumn<int>(
+        'posted_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($CapturedNotificationsTable.$converterpostedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> capturedAt =
+      GeneratedColumn<int>(
+        'captured_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>(
+        $CapturedNotificationsTable.$convertercapturedAt,
+      );
+  static const VerificationMeta _processedMeta = const VerificationMeta(
+    'processed',
+  );
+  @override
+  late final GeneratedColumn<bool> processed = GeneratedColumn<bool>(
+    'processed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("processed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _ruleIdMeta = const VerificationMeta('ruleId');
+  @override
+  late final GeneratedColumn<String> ruleId = GeneratedColumn<String>(
+    'rule_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _transactionIdMeta = const VerificationMeta(
+    'transactionId',
+  );
+  @override
+  late final GeneratedColumn<String> transactionId = GeneratedColumn<String>(
+    'transaction_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _txTypeMeta = const VerificationMeta('txType');
+  @override
+  late final GeneratedColumn<String> txType = GeneratedColumn<String>(
+    'tx_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _parseErrorMeta = const VerificationMeta(
+    'parseError',
+  );
+  @override
+  late final GeneratedColumn<String> parseError = GeneratedColumn<String>(
+    'parse_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    packageName,
+    appName,
+    title,
+    body,
+    notificationKey,
+    postedAt,
+    capturedAt,
+    processed,
+    ruleId,
+    transactionId,
+    txType,
+    amount,
+    parseError,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'captured_notifications';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CapturedNotificationRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('package_name')) {
+      context.handle(
+        _packageNameMeta,
+        packageName.isAcceptableOrUnknown(
+          data['package_name']!,
+          _packageNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_packageNameMeta);
+    }
+    if (data.containsKey('app_name')) {
+      context.handle(
+        _appNameMeta,
+        appName.isAcceptableOrUnknown(data['app_name']!, _appNameMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    }
+    if (data.containsKey('body')) {
+      context.handle(
+        _bodyMeta,
+        body.isAcceptableOrUnknown(data['body']!, _bodyMeta),
+      );
+    }
+    if (data.containsKey('notification_key')) {
+      context.handle(
+        _notificationKeyMeta,
+        notificationKey.isAcceptableOrUnknown(
+          data['notification_key']!,
+          _notificationKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('processed')) {
+      context.handle(
+        _processedMeta,
+        processed.isAcceptableOrUnknown(data['processed']!, _processedMeta),
+      );
+    }
+    if (data.containsKey('rule_id')) {
+      context.handle(
+        _ruleIdMeta,
+        ruleId.isAcceptableOrUnknown(data['rule_id']!, _ruleIdMeta),
+      );
+    }
+    if (data.containsKey('transaction_id')) {
+      context.handle(
+        _transactionIdMeta,
+        transactionId.isAcceptableOrUnknown(
+          data['transaction_id']!,
+          _transactionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tx_type')) {
+      context.handle(
+        _txTypeMeta,
+        txType.isAcceptableOrUnknown(data['tx_type']!, _txTypeMeta),
+      );
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    }
+    if (data.containsKey('parse_error')) {
+      context.handle(
+        _parseErrorMeta,
+        parseError.isAcceptableOrUnknown(data['parse_error']!, _parseErrorMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CapturedNotificationRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CapturedNotificationRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      packageName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}package_name'],
+      )!,
+      appName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}app_name'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      body: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}body'],
+      )!,
+      notificationKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notification_key'],
+      ),
+      postedAt: $CapturedNotificationsTable.$converterpostedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}posted_at'],
+        )!,
+      ),
+      capturedAt: $CapturedNotificationsTable.$convertercapturedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}captured_at'],
+        )!,
+      ),
+      processed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}processed'],
+      )!,
+      ruleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rule_id'],
+      ),
+      transactionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transaction_id'],
+      ),
+      txType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tx_type'],
+      ),
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      ),
+      parseError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parse_error'],
+      ),
+    );
+  }
+
+  @override
+  $CapturedNotificationsTable createAlias(String alias) {
+    return $CapturedNotificationsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterpostedAt = epochMs;
+  static TypeConverter<DateTime, int> $convertercapturedAt = epochMs;
+}
+
+class CapturedNotificationRow extends DataClass
+    implements Insertable<CapturedNotificationRow> {
+  final int id;
+  final String packageName;
+
+  /// Launcher label; null until the UI isolate resolves it.
+  final String? appName;
+  final String title;
+  final String body;
+
+  /// `StatusBarNotification.key` (diagnostics only).
+  final String? notificationKey;
+  final DateTime postedAt;
+  final DateTime capturedAt;
+
+  /// Checked against the parsing rules.
+  final bool processed;
+  final String? ruleId;
+  final String? transactionId;
+
+  /// `income` | `expense` of the matching rule.
+  final String? txType;
+  final double? amount;
+  final String? parseError;
+  const CapturedNotificationRow({
+    required this.id,
+    required this.packageName,
+    this.appName,
+    required this.title,
+    required this.body,
+    this.notificationKey,
+    required this.postedAt,
+    required this.capturedAt,
+    required this.processed,
+    this.ruleId,
+    this.transactionId,
+    this.txType,
+    this.amount,
+    this.parseError,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['package_name'] = Variable<String>(packageName);
+    if (!nullToAbsent || appName != null) {
+      map['app_name'] = Variable<String>(appName);
+    }
+    map['title'] = Variable<String>(title);
+    map['body'] = Variable<String>(body);
+    if (!nullToAbsent || notificationKey != null) {
+      map['notification_key'] = Variable<String>(notificationKey);
+    }
+    {
+      map['posted_at'] = Variable<int>(
+        $CapturedNotificationsTable.$converterpostedAt.toSql(postedAt),
+      );
+    }
+    {
+      map['captured_at'] = Variable<int>(
+        $CapturedNotificationsTable.$convertercapturedAt.toSql(capturedAt),
+      );
+    }
+    map['processed'] = Variable<bool>(processed);
+    if (!nullToAbsent || ruleId != null) {
+      map['rule_id'] = Variable<String>(ruleId);
+    }
+    if (!nullToAbsent || transactionId != null) {
+      map['transaction_id'] = Variable<String>(transactionId);
+    }
+    if (!nullToAbsent || txType != null) {
+      map['tx_type'] = Variable<String>(txType);
+    }
+    if (!nullToAbsent || amount != null) {
+      map['amount'] = Variable<double>(amount);
+    }
+    if (!nullToAbsent || parseError != null) {
+      map['parse_error'] = Variable<String>(parseError);
+    }
+    return map;
+  }
+
+  CapturedNotificationsCompanion toCompanion(bool nullToAbsent) {
+    return CapturedNotificationsCompanion(
+      id: Value(id),
+      packageName: Value(packageName),
+      appName: appName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appName),
+      title: Value(title),
+      body: Value(body),
+      notificationKey: notificationKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notificationKey),
+      postedAt: Value(postedAt),
+      capturedAt: Value(capturedAt),
+      processed: Value(processed),
+      ruleId: ruleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ruleId),
+      transactionId: transactionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transactionId),
+      txType: txType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(txType),
+      amount: amount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amount),
+      parseError: parseError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parseError),
+    );
+  }
+
+  factory CapturedNotificationRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CapturedNotificationRow(
+      id: serializer.fromJson<int>(json['id']),
+      packageName: serializer.fromJson<String>(json['packageName']),
+      appName: serializer.fromJson<String?>(json['appName']),
+      title: serializer.fromJson<String>(json['title']),
+      body: serializer.fromJson<String>(json['body']),
+      notificationKey: serializer.fromJson<String?>(json['notificationKey']),
+      postedAt: serializer.fromJson<DateTime>(json['postedAt']),
+      capturedAt: serializer.fromJson<DateTime>(json['capturedAt']),
+      processed: serializer.fromJson<bool>(json['processed']),
+      ruleId: serializer.fromJson<String?>(json['ruleId']),
+      transactionId: serializer.fromJson<String?>(json['transactionId']),
+      txType: serializer.fromJson<String?>(json['txType']),
+      amount: serializer.fromJson<double?>(json['amount']),
+      parseError: serializer.fromJson<String?>(json['parseError']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'packageName': serializer.toJson<String>(packageName),
+      'appName': serializer.toJson<String?>(appName),
+      'title': serializer.toJson<String>(title),
+      'body': serializer.toJson<String>(body),
+      'notificationKey': serializer.toJson<String?>(notificationKey),
+      'postedAt': serializer.toJson<DateTime>(postedAt),
+      'capturedAt': serializer.toJson<DateTime>(capturedAt),
+      'processed': serializer.toJson<bool>(processed),
+      'ruleId': serializer.toJson<String?>(ruleId),
+      'transactionId': serializer.toJson<String?>(transactionId),
+      'txType': serializer.toJson<String?>(txType),
+      'amount': serializer.toJson<double?>(amount),
+      'parseError': serializer.toJson<String?>(parseError),
+    };
+  }
+
+  CapturedNotificationRow copyWith({
+    int? id,
+    String? packageName,
+    Value<String?> appName = const Value.absent(),
+    String? title,
+    String? body,
+    Value<String?> notificationKey = const Value.absent(),
+    DateTime? postedAt,
+    DateTime? capturedAt,
+    bool? processed,
+    Value<String?> ruleId = const Value.absent(),
+    Value<String?> transactionId = const Value.absent(),
+    Value<String?> txType = const Value.absent(),
+    Value<double?> amount = const Value.absent(),
+    Value<String?> parseError = const Value.absent(),
+  }) => CapturedNotificationRow(
+    id: id ?? this.id,
+    packageName: packageName ?? this.packageName,
+    appName: appName.present ? appName.value : this.appName,
+    title: title ?? this.title,
+    body: body ?? this.body,
+    notificationKey: notificationKey.present
+        ? notificationKey.value
+        : this.notificationKey,
+    postedAt: postedAt ?? this.postedAt,
+    capturedAt: capturedAt ?? this.capturedAt,
+    processed: processed ?? this.processed,
+    ruleId: ruleId.present ? ruleId.value : this.ruleId,
+    transactionId: transactionId.present
+        ? transactionId.value
+        : this.transactionId,
+    txType: txType.present ? txType.value : this.txType,
+    amount: amount.present ? amount.value : this.amount,
+    parseError: parseError.present ? parseError.value : this.parseError,
+  );
+  CapturedNotificationRow copyWithCompanion(
+    CapturedNotificationsCompanion data,
+  ) {
+    return CapturedNotificationRow(
+      id: data.id.present ? data.id.value : this.id,
+      packageName: data.packageName.present
+          ? data.packageName.value
+          : this.packageName,
+      appName: data.appName.present ? data.appName.value : this.appName,
+      title: data.title.present ? data.title.value : this.title,
+      body: data.body.present ? data.body.value : this.body,
+      notificationKey: data.notificationKey.present
+          ? data.notificationKey.value
+          : this.notificationKey,
+      postedAt: data.postedAt.present ? data.postedAt.value : this.postedAt,
+      capturedAt: data.capturedAt.present
+          ? data.capturedAt.value
+          : this.capturedAt,
+      processed: data.processed.present ? data.processed.value : this.processed,
+      ruleId: data.ruleId.present ? data.ruleId.value : this.ruleId,
+      transactionId: data.transactionId.present
+          ? data.transactionId.value
+          : this.transactionId,
+      txType: data.txType.present ? data.txType.value : this.txType,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      parseError: data.parseError.present
+          ? data.parseError.value
+          : this.parseError,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CapturedNotificationRow(')
+          ..write('id: $id, ')
+          ..write('packageName: $packageName, ')
+          ..write('appName: $appName, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('postedAt: $postedAt, ')
+          ..write('capturedAt: $capturedAt, ')
+          ..write('processed: $processed, ')
+          ..write('ruleId: $ruleId, ')
+          ..write('transactionId: $transactionId, ')
+          ..write('txType: $txType, ')
+          ..write('amount: $amount, ')
+          ..write('parseError: $parseError')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    packageName,
+    appName,
+    title,
+    body,
+    notificationKey,
+    postedAt,
+    capturedAt,
+    processed,
+    ruleId,
+    transactionId,
+    txType,
+    amount,
+    parseError,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CapturedNotificationRow &&
+          other.id == this.id &&
+          other.packageName == this.packageName &&
+          other.appName == this.appName &&
+          other.title == this.title &&
+          other.body == this.body &&
+          other.notificationKey == this.notificationKey &&
+          other.postedAt == this.postedAt &&
+          other.capturedAt == this.capturedAt &&
+          other.processed == this.processed &&
+          other.ruleId == this.ruleId &&
+          other.transactionId == this.transactionId &&
+          other.txType == this.txType &&
+          other.amount == this.amount &&
+          other.parseError == this.parseError);
+}
+
+class CapturedNotificationsCompanion
+    extends UpdateCompanion<CapturedNotificationRow> {
+  final Value<int> id;
+  final Value<String> packageName;
+  final Value<String?> appName;
+  final Value<String> title;
+  final Value<String> body;
+  final Value<String?> notificationKey;
+  final Value<DateTime> postedAt;
+  final Value<DateTime> capturedAt;
+  final Value<bool> processed;
+  final Value<String?> ruleId;
+  final Value<String?> transactionId;
+  final Value<String?> txType;
+  final Value<double?> amount;
+  final Value<String?> parseError;
+  const CapturedNotificationsCompanion({
+    this.id = const Value.absent(),
+    this.packageName = const Value.absent(),
+    this.appName = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.notificationKey = const Value.absent(),
+    this.postedAt = const Value.absent(),
+    this.capturedAt = const Value.absent(),
+    this.processed = const Value.absent(),
+    this.ruleId = const Value.absent(),
+    this.transactionId = const Value.absent(),
+    this.txType = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.parseError = const Value.absent(),
+  });
+  CapturedNotificationsCompanion.insert({
+    this.id = const Value.absent(),
+    required String packageName,
+    this.appName = const Value.absent(),
+    this.title = const Value.absent(),
+    this.body = const Value.absent(),
+    this.notificationKey = const Value.absent(),
+    required DateTime postedAt,
+    required DateTime capturedAt,
+    this.processed = const Value.absent(),
+    this.ruleId = const Value.absent(),
+    this.transactionId = const Value.absent(),
+    this.txType = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.parseError = const Value.absent(),
+  }) : packageName = Value(packageName),
+       postedAt = Value(postedAt),
+       capturedAt = Value(capturedAt);
+  static Insertable<CapturedNotificationRow> custom({
+    Expression<int>? id,
+    Expression<String>? packageName,
+    Expression<String>? appName,
+    Expression<String>? title,
+    Expression<String>? body,
+    Expression<String>? notificationKey,
+    Expression<int>? postedAt,
+    Expression<int>? capturedAt,
+    Expression<bool>? processed,
+    Expression<String>? ruleId,
+    Expression<String>? transactionId,
+    Expression<String>? txType,
+    Expression<double>? amount,
+    Expression<String>? parseError,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (packageName != null) 'package_name': packageName,
+      if (appName != null) 'app_name': appName,
+      if (title != null) 'title': title,
+      if (body != null) 'body': body,
+      if (notificationKey != null) 'notification_key': notificationKey,
+      if (postedAt != null) 'posted_at': postedAt,
+      if (capturedAt != null) 'captured_at': capturedAt,
+      if (processed != null) 'processed': processed,
+      if (ruleId != null) 'rule_id': ruleId,
+      if (transactionId != null) 'transaction_id': transactionId,
+      if (txType != null) 'tx_type': txType,
+      if (amount != null) 'amount': amount,
+      if (parseError != null) 'parse_error': parseError,
+    });
+  }
+
+  CapturedNotificationsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? packageName,
+    Value<String?>? appName,
+    Value<String>? title,
+    Value<String>? body,
+    Value<String?>? notificationKey,
+    Value<DateTime>? postedAt,
+    Value<DateTime>? capturedAt,
+    Value<bool>? processed,
+    Value<String?>? ruleId,
+    Value<String?>? transactionId,
+    Value<String?>? txType,
+    Value<double?>? amount,
+    Value<String?>? parseError,
+  }) {
+    return CapturedNotificationsCompanion(
+      id: id ?? this.id,
+      packageName: packageName ?? this.packageName,
+      appName: appName ?? this.appName,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      notificationKey: notificationKey ?? this.notificationKey,
+      postedAt: postedAt ?? this.postedAt,
+      capturedAt: capturedAt ?? this.capturedAt,
+      processed: processed ?? this.processed,
+      ruleId: ruleId ?? this.ruleId,
+      transactionId: transactionId ?? this.transactionId,
+      txType: txType ?? this.txType,
+      amount: amount ?? this.amount,
+      parseError: parseError ?? this.parseError,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (packageName.present) {
+      map['package_name'] = Variable<String>(packageName.value);
+    }
+    if (appName.present) {
+      map['app_name'] = Variable<String>(appName.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (body.present) {
+      map['body'] = Variable<String>(body.value);
+    }
+    if (notificationKey.present) {
+      map['notification_key'] = Variable<String>(notificationKey.value);
+    }
+    if (postedAt.present) {
+      map['posted_at'] = Variable<int>(
+        $CapturedNotificationsTable.$converterpostedAt.toSql(postedAt.value),
+      );
+    }
+    if (capturedAt.present) {
+      map['captured_at'] = Variable<int>(
+        $CapturedNotificationsTable.$convertercapturedAt.toSql(
+          capturedAt.value,
+        ),
+      );
+    }
+    if (processed.present) {
+      map['processed'] = Variable<bool>(processed.value);
+    }
+    if (ruleId.present) {
+      map['rule_id'] = Variable<String>(ruleId.value);
+    }
+    if (transactionId.present) {
+      map['transaction_id'] = Variable<String>(transactionId.value);
+    }
+    if (txType.present) {
+      map['tx_type'] = Variable<String>(txType.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (parseError.present) {
+      map['parse_error'] = Variable<String>(parseError.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CapturedNotificationsCompanion(')
+          ..write('id: $id, ')
+          ..write('packageName: $packageName, ')
+          ..write('appName: $appName, ')
+          ..write('title: $title, ')
+          ..write('body: $body, ')
+          ..write('notificationKey: $notificationKey, ')
+          ..write('postedAt: $postedAt, ')
+          ..write('capturedAt: $capturedAt, ')
+          ..write('processed: $processed, ')
+          ..write('ruleId: $ruleId, ')
+          ..write('transactionId: $transactionId, ')
+          ..write('txType: $txType, ')
+          ..write('amount: $amount, ')
+          ..write('parseError: $parseError')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $NotificationRulesTable extends NotificationRules
+    with TableInfo<$NotificationRulesTable, NotificationRuleRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotificationRulesTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($NotificationRulesTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($NotificationRulesTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _packagesMeta = const VerificationMeta(
+    'packages',
+  );
+  @override
+  late final GeneratedColumn<String> packages = GeneratedColumn<String>(
+    'packages',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _matchFieldMeta = const VerificationMeta(
+    'matchField',
+  );
+  @override
+  late final GeneratedColumn<String> matchField = GeneratedColumn<String>(
+    'match_field',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('any'),
+  );
+  static const VerificationMeta _patternMeta = const VerificationMeta(
+    'pattern',
+  );
+  @override
+  late final GeneratedColumn<String> pattern = GeneratedColumn<String>(
+    'pattern',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isRegexMeta = const VerificationMeta(
+    'isRegex',
+  );
+  @override
+  late final GeneratedColumn<bool> isRegex = GeneratedColumn<bool>(
+    'is_regex',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_regex" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountPatternMeta = const VerificationMeta(
+    'amountPattern',
+  );
+  @override
+  late final GeneratedColumn<String> amountPattern = GeneratedColumn<String>(
+    'amount_pattern',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _walletIdMeta = const VerificationMeta(
+    'walletId',
+  );
+  @override
+  late final GeneratedColumn<String> walletId = GeneratedColumn<String>(
+    'wallet_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'category_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _enabledMeta = const VerificationMeta(
+    'enabled',
+  );
+  @override
+  late final GeneratedColumn<bool> enabled = GeneratedColumn<bool>(
+    'enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _presetKeyMeta = const VerificationMeta(
+    'presetKey',
+  );
+  @override
+  late final GeneratedColumn<String> presetKey = GeneratedColumn<String>(
+    'preset_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    name,
+    packages,
+    matchField,
+    pattern,
+    isRegex,
+    type,
+    amountPattern,
+    walletId,
+    categoryId,
+    enabled,
+    presetKey,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'notification_rules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NotificationRuleRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('packages')) {
+      context.handle(
+        _packagesMeta,
+        packages.isAcceptableOrUnknown(data['packages']!, _packagesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_packagesMeta);
+    }
+    if (data.containsKey('match_field')) {
+      context.handle(
+        _matchFieldMeta,
+        matchField.isAcceptableOrUnknown(data['match_field']!, _matchFieldMeta),
+      );
+    }
+    if (data.containsKey('pattern')) {
+      context.handle(
+        _patternMeta,
+        pattern.isAcceptableOrUnknown(data['pattern']!, _patternMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_patternMeta);
+    }
+    if (data.containsKey('is_regex')) {
+      context.handle(
+        _isRegexMeta,
+        isRegex.isAcceptableOrUnknown(data['is_regex']!, _isRegexMeta),
+      );
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('amount_pattern')) {
+      context.handle(
+        _amountPatternMeta,
+        amountPattern.isAcceptableOrUnknown(
+          data['amount_pattern']!,
+          _amountPatternMeta,
+        ),
+      );
+    }
+    if (data.containsKey('wallet_id')) {
+      context.handle(
+        _walletIdMeta,
+        walletId.isAcceptableOrUnknown(data['wallet_id']!, _walletIdMeta),
+      );
+    }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(
+        _enabledMeta,
+        enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta),
+      );
+    }
+    if (data.containsKey('preset_key')) {
+      context.handle(
+        _presetKeyMeta,
+        presetKey.isAcceptableOrUnknown(data['preset_key']!, _presetKeyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NotificationRuleRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NotificationRuleRow(
+      createdAt: $NotificationRulesTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $NotificationRulesTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      packages: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}packages'],
+      )!,
+      matchField: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}match_field'],
+      )!,
+      pattern: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pattern'],
+      )!,
+      isRegex: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_regex'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      amountPattern: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}amount_pattern'],
+      ),
+      walletId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}wallet_id'],
+      ),
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_id'],
+      ),
+      enabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enabled'],
+      )!,
+      presetKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}preset_key'],
+      ),
+    );
+  }
+
+  @override
+  $NotificationRulesTable createAlias(String alias) {
+    return $NotificationRulesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+}
+
+class NotificationRuleRow extends DataClass
+    implements Insertable<NotificationRuleRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String name;
+
+  /// JSON array of package names.
+  final String packages;
+
+  /// `any` | `title` | `body`
+  final String matchField;
+  final String pattern;
+  final bool isRegex;
+
+  /// `income` | `expense`
+  final String type;
+  final String? amountPattern;
+  final String? walletId;
+  final String? categoryId;
+  final bool enabled;
+  final String? presetKey;
+  const NotificationRuleRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.name,
+    required this.packages,
+    required this.matchField,
+    required this.pattern,
+    required this.isRegex,
+    required this.type,
+    this.amountPattern,
+    this.walletId,
+    this.categoryId,
+    required this.enabled,
+    this.presetKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $NotificationRulesTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $NotificationRulesTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['packages'] = Variable<String>(packages);
+    map['match_field'] = Variable<String>(matchField);
+    map['pattern'] = Variable<String>(pattern);
+    map['is_regex'] = Variable<bool>(isRegex);
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || amountPattern != null) {
+      map['amount_pattern'] = Variable<String>(amountPattern);
+    }
+    if (!nullToAbsent || walletId != null) {
+      map['wallet_id'] = Variable<String>(walletId);
+    }
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<String>(categoryId);
+    }
+    map['enabled'] = Variable<bool>(enabled);
+    if (!nullToAbsent || presetKey != null) {
+      map['preset_key'] = Variable<String>(presetKey);
+    }
+    return map;
+  }
+
+  NotificationRulesCompanion toCompanion(bool nullToAbsent) {
+    return NotificationRulesCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      name: Value(name),
+      packages: Value(packages),
+      matchField: Value(matchField),
+      pattern: Value(pattern),
+      isRegex: Value(isRegex),
+      type: Value(type),
+      amountPattern: amountPattern == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amountPattern),
+      walletId: walletId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(walletId),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
+      enabled: Value(enabled),
+      presetKey: presetKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(presetKey),
+    );
+  }
+
+  factory NotificationRuleRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NotificationRuleRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      packages: serializer.fromJson<String>(json['packages']),
+      matchField: serializer.fromJson<String>(json['matchField']),
+      pattern: serializer.fromJson<String>(json['pattern']),
+      isRegex: serializer.fromJson<bool>(json['isRegex']),
+      type: serializer.fromJson<String>(json['type']),
+      amountPattern: serializer.fromJson<String?>(json['amountPattern']),
+      walletId: serializer.fromJson<String?>(json['walletId']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
+      enabled: serializer.fromJson<bool>(json['enabled']),
+      presetKey: serializer.fromJson<String?>(json['presetKey']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'packages': serializer.toJson<String>(packages),
+      'matchField': serializer.toJson<String>(matchField),
+      'pattern': serializer.toJson<String>(pattern),
+      'isRegex': serializer.toJson<bool>(isRegex),
+      'type': serializer.toJson<String>(type),
+      'amountPattern': serializer.toJson<String?>(amountPattern),
+      'walletId': serializer.toJson<String?>(walletId),
+      'categoryId': serializer.toJson<String?>(categoryId),
+      'enabled': serializer.toJson<bool>(enabled),
+      'presetKey': serializer.toJson<String?>(presetKey),
+    };
+  }
+
+  NotificationRuleRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? name,
+    String? packages,
+    String? matchField,
+    String? pattern,
+    bool? isRegex,
+    String? type,
+    Value<String?> amountPattern = const Value.absent(),
+    Value<String?> walletId = const Value.absent(),
+    Value<String?> categoryId = const Value.absent(),
+    bool? enabled,
+    Value<String?> presetKey = const Value.absent(),
+  }) => NotificationRuleRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    name: name ?? this.name,
+    packages: packages ?? this.packages,
+    matchField: matchField ?? this.matchField,
+    pattern: pattern ?? this.pattern,
+    isRegex: isRegex ?? this.isRegex,
+    type: type ?? this.type,
+    amountPattern: amountPattern.present
+        ? amountPattern.value
+        : this.amountPattern,
+    walletId: walletId.present ? walletId.value : this.walletId,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
+    enabled: enabled ?? this.enabled,
+    presetKey: presetKey.present ? presetKey.value : this.presetKey,
+  );
+  NotificationRuleRow copyWithCompanion(NotificationRulesCompanion data) {
+    return NotificationRuleRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      packages: data.packages.present ? data.packages.value : this.packages,
+      matchField: data.matchField.present
+          ? data.matchField.value
+          : this.matchField,
+      pattern: data.pattern.present ? data.pattern.value : this.pattern,
+      isRegex: data.isRegex.present ? data.isRegex.value : this.isRegex,
+      type: data.type.present ? data.type.value : this.type,
+      amountPattern: data.amountPattern.present
+          ? data.amountPattern.value
+          : this.amountPattern,
+      walletId: data.walletId.present ? data.walletId.value : this.walletId,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      presetKey: data.presetKey.present ? data.presetKey.value : this.presetKey,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationRuleRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('packages: $packages, ')
+          ..write('matchField: $matchField, ')
+          ..write('pattern: $pattern, ')
+          ..write('isRegex: $isRegex, ')
+          ..write('type: $type, ')
+          ..write('amountPattern: $amountPattern, ')
+          ..write('walletId: $walletId, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('enabled: $enabled, ')
+          ..write('presetKey: $presetKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    name,
+    packages,
+    matchField,
+    pattern,
+    isRegex,
+    type,
+    amountPattern,
+    walletId,
+    categoryId,
+    enabled,
+    presetKey,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotificationRuleRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.packages == this.packages &&
+          other.matchField == this.matchField &&
+          other.pattern == this.pattern &&
+          other.isRegex == this.isRegex &&
+          other.type == this.type &&
+          other.amountPattern == this.amountPattern &&
+          other.walletId == this.walletId &&
+          other.categoryId == this.categoryId &&
+          other.enabled == this.enabled &&
+          other.presetKey == this.presetKey);
+}
+
+class NotificationRulesCompanion extends UpdateCompanion<NotificationRuleRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> packages;
+  final Value<String> matchField;
+  final Value<String> pattern;
+  final Value<bool> isRegex;
+  final Value<String> type;
+  final Value<String?> amountPattern;
+  final Value<String?> walletId;
+  final Value<String?> categoryId;
+  final Value<bool> enabled;
+  final Value<String?> presetKey;
+  final Value<int> rowid;
+  const NotificationRulesCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.packages = const Value.absent(),
+    this.matchField = const Value.absent(),
+    this.pattern = const Value.absent(),
+    this.isRegex = const Value.absent(),
+    this.type = const Value.absent(),
+    this.amountPattern = const Value.absent(),
+    this.walletId = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.presetKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NotificationRulesCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String name,
+    required String packages,
+    this.matchField = const Value.absent(),
+    required String pattern,
+    this.isRegex = const Value.absent(),
+    required String type,
+    this.amountPattern = const Value.absent(),
+    this.walletId = const Value.absent(),
+    this.categoryId = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.presetKey = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       name = Value(name),
+       packages = Value(packages),
+       pattern = Value(pattern),
+       type = Value(type);
+  static Insertable<NotificationRuleRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? packages,
+    Expression<String>? matchField,
+    Expression<String>? pattern,
+    Expression<bool>? isRegex,
+    Expression<String>? type,
+    Expression<String>? amountPattern,
+    Expression<String>? walletId,
+    Expression<String>? categoryId,
+    Expression<bool>? enabled,
+    Expression<String>? presetKey,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (packages != null) 'packages': packages,
+      if (matchField != null) 'match_field': matchField,
+      if (pattern != null) 'pattern': pattern,
+      if (isRegex != null) 'is_regex': isRegex,
+      if (type != null) 'type': type,
+      if (amountPattern != null) 'amount_pattern': amountPattern,
+      if (walletId != null) 'wallet_id': walletId,
+      if (categoryId != null) 'category_id': categoryId,
+      if (enabled != null) 'enabled': enabled,
+      if (presetKey != null) 'preset_key': presetKey,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NotificationRulesCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? packages,
+    Value<String>? matchField,
+    Value<String>? pattern,
+    Value<bool>? isRegex,
+    Value<String>? type,
+    Value<String?>? amountPattern,
+    Value<String?>? walletId,
+    Value<String?>? categoryId,
+    Value<bool>? enabled,
+    Value<String?>? presetKey,
+    Value<int>? rowid,
+  }) {
+    return NotificationRulesCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      packages: packages ?? this.packages,
+      matchField: matchField ?? this.matchField,
+      pattern: pattern ?? this.pattern,
+      isRegex: isRegex ?? this.isRegex,
+      type: type ?? this.type,
+      amountPattern: amountPattern ?? this.amountPattern,
+      walletId: walletId ?? this.walletId,
+      categoryId: categoryId ?? this.categoryId,
+      enabled: enabled ?? this.enabled,
+      presetKey: presetKey ?? this.presetKey,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $NotificationRulesTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $NotificationRulesTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (packages.present) {
+      map['packages'] = Variable<String>(packages.value);
+    }
+    if (matchField.present) {
+      map['match_field'] = Variable<String>(matchField.value);
+    }
+    if (pattern.present) {
+      map['pattern'] = Variable<String>(pattern.value);
+    }
+    if (isRegex.present) {
+      map['is_regex'] = Variable<bool>(isRegex.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (amountPattern.present) {
+      map['amount_pattern'] = Variable<String>(amountPattern.value);
+    }
+    if (walletId.present) {
+      map['wallet_id'] = Variable<String>(walletId.value);
+    }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<bool>(enabled.value);
+    }
+    if (presetKey.present) {
+      map['preset_key'] = Variable<String>(presetKey.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotificationRulesCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('packages: $packages, ')
+          ..write('matchField: $matchField, ')
+          ..write('pattern: $pattern, ')
+          ..write('isRegex: $isRegex, ')
+          ..write('type: $type, ')
+          ..write('amountPattern: $amountPattern, ')
+          ..write('walletId: $walletId, ')
+          ..write('categoryId: $categoryId, ')
+          ..write('enabled: $enabled, ')
+          ..write('presetKey: $presetKey, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $OutboxTable extends Outbox with TableInfo<$OutboxTable, OutboxRow> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -16443,6 +18085,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $CachedPricesTable cachedPrices = $CachedPricesTable(this);
   late final $PortfolioSnapshotsTable portfolioSnapshots =
       $PortfolioSnapshotsTable(this);
+  late final $CapturedNotificationsTable capturedNotifications =
+      $CapturedNotificationsTable(this);
+  late final $NotificationRulesTable notificationRules =
+      $NotificationRulesTable(this);
   late final $OutboxTable outbox = $OutboxTable(this);
   late final $SyncMetaTable syncMeta = $SyncMetaTable(this);
   late final Index idxTxDate = Index(
@@ -16521,6 +18167,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_trade_cash_tx',
     'CREATE INDEX idx_trade_cash_tx ON asset_trades (cash_transaction_id)',
   );
+  late final Index idxNotifPosted = Index(
+    'idx_notif_posted',
+    'CREATE INDEX idx_notif_posted ON captured_notifications (posted_at)',
+  );
+  late final Index idxNotifPackage = Index(
+    'idx_notif_package',
+    'CREATE INDEX idx_notif_package ON captured_notifications (package_name)',
+  );
+  late final Index idxNotifProcessed = Index(
+    'idx_notif_processed',
+    'CREATE INDEX idx_notif_processed ON captured_notifications (processed)',
+  );
   late final Index idxOutboxEntity = Index(
     'idx_outbox_entity',
     'CREATE INDEX idx_outbox_entity ON outbox (entity, entity_id)',
@@ -16553,6 +18211,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     assetTrades,
     cachedPrices,
     portfolioSnapshots,
+    capturedNotifications,
+    notificationRules,
     outbox,
     syncMeta,
     idxTxDate,
@@ -16574,6 +18234,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxAssetSymbol,
     idxTradeAsset,
     idxTradeCashTx,
+    idxNotifPosted,
+    idxNotifPackage,
+    idxNotifProcessed,
     idxOutboxEntity,
   ];
 }
@@ -24157,6 +25820,818 @@ typedef $$PortfolioSnapshotsTableProcessedTableManager =
       PortfolioSnapshotRow,
       PrefetchHooks Function()
     >;
+typedef $$CapturedNotificationsTableCreateCompanionBuilder =
+    CapturedNotificationsCompanion Function({
+      Value<int> id,
+      required String packageName,
+      Value<String?> appName,
+      Value<String> title,
+      Value<String> body,
+      Value<String?> notificationKey,
+      required DateTime postedAt,
+      required DateTime capturedAt,
+      Value<bool> processed,
+      Value<String?> ruleId,
+      Value<String?> transactionId,
+      Value<String?> txType,
+      Value<double?> amount,
+      Value<String?> parseError,
+    });
+typedef $$CapturedNotificationsTableUpdateCompanionBuilder =
+    CapturedNotificationsCompanion Function({
+      Value<int> id,
+      Value<String> packageName,
+      Value<String?> appName,
+      Value<String> title,
+      Value<String> body,
+      Value<String?> notificationKey,
+      Value<DateTime> postedAt,
+      Value<DateTime> capturedAt,
+      Value<bool> processed,
+      Value<String?> ruleId,
+      Value<String?> transactionId,
+      Value<String?> txType,
+      Value<double?> amount,
+      Value<String?> parseError,
+    });
+
+class $$CapturedNotificationsTableFilterComposer
+    extends Composer<_$AppDatabase, $CapturedNotificationsTable> {
+  $$CapturedNotificationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appName => $composableBuilder(
+    column: $table.appName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get postedAt =>
+      $composableBuilder(
+        column: $table.postedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get capturedAt =>
+      $composableBuilder(
+        column: $table.capturedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<bool> get processed => $composableBuilder(
+    column: $table.processed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ruleId => $composableBuilder(
+    column: $table.ruleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get txType => $composableBuilder(
+    column: $table.txType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parseError => $composableBuilder(
+    column: $table.parseError,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CapturedNotificationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CapturedNotificationsTable> {
+  $$CapturedNotificationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appName => $composableBuilder(
+    column: $table.appName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get body => $composableBuilder(
+    column: $table.body,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get postedAt => $composableBuilder(
+    column: $table.postedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get capturedAt => $composableBuilder(
+    column: $table.capturedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get processed => $composableBuilder(
+    column: $table.processed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ruleId => $composableBuilder(
+    column: $table.ruleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get txType => $composableBuilder(
+    column: $table.txType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parseError => $composableBuilder(
+    column: $table.parseError,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CapturedNotificationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CapturedNotificationsTable> {
+  $$CapturedNotificationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get packageName => $composableBuilder(
+    column: $table.packageName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get appName =>
+      $composableBuilder(column: $table.appName, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get body =>
+      $composableBuilder(column: $table.body, builder: (column) => column);
+
+  GeneratedColumn<String> get notificationKey => $composableBuilder(
+    column: $table.notificationKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get postedAt =>
+      $composableBuilder(column: $table.postedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get capturedAt =>
+      $composableBuilder(
+        column: $table.capturedAt,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<bool> get processed =>
+      $composableBuilder(column: $table.processed, builder: (column) => column);
+
+  GeneratedColumn<String> get ruleId =>
+      $composableBuilder(column: $table.ruleId, builder: (column) => column);
+
+  GeneratedColumn<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get txType =>
+      $composableBuilder(column: $table.txType, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get parseError => $composableBuilder(
+    column: $table.parseError,
+    builder: (column) => column,
+  );
+}
+
+class $$CapturedNotificationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CapturedNotificationsTable,
+          CapturedNotificationRow,
+          $$CapturedNotificationsTableFilterComposer,
+          $$CapturedNotificationsTableOrderingComposer,
+          $$CapturedNotificationsTableAnnotationComposer,
+          $$CapturedNotificationsTableCreateCompanionBuilder,
+          $$CapturedNotificationsTableUpdateCompanionBuilder,
+          (
+            CapturedNotificationRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CapturedNotificationsTable,
+              CapturedNotificationRow
+            >,
+          ),
+          CapturedNotificationRow,
+          PrefetchHooks Function()
+        > {
+  $$CapturedNotificationsTableTableManager(
+    _$AppDatabase db,
+    $CapturedNotificationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CapturedNotificationsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CapturedNotificationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CapturedNotificationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> packageName = const Value.absent(),
+                Value<String?> appName = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> notificationKey = const Value.absent(),
+                Value<DateTime> postedAt = const Value.absent(),
+                Value<DateTime> capturedAt = const Value.absent(),
+                Value<bool> processed = const Value.absent(),
+                Value<String?> ruleId = const Value.absent(),
+                Value<String?> transactionId = const Value.absent(),
+                Value<String?> txType = const Value.absent(),
+                Value<double?> amount = const Value.absent(),
+                Value<String?> parseError = const Value.absent(),
+              }) => CapturedNotificationsCompanion(
+                id: id,
+                packageName: packageName,
+                appName: appName,
+                title: title,
+                body: body,
+                notificationKey: notificationKey,
+                postedAt: postedAt,
+                capturedAt: capturedAt,
+                processed: processed,
+                ruleId: ruleId,
+                transactionId: transactionId,
+                txType: txType,
+                amount: amount,
+                parseError: parseError,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String packageName,
+                Value<String?> appName = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> body = const Value.absent(),
+                Value<String?> notificationKey = const Value.absent(),
+                required DateTime postedAt,
+                required DateTime capturedAt,
+                Value<bool> processed = const Value.absent(),
+                Value<String?> ruleId = const Value.absent(),
+                Value<String?> transactionId = const Value.absent(),
+                Value<String?> txType = const Value.absent(),
+                Value<double?> amount = const Value.absent(),
+                Value<String?> parseError = const Value.absent(),
+              }) => CapturedNotificationsCompanion.insert(
+                id: id,
+                packageName: packageName,
+                appName: appName,
+                title: title,
+                body: body,
+                notificationKey: notificationKey,
+                postedAt: postedAt,
+                capturedAt: capturedAt,
+                processed: processed,
+                ruleId: ruleId,
+                transactionId: transactionId,
+                txType: txType,
+                amount: amount,
+                parseError: parseError,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CapturedNotificationsTable,
+                    CapturedNotificationRow
+                  >(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CapturedNotificationsTable,
+                    CapturedNotificationRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CapturedNotificationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CapturedNotificationsTable,
+      CapturedNotificationRow,
+      $$CapturedNotificationsTableFilterComposer,
+      $$CapturedNotificationsTableOrderingComposer,
+      $$CapturedNotificationsTableAnnotationComposer,
+      $$CapturedNotificationsTableCreateCompanionBuilder,
+      $$CapturedNotificationsTableUpdateCompanionBuilder,
+      (
+        CapturedNotificationRow,
+        BaseReferences<
+          _$AppDatabase,
+          $CapturedNotificationsTable,
+          CapturedNotificationRow
+        >,
+      ),
+      CapturedNotificationRow,
+      PrefetchHooks Function()
+    >;
+typedef $$NotificationRulesTableCreateCompanionBuilder =
+    NotificationRulesCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String name,
+      required String packages,
+      Value<String> matchField,
+      required String pattern,
+      Value<bool> isRegex,
+      required String type,
+      Value<String?> amountPattern,
+      Value<String?> walletId,
+      Value<String?> categoryId,
+      Value<bool> enabled,
+      Value<String?> presetKey,
+      Value<int> rowid,
+    });
+typedef $$NotificationRulesTableUpdateCompanionBuilder =
+    NotificationRulesCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> name,
+      Value<String> packages,
+      Value<String> matchField,
+      Value<String> pattern,
+      Value<bool> isRegex,
+      Value<String> type,
+      Value<String?> amountPattern,
+      Value<String?> walletId,
+      Value<String?> categoryId,
+      Value<bool> enabled,
+      Value<String?> presetKey,
+      Value<int> rowid,
+    });
+
+class $$NotificationRulesTableFilterComposer
+    extends Composer<_$AppDatabase, $NotificationRulesTable> {
+  $$NotificationRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get packages => $composableBuilder(
+    column: $table.packages,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pattern => $composableBuilder(
+    column: $table.pattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isRegex => $composableBuilder(
+    column: $table.isRegex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get amountPattern => $composableBuilder(
+    column: $table.amountPattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get walletId => $composableBuilder(
+    column: $table.walletId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get presetKey => $composableBuilder(
+    column: $table.presetKey,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NotificationRulesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotificationRulesTable> {
+  $$NotificationRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get packages => $composableBuilder(
+    column: $table.packages,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pattern => $composableBuilder(
+    column: $table.pattern,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isRegex => $composableBuilder(
+    column: $table.isRegex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get amountPattern => $composableBuilder(
+    column: $table.amountPattern,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get walletId => $composableBuilder(
+    column: $table.walletId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get presetKey => $composableBuilder(
+    column: $table.presetKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NotificationRulesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotificationRulesTable> {
+  $$NotificationRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get packages =>
+      $composableBuilder(column: $table.packages, builder: (column) => column);
+
+  GeneratedColumn<String> get matchField => $composableBuilder(
+    column: $table.matchField,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pattern =>
+      $composableBuilder(column: $table.pattern, builder: (column) => column);
+
+  GeneratedColumn<bool> get isRegex =>
+      $composableBuilder(column: $table.isRegex, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get amountPattern => $composableBuilder(
+    column: $table.amountPattern,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get walletId =>
+      $composableBuilder(column: $table.walletId, builder: (column) => column);
+
+  GeneratedColumn<String> get categoryId => $composableBuilder(
+    column: $table.categoryId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<String> get presetKey =>
+      $composableBuilder(column: $table.presetKey, builder: (column) => column);
+}
+
+class $$NotificationRulesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NotificationRulesTable,
+          NotificationRuleRow,
+          $$NotificationRulesTableFilterComposer,
+          $$NotificationRulesTableOrderingComposer,
+          $$NotificationRulesTableAnnotationComposer,
+          $$NotificationRulesTableCreateCompanionBuilder,
+          $$NotificationRulesTableUpdateCompanionBuilder,
+          (
+            NotificationRuleRow,
+            BaseReferences<
+              _$AppDatabase,
+              $NotificationRulesTable,
+              NotificationRuleRow
+            >,
+          ),
+          NotificationRuleRow,
+          PrefetchHooks Function()
+        > {
+  $$NotificationRulesTableTableManager(
+    _$AppDatabase db,
+    $NotificationRulesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotificationRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotificationRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotificationRulesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> packages = const Value.absent(),
+                Value<String> matchField = const Value.absent(),
+                Value<String> pattern = const Value.absent(),
+                Value<bool> isRegex = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String?> amountPattern = const Value.absent(),
+                Value<String?> walletId = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<String?> presetKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotificationRulesCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                name: name,
+                packages: packages,
+                matchField: matchField,
+                pattern: pattern,
+                isRegex: isRegex,
+                type: type,
+                amountPattern: amountPattern,
+                walletId: walletId,
+                categoryId: categoryId,
+                enabled: enabled,
+                presetKey: presetKey,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String name,
+                required String packages,
+                Value<String> matchField = const Value.absent(),
+                required String pattern,
+                Value<bool> isRegex = const Value.absent(),
+                required String type,
+                Value<String?> amountPattern = const Value.absent(),
+                Value<String?> walletId = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
+                Value<bool> enabled = const Value.absent(),
+                Value<String?> presetKey = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotificationRulesCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                name: name,
+                packages: packages,
+                matchField: matchField,
+                pattern: pattern,
+                isRegex: isRegex,
+                type: type,
+                amountPattern: amountPattern,
+                walletId: walletId,
+                categoryId: categoryId,
+                enabled: enabled,
+                presetKey: presetKey,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$NotificationRulesTable, NotificationRuleRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $NotificationRulesTable,
+                    NotificationRuleRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NotificationRulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NotificationRulesTable,
+      NotificationRuleRow,
+      $$NotificationRulesTableFilterComposer,
+      $$NotificationRulesTableOrderingComposer,
+      $$NotificationRulesTableAnnotationComposer,
+      $$NotificationRulesTableCreateCompanionBuilder,
+      $$NotificationRulesTableUpdateCompanionBuilder,
+      (
+        NotificationRuleRow,
+        BaseReferences<
+          _$AppDatabase,
+          $NotificationRulesTable,
+          NotificationRuleRow
+        >,
+      ),
+      NotificationRuleRow,
+      PrefetchHooks Function()
+    >;
 typedef $$OutboxTableCreateCompanionBuilder =
     OutboxCompanion Function({
       Value<int> seq,
@@ -24807,6 +27282,10 @@ class $AppDatabaseManager {
       $$CachedPricesTableTableManager(_db, _db.cachedPrices);
   $$PortfolioSnapshotsTableTableManager get portfolioSnapshots =>
       $$PortfolioSnapshotsTableTableManager(_db, _db.portfolioSnapshots);
+  $$CapturedNotificationsTableTableManager get capturedNotifications =>
+      $$CapturedNotificationsTableTableManager(_db, _db.capturedNotifications);
+  $$NotificationRulesTableTableManager get notificationRules =>
+      $$NotificationRulesTableTableManager(_db, _db.notificationRules);
   $$OutboxTableTableManager get outbox =>
       $$OutboxTableTableManager(_db, _db.outbox);
   $$SyncMetaTableTableManager get syncMeta =>

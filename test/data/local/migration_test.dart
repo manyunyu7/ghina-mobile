@@ -90,6 +90,22 @@ void main() {
     await db.close();
   });
 
+  for (final from in [1, 2, 3, 4, 5]) {
+    test('upgrade v$from → v6 yields exactly the v6 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 6);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v6 schema', () async {
+    final schema = await verifier.schemaAt(6);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 6);
+    await db.close();
+  });
+
   test('v1 data survives on a real database file: prayers become ontime', () async {
     final dir = await Directory.systemTemp.createTemp('ghina_migration');
     final file = File('${dir.path}/ghina.sqlite');
@@ -499,13 +515,13 @@ void main() {
     );
     await old.close();
 
-    // 2. Open with the current app → onUpgrade(4, 5).
+    // 2. Open with the current app → onUpgrade(4, current).
     final db = AppDatabase(NativeDatabase(file));
     expect(
       (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
         'user_version',
       ),
-      5,
+      db.schemaVersion,
     );
     expect((await db.select(db.wallets).getSingle()).balance, 1000000);
     // The hidden v4 row is now a known `investment` transaction.

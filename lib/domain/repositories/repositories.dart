@@ -300,6 +300,52 @@ abstract interface class PortfolioSnapshotRepository {
   Future<void> put(PortfolioPoint point, DateTime at);
 }
 
+/// Device-only log of notifications from other apps ("Log Notifikasi"),
+/// written by the Android notification listener (also from its background
+/// isolate). Not synced; wiped on sign-out.
+abstract interface class CapturedNotificationRepository {
+  /// Newest first (`postedAt` desc). [search] matches title, body and app
+  /// name (case-insensitive).
+  Stream<List<CapturedNotification>> watch({
+    String? packageName,
+    String? search,
+    int limit = 300,
+  });
+
+  /// Apps present in the log, most notifications first.
+  Stream<List<NotificationSource>> watchSources();
+
+  /// Emits the number of rows not yet checked against the rules.
+  Stream<int> watchUnprocessedCount();
+
+  /// Oldest first.
+  Future<List<CapturedNotification>> unprocessed({int limit = 50});
+
+  Future<void> markProcessed(
+    int id, {
+    String? appName,
+    String? ruleId,
+    String? transactionId,
+    TxType? txType,
+    double? amount,
+    String? parseError,
+  });
+
+  /// Deletes every row (or only [packageName]'s). Returns the count.
+  Future<int> clear({String? packageName});
+}
+
+/// Device-only parsing rules: notification → income/expense transaction.
+abstract interface class NotificationRuleRepository {
+  /// User rules first, then presets; oldest first within each.
+  Stream<List<NotificationRule>> watchAll();
+  Future<List<NotificationRule>> getAll();
+  Stream<NotificationRule?> watchById(String id);
+  Future<NotificationRule?> getById(String id);
+  Future<void> save(NotificationRule rule);
+  Future<void> delete(String id);
+}
+
 /// Whether the server already owns seeding the notes/content defaults (a pull
 /// from a notes/content-aware server succeeded). Before that, the app may seed
 /// them locally as an offline fallback (same deterministic ids).

@@ -16,6 +16,8 @@ import '../data/datasources/remote/auth_api.dart';
 import '../data/datasources/remote/prices_api.dart';
 import '../data/datasources/remote/sync_api.dart';
 import '../data/datasources/remote/token_store.dart';
+import '../data/platform/platform.dart'
+    show createDeviceNotificationListener, notificationCaptureDatabase;
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/content_repositories.dart';
 import '../data/repositories/finance_repositories.dart';
@@ -24,12 +26,14 @@ import '../data/repositories/investment_repositories.dart';
 import '../data/repositories/life_repositories.dart';
 import '../data/repositories/local_store.dart';
 import '../data/repositories/notes_repositories.dart';
+import '../data/repositories/notification_log_repositories.dart';
 import '../data/repositories/photo_store.dart';
 import '../data/repositories/task_repositories.dart';
 import '../data/sync/outbox.dart';
 import '../data/sync/sync_engine.dart';
 import '../data/sync/sync_triggers.dart';
 import '../domain/repositories/repositories.dart';
+import '../domain/services/notification_listener.dart';
 import '../domain/usecases/task_usecases.dart' show TickSource;
 
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
@@ -45,9 +49,23 @@ final apiBaseUrlProvider = Provider<String>((ref) => AppConfig.apiBaseUrl);
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase.open();
-  ref.onDispose(db.close);
+  // The notification listener callback reuses this connection when it runs
+  // in the UI isolate.
+  notificationCaptureDatabase = db;
+  ref.onDispose(() {
+    if (identical(notificationCaptureDatabase, db)) {
+      notificationCaptureDatabase = null;
+    }
+    db.close();
+  });
   return db;
 });
+
+/// Android notification listener ("Log Notifikasi"); a no-op on iOS and
+/// under `flutter test`.
+final deviceNotificationListenerProvider = Provider<DeviceNotificationListener>(
+  (ref) => createDeviceNotificationListener(),
+);
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());
 
@@ -191,6 +209,14 @@ final contentPillarRepositoryProvider = Provider<ContentPillarRepository>(
 );
 final defaultsSeedStateProvider = Provider<DefaultsSeedState>(
   (ref) => DriftDefaultsSeedState(ref.watch(appDatabaseProvider)),
+);
+final capturedNotificationRepositoryProvider =
+    Provider<CapturedNotificationRepository>(
+      (ref) =>
+          DriftCapturedNotificationRepository(ref.watch(appDatabaseProvider)),
+    );
+final notificationRuleRepositoryProvider = Provider<NotificationRuleRepository>(
+  (ref) => DriftNotificationRuleRepository(ref.watch(appDatabaseProvider)),
 );
 final habitRepositoryProvider = Provider<HabitRepository>(
   (ref) => DriftHabitRepository(ref.watch(localStoreProvider)),

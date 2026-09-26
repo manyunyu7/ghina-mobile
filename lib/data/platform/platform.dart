@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/microphone_permission.dart';
+import '../../domain/services/notification_listener.dart';
 import '../../domain/services/share_intake.dart';
 import '../../domain/services/speech_transcriber.dart';
 import '../../domain/services/voice_recorder.dart';
@@ -19,11 +20,14 @@ import 'channel_share_intake.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'just_audio_playback.dart';
+import 'notification_listener_bridge.dart';
 import 'quick_actions_app_shortcuts.dart';
 import 'record_voice_recorder.dart';
 import 'stt_speech_transcriber.dart';
 
 export 'fakes.dart';
+export 'notification_listener_bridge.dart'
+    show NoopDeviceNotificationListener, notificationCaptureDatabase;
 
 bool get _isTest => !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
@@ -57,3 +61,9 @@ ShareIntake createShareIntake() =>
 /// Launcher shortcuts (Android app shortcuts / iOS quick actions).
 AppShortcuts createAppShortcuts() =>
     isMobileDevice ? QuickActionsAppShortcuts() : const NoopAppShortcuts();
+
+/// Android only: iOS can't read other apps' notifications ("Log Notifikasi"
+/// is hidden there).
+DeviceNotificationListener createDeviceNotificationListener() => _isAndroid
+    ? FlutterDeviceNotificationListener()
+    : const NoopDeviceNotificationListener();

@@ -15,6 +15,8 @@ import android.speech.SpeechRecognizer
 import android.webkit.MimeTypeMap
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
+import im.zoe.labs.flutter_notification_listener.NotificationsHandlerService
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -33,6 +35,9 @@ import java.util.concurrent.Executors
  *    from Dart; the plugin reads the launch extra on cold start and gets warm
  *    starts through onNewIntent). This activity only makes sure a shortcut
  *    doesn't fire twice (restored from Recents / re-attached plugin).
+ *  - Log Notifikasi: launchable apps + app labels (apps.list / apps.label), and a
+ *    hand-over of the flutter_notification_listener service to a background engine
+ *    when this activity's engine dies (see onDestroy).
  *
  * A FlutterFragmentActivity (not FlutterActivity) because local_auth ("Kunci
  * Kebiasaan") shows the BiometricPrompt as a fragment. The share / settings / speech
@@ -45,6 +50,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var shareSink: EventChannel.EventSink? = null
     private val pendingShares = mutableListOf<Map<String, Any?>>()
     private var fileSeq = 0
+    private var uiEngine: FlutterEngine? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Restored (rotation / process death) or reopened from Recents: the share /
@@ -66,6 +72,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        uiEngine = flutterEngine
         val messenger = flutterEngine.dartExecutor.binaryMessenger
 
         EventChannel(messenger, SHARE_EVENTS).setStreamHandler(object : EventChannel.StreamHandler {
@@ -96,6 +103,11 @@ class MainActivity : FlutterFragmentActivity() {
                 "speech.downloadModel" -> result.success(
                     downloadSpeechModel(call.argument<String>("locale") ?: "id-ID")
                 )
+                "apps.list" -> io.execute {
+                    val apps = launchableApps()
+                    main.post { result.success(apps) }
+                }
+                "apps.label" -> result.success(appLabel(call.argument<String>("package")))
                 else -> result.notImplemented()
             }
         }
@@ -309,9 +321,52 @@ class MainActivity : FlutterFragmentActivity() {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
     }
 
+    // --- Log Notifikasi -------------------------------------------------------------
+
+    private fun launchableApps(): List<Map<String, String>> = runCatching {
+        val pm = packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        pm.queryIntentActivities(launcher, 0)
+            .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+            .filter { it.first != packageName }
+            .distinctBy { it.first }
+            .sortedBy { it.second.lowercase() }
+            .map { mapOf("package" to it.first, "label" to it.second) }
+    }.getOrDefault(emptyList())
+
+    private fun appLabel(pkg: String?): String? {
+        if (pkg.isNullOrBlank()) return null
+        return runCatching {
+            val info = packageManager.getApplicationInfo(pkg, 0)
+            packageManager.getApplicationLabel(info).toString()
+        }.getOrNull()
+    }
+
+    /**
+     * flutter_notification_listener keeps delivering notifications to the engine in
+     * FlutterEngineCache ("flutter_engine_main" = this activity's engine while it
+     * lives). When the activity finishes, that engine is destroyed but stays cached,
+     * so events would go nowhere until the process dies. Drop it from the cache and
+     * let the running listener service start its headless background engine, which
+     * runs the Dart callback and keeps storing notifications.
+     */
+    private fun handOverNotificationListener() {
+        runCatching {
+            val cache = FlutterEngineCache.getInstance()
+            val engine = uiEngine ?: return
+            if (cache.get(LISTENER_ENGINE_KEY) !== engine) return
+            cache.remove(LISTENER_ENGINE_KEY)
+            if (NotificationsHandlerService.permissionGiven(applicationContext)) {
+                NotificationsHandlerService.updateFlutterEngine(applicationContext)
+            }
+        }
+    }
+
     override fun onDestroy() {
         io.shutdown()
         super.onDestroy()
+        if (!isChangingConfigurations) handOverNotificationListener()
+        uiEngine = null
     }
 
     companion object {
@@ -320,6 +375,9 @@ class MainActivity : FlutterFragmentActivity() {
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
         private const val MAX_TEXT_BYTES = 100 * 1024
+
+        /** FlutterNotificationListenerPlugin.FLUTTER_ENGINE_CACHE_KEY. */
+        private const val LISTENER_ENGINE_KEY = "flutter_engine_main"
 
         /** quick_actions' launch extra (QuickActions.EXTRA_ACTION). */
         private const val QUICK_ACTION_EXTRA = "some unique action key"

@@ -45,6 +45,10 @@ import '../presentation/features/content/pages/content_report_page.dart';
 import '../presentation/features/notes/pages/note_editor_page.dart';
 import '../presentation/features/notes/pages/note_labels_page.dart';
 import '../presentation/features/notes/pages/notes_page.dart';
+import '../presentation/features/notification_log/notification_log_format.dart';
+import '../presentation/features/notification_log/pages/notification_log_page.dart';
+import '../presentation/features/notification_log/pages/notification_rule_form_page.dart';
+import '../presentation/features/notification_log/pages/notification_rules_page.dart';
 import '../presentation/features/tasks/pages/task_area_form_page.dart';
 import '../presentation/features/tasks/pages/task_areas_page.dart';
 import '../presentation/features/tasks/pages/task_form_page.dart';
@@ -54,6 +58,7 @@ import '../presentation/features/transactions/pages/transaction_form_page.dart';
 import '../presentation/features/transactions/pages/transactions_page.dart';
 import '../presentation/features/wallets/pages/wallet_form_page.dart';
 import '../presentation/features/wallets/pages/wallets_page.dart';
+import '../domain/usecases/notification_rules.dart' show NotificationRulePreset;
 import '../presentation/state/game/game_providers.dart';
 import '../presentation/state/session_controller.dart';
 
@@ -258,6 +263,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/learn/lesson/:lessonId',
         builder: (_, s) => LessonPage(lessonId: s.pathParameters['lessonId']!),
+      ),
+      // Log Notifikasi + parsing rules (Android; the page explains itself on iOS).
+      GoRoute(
+        path: '/notification-log',
+        builder: (_, _) => const NotificationLogPage(),
+      ),
+      GoRoute(
+        path: '/notification-log/rules',
+        builder: (_, _) => const NotificationRulesPage(),
+      ),
+      GoRoute(
+        path: '/notification-log/rules/new',
+        builder: (_, s) => NotificationRuleFormPage(
+          draft: s.extra is NotificationRuleDraft
+              ? s.extra as NotificationRuleDraft
+              : null,
+          preset: s.extra is NotificationRulePreset
+              ? s.extra as NotificationRulePreset
+              : null,
+        ),
+      ),
+      GoRoute(
+        path: '/notification-log/rules/:id',
+        builder: (_, s) => NotificationRuleFormPage(id: s.pathParameters['id']),
       ),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(path: '/sync', builder: (_, _) => const SyncPage()),

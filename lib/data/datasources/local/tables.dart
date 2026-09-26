@@ -538,6 +538,63 @@ class PortfolioSnapshots extends Table {
   Set<Column> get primaryKey => {date};
 }
 
+/// Device-only log of other apps' notifications ("Log Notifikasi"), written by
+/// the Android notification listener (possibly from its background isolate).
+@DataClassName('CapturedNotificationRow')
+@TableIndex(name: 'idx_notif_posted', columns: {#postedAt})
+@TableIndex(name: 'idx_notif_package', columns: {#packageName})
+@TableIndex(name: 'idx_notif_processed', columns: {#processed})
+class CapturedNotifications extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get packageName => text()();
+
+  /// Launcher label; null until the UI isolate resolves it.
+  TextColumn get appName => text().nullable()();
+  TextColumn get title => text().withDefault(const Constant(''))();
+  TextColumn get body => text().withDefault(const Constant(''))();
+
+  /// `StatusBarNotification.key` (diagnostics only).
+  TextColumn get notificationKey => text().nullable()();
+  IntColumn get postedAt => integer().map(epochMs)();
+  IntColumn get capturedAt => integer().map(epochMs)();
+
+  /// Checked against the parsing rules.
+  BoolColumn get processed => boolean().withDefault(const Constant(false))();
+  TextColumn get ruleId => text().nullable()();
+  TextColumn get transactionId => text().nullable()();
+
+  /// `income` | `expense` of the matching rule.
+  TextColumn get txType => text().nullable()();
+  RealColumn get amount => real().nullable()();
+  TextColumn get parseError => text().nullable()();
+}
+
+/// Device-only notification parsing rules (notification → transaction).
+@DataClassName('NotificationRuleRow')
+class NotificationRules extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+
+  /// JSON array of package names.
+  TextColumn get packages => text()();
+
+  /// `any` | `title` | `body`
+  TextColumn get matchField => text().withDefault(const Constant('any'))();
+  TextColumn get pattern => text()();
+  BoolColumn get isRegex => boolean().withDefault(const Constant(false))();
+
+  /// `income` | `expense`
+  TextColumn get type => text()();
+  TextColumn get amountPattern => text().nullable()();
+  TextColumn get walletId => text().nullable()();
+  TextColumn get categoryId => text().nullable()();
+  BoolColumn get enabled => boolean().withDefault(const Constant(true))();
+  TextColumn get presetKey => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Pending local mutations, pushed in [seq] order.
 @DataClassName('OutboxRow')
 @TableIndex(name: 'idx_outbox_entity', columns: {#entity, #entityId})
