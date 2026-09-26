@@ -4,6 +4,7 @@ library;
 
 import 'dart:async';
 
+import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/share_intake.dart';
@@ -104,6 +105,16 @@ final class NoopShareIntake implements ShareIntake {
   const NoopShareIntake();
   @override
   Stream<SharedPayload> get payloads => const Stream.empty();
+  @override
+  Future<void> dispose() async {}
+}
+
+final class NoopAppShortcuts implements AppShortcuts {
+  const NoopAppShortcuts();
+  @override
+  Stream<AppShortcut> get launches => const Stream.empty();
+  @override
+  Future<void> install(List<AppShortcut> items) async {}
   @override
   Future<void> dispose() async {}
 }
@@ -297,6 +308,23 @@ final class FakeShareIntake implements ShareIntake {
 
   @override
   Stream<SharedPayload> get payloads => _c.stream;
+
+  @override
+  Future<void> dispose() => _c.close();
+}
+
+/// Scriptable launcher shortcuts: [launch] simulates a long-press → tap.
+final class FakeAppShortcuts implements AppShortcuts {
+  final _c = StreamController<AppShortcut>.broadcast(sync: true);
+  List<AppShortcut>? installed;
+
+  void launch(AppShortcut s) => _c.add(s);
+
+  @override
+  Stream<AppShortcut> get launches => _c.stream;
+
+  @override
+  Future<void> install(List<AppShortcut> items) async => installed = items;
 
   @override
   Future<void> dispose() => _c.close();

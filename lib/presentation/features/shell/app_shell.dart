@@ -7,6 +7,7 @@ import '../../design_system/design_system.dart';
 import '../../state/notifications/notification_providers.dart';
 import '../../state/notifications/reminder_sync_controller.dart';
 import '../../state/sync_status_provider.dart';
+import 'app_drawer.dart';
 import 'share_intake_listener.dart';
 
 /// Bottom-navigation shell around the four tabs (Beranda, Transaksi, Tugas,
@@ -16,6 +17,10 @@ import 'share_intake_listener.dart';
 /// Also keeps the task reminders scheduled (`reminderSyncControllerProvider`,
 /// started once here) and refreshes the notification permission and the
 /// schedule when the app comes back to the foreground.
+///
+/// Owns the side drawer ([AppDrawer], "Semua menu"): the tabs open it with
+/// their ☰ button ([AppDrawerButton], via [AppDrawerScope]) or an edge swipe
+/// from the left.
 ///
 /// Hosts the Android share-target hook ([ShareIntakeListener]): shares become
 /// notes with the "Catatan dari share" sheet.
@@ -29,6 +34,8 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(
     onResume: () {
       ref.read(notificationPermissionProvider.notifier).refresh();
@@ -52,29 +59,40 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     ref.watch(reminderSyncControllerProvider);
     final shell = widget.navigationShell;
+    final location =
+        shell.route.branches[shell.currentIndex].defaultRoute?.path ?? '';
     return ShareIntakeListener(
-      child: Scaffold(
-        body: Column(
-          children: [
-            Expanded(child: shell),
-            const OfflineBanner(),
-          ],
-        ),
-        bottomNavigationBar: ChunkyNavBar(
-          currentIndex: shell.currentIndex,
-          onTap: (i) =>
-              shell.goBranch(i, initialLocation: i == shell.currentIndex),
-          onCenterTap: () => context.push('/transactions/new'),
-          items: const [
-            ChunkyNavItem(icon: Icons.home_rounded, label: 'Beranda'),
-            ChunkyNavItem(icon: Icons.receipt_long_rounded, label: 'Transaksi'),
-            ChunkyNavItem(icon: Icons.checklist_rounded, label: 'Tugas'),
-            ChunkyNavItem(icon: Icons.person_rounded, label: 'Profil'),
-          ],
-        ),
+      child: AppDrawerScope(
+        scaffoldKey: _scaffoldKey,
+        child: _scaffold(shell, location),
       ),
     );
   }
+
+  Widget _scaffold(StatefulNavigationShell shell, String location) => Scaffold(
+    key: _scaffoldKey,
+    drawer: AppDrawer(location: location),
+    // Edge swipe only (the default strip at the left edge), so horizontal
+    // chip rows and carousels keep their own drags.
+    drawerEnableOpenDragGesture: true,
+    body: Column(
+      children: [
+        Expanded(child: shell),
+        const OfflineBanner(),
+      ],
+    ),
+    bottomNavigationBar: ChunkyNavBar(
+      currentIndex: shell.currentIndex,
+      onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+      onCenterTap: () => context.push('/transactions/new'),
+      items: const [
+        ChunkyNavItem(icon: Icons.home_rounded, label: 'Beranda'),
+        ChunkyNavItem(icon: Icons.receipt_long_rounded, label: 'Transaksi'),
+        ChunkyNavItem(icon: Icons.checklist_rounded, label: 'Tugas'),
+        ChunkyNavItem(icon: Icons.person_rounded, label: 'Profil'),
+      ],
+    ),
+  );
 }
 
 /// "Mode offline" strip; collapses to nothing while online. Tap → `/sync`.

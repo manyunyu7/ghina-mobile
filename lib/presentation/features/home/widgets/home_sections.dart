@@ -8,11 +8,13 @@ import '../../../../domain/game/game.dart' hide MascotMood;
 import '../../../../domain/game/game.dart' as game show MascotMood;
 import '../../../design_system/design_system.dart';
 import '../../../shared/game_visuals.dart';
+import '../../shell/app_drawer.dart';
+import '../../shell/app_menu.dart';
 import '../../shell/sync_indicator.dart';
 
 // ---------------------------------------------------------------- top stats bar
 
-/// Level · streak · XP · hearts · sync badge, pinned above the scroll view.
+/// ☰ · level · streak · XP · hearts · sync badge, pinned above the scroll view.
 class HomeStatsBar extends StatelessWidget {
   const HomeStatsBar({super.key, required this.summary});
 
@@ -23,8 +25,8 @@ class HomeStatsBar extends StatelessWidget {
     final s = summary;
     final g = context.ghina;
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        GhinaSpace.page - 4,
+      padding: EdgeInsets.fromLTRB(
+        AppDrawerScope.maybeOf(context) == null ? GhinaSpace.page - 4 : 4,
         8,
         GhinaSpace.page - 4,
         10,
@@ -35,6 +37,7 @@ class HomeStatsBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          AppDrawerButton(color: g.textSecondary),
           Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
@@ -391,93 +394,22 @@ class ContinueLearningCard extends StatelessWidget {
 
 // ---------------------------------------------------------------- quick actions
 
-class _QuickAction {
-  const _QuickAction(
-    this.label,
-    this.icon,
-    this.color,
-    this.path, {
-    this.longPressPath,
-  });
-  final String label;
-  final IconData icon;
-  final ChunkySwatch color;
-  final String path;
-
-  /// Shortcut on long-press (Catatan → a new note right away).
-  final String? longPressPath;
-}
-
-const _actions = [
-  // Belajar left the tab bar (Tugas took its place): keep it one tap away.
-  _QuickAction('Belajar', Icons.school_rounded, GhinaColors.purple, '/learn'),
-  _QuickAction(
-    'Dompet',
-    Icons.account_balance_wallet_rounded,
-    GhinaColors.blue,
+/// The 8 most-used screens that aren't tabs (labels/icons/colors come from
+/// the drawer's [kAppMenu]); everything else lives in "Semua menu" (the side
+/// drawer), which the 9th tile opens.
+final _actions = [
+  for (final path in const [
     '/wallets',
-  ),
-  // Investasi (`docs/investments.md` → UI): with Kebiasaan it fills a 4×3 grid.
-  _QuickAction(
-    'Investasi',
-    Icons.trending_up_rounded,
-    GhinaColors.purple,
-    '/investments',
-  ),
-  _QuickAction(
-    'Anggaran',
-    Icons.pie_chart_rounded,
-    GhinaColors.green,
     '/budgets',
-  ),
-  _QuickAction(
-    'Langganan',
-    Icons.autorenew_rounded,
-    GhinaColors.pink,
     '/subscriptions',
-  ),
-  // Catatan replaced Proyeksi (still in Profil › Kelola): keeps the 3×3 grid.
-  _QuickAction(
-    'Catatan',
-    Icons.sticky_note_2_rounded,
-    GhinaColors.orange,
+    '/investments',
     '/notes',
-    longPressPath: '/notes/new',
-  ),
-  // Konten (`docs/content.md` → Navigation): quick action + Profil menu.
-  _QuickAction(
-    'Konten',
-    Icons.campaign_rounded,
-    GhinaColors.purple,
-    '/content',
-  ),
-  _QuickAction(
-    'Laporan',
-    Icons.bar_chart_rounded,
-    GhinaColors.blue,
-    '/reports',
-  ),
-  _QuickAction('Sholat', Icons.mosque_rounded, GhinaColors.lime, '/prayers'),
-  // Kebiasaan (`docs/habits.md` → UI): quick action + Profil menu.
-  _QuickAction(
-    'Kebiasaan',
-    Icons.self_improvement_rounded,
-    GhinaColors.green,
     '/habits',
-    longPressPath: '/habits/new',
-  ),
-  _QuickAction(
-    'Kesehatan',
-    Icons.monitor_heart_rounded,
-    GhinaColors.red,
-    '/health',
-  ),
-  _QuickAction(
-    'Makanan',
-    Icons.restaurant_rounded,
-    GhinaColors.yellow,
-    '/food',
-  ),
+    '/prayers',
+    // Belajar left the tab bar (Tugas took its place): keep it one tap away.
+    '/learn',
+  ])
+    appMenuItem(path),
 ];
 
 class QuickActionsGrid extends StatelessWidget {
@@ -487,12 +419,43 @@ class QuickActionsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final scale = MediaQuery.textScalerOf(context).scale(1);
+    final drawer = AppDrawerScope.maybeOf(context);
+    final count = _actions.length + (drawer == null ? 0 : 1);
+
+    Widget tile({
+      required Key key,
+      required String label,
+      required Widget icon,
+      required VoidCallback onTap,
+      VoidCallback? onLongPress,
+    }) => ChunkyCard(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      borderRadius: GhinaRadii.rLg,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      semanticLabel: label,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          icon,
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GhinaType.bodyS.w(800).copyWith(color: g.textPrimary),
+          ),
+        ],
+      ),
+    );
+
     return LayoutBuilder(
       builder: (context, c) => GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
-        itemCount: _actions.length,
+        itemCount: count,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: c.maxWidth > 520 ? 5 : 3,
           mainAxisSpacing: 10,
@@ -500,29 +463,36 @@ class QuickActionsGrid extends StatelessWidget {
           mainAxisExtent: 78 + 18 * scale,
         ),
         itemBuilder: (context, i) {
+          if (i == _actions.length) {
+            return tile(
+              key: const ValueKey('qa-all'),
+              label: 'Semua menu',
+              icon: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: g.surfaceAlt,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: g.border, width: 2),
+                ),
+                child: Icon(
+                  Icons.apps_rounded,
+                  color: g.textSecondary,
+                  size: 24,
+                ),
+              ),
+              onTap: drawer!.open,
+            );
+          }
           final a = _actions[i];
-          return ChunkyCard(
+          return tile(
             key: ValueKey('qa-${a.path}'),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-            borderRadius: GhinaRadii.rLg,
+            label: a.label,
+            icon: CategoryAvatar(icon: a.icon, color: a.color.base, size: 42),
             onTap: () => context.push(a.path),
             onLongPress: a.longPressPath == null
                 ? null
                 : () => context.push(a.longPressPath!),
-            semanticLabel: a.label,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CategoryAvatar(icon: a.icon, color: a.color.base, size: 42),
-                const SizedBox(height: 6),
-                Text(
-                  a.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.bodyS.w(800).copyWith(color: g.textPrimary),
-                ),
-              ],
-            ),
           );
         },
       ),

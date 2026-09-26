@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Keep the notification icon: it is only referenced by name from Dart
-     (flutter_local_notifications), so R8 resource shrinking would drop it. -->
+<!-- Keep resources referenced only by name from Dart, which R8 resource shrinking
+     would otherwise drop: the notification icon (flutter_local_notifications) and
+     the launcher shortcut icons (quick_actions, AppShortcut.icon). -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_ghina" />
+    tools:keep="@drawable/ic_stat_ghina,@drawable/ic_shortcut_*" />

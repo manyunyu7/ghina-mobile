@@ -78,22 +78,35 @@ void main() {
     expect(find.text('ROUTE:/prayers'), findsOneWidget);
   });
 
-  testWidgets('quick actions include Konten', (tester) async {
+  testWidgets('quick actions: the 8 most-used screens (rest in the drawer)', (
+    tester,
+  ) async {
     await pumpPage(
       tester,
       const HomePage(),
       overrides: withTasks(pageOverrides()),
     );
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('qa-/content')),
+      find.byKey(const ValueKey('qa-/learn')),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.ensureVisible(find.byKey(const ValueKey('qa-/content')));
     await settle(tester, 3);
-    await tester.tap(find.byKey(const ValueKey('qa-/content')));
-    await settle(tester);
-    expect(find.text('ROUTE:/content'), findsOneWidget);
+    for (final p in [
+      '/wallets',
+      '/budgets',
+      '/subscriptions',
+      '/investments',
+      '/notes',
+      '/habits',
+      '/prayers',
+      '/learn',
+    ]) {
+      expect(find.byKey(ValueKey('qa-$p')), findsOneWidget, reason: p);
+    }
+    expect(find.byKey(const ValueKey('qa-/content')), findsNothing);
+    // Outside the shell there is no drawer, so no "Semua menu" tile.
+    expect(find.byKey(const ValueKey('qa-all')), findsNothing);
   });
 
   testWidgets('empty account invites the first transaction', (tester) async {

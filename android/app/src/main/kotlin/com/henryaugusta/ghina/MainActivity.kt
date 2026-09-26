@@ -29,6 +29,10 @@ import java.util.concurrent.Executors
  *    share EventChannel, so none is lost.
  *  - App settings shortcut + "should show rationale" for the mic permission.
  *  - Offline speech support query / model download (Android 13+ RecognitionSupport).
+ *  - Launcher shortcuts come from the quick_actions plugin (dynamic shortcuts set
+ *    from Dart; the plugin reads the launch extra on cold start and gets warm
+ *    starts through onNewIntent). This activity only makes sure a shortcut
+ *    doesn't fire twice (restored from Recents / re-attached plugin).
  *
  * A FlutterFragmentActivity (not FlutterActivity) because local_auth ("Kunci
  * Kebiasaan") shows the BiometricPrompt as a fragment. The share / settings / speech
@@ -43,15 +47,19 @@ class MainActivity : FlutterFragmentActivity() {
     private var fileSeq = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // Restored (rotation / process death) or reopened from Recents: the share
-        // was already handled — don't import it twice.
+        // Restored (rotation / process death) or reopened from Recents: the share /
+        // shortcut was already handled — don't import or open it twice.
         val fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (savedInstanceState != null || fromHistory) intent.removeExtra(QUICK_ACTION_EXTRA)
+        super.onCreate(savedInstanceState)
         if (savedInstanceState == null && !fromHistory) handleShareIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
+        // Plugins (quick_actions) read the shortcut extra synchronously in here.
         super.onNewIntent(intent)
+        // Consumed: a later plugin re-attach re-reads getIntent() — don't re-open it.
+        intent.removeExtra(QUICK_ACTION_EXTRA)
         setIntent(intent)
         handleShareIntent(intent)
     }
@@ -312,5 +320,8 @@ class MainActivity : FlutterFragmentActivity() {
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
         private const val MAX_TEXT_BYTES = 100 * 1024
+
+        /** quick_actions' launch extra (QuickActions.EXTRA_ACTION). */
+        private const val QUICK_ACTION_EXTRA = "some unique action key"
     }
 }

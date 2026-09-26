@@ -44,6 +44,14 @@ final shareIntakeProvider = Provider<ShareIntake>((ref) {
   return s;
 });
 
+/// Launcher shortcuts (long-press the app icon). See
+/// `features/shell/app_shortcut_listener.dart`.
+final appShortcutsProvider = Provider<AppShortcuts>((ref) {
+  final s = createAppShortcuts();
+  ref.onDispose(s.dispose);
+  return s;
+});
+
 // --- policy -------------------------------------------------------------------
 
 /// Max length of one voice clip (spec: 10 min). Tests override it.

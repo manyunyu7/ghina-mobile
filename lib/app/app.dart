@@ -3,12 +3,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/design_system/design_system.dart';
+import '../presentation/features/shell/app_shortcut_listener.dart';
 import '../presentation/features/shell/notification_navigation.dart';
 import '../presentation/state/balance_privacy_provider.dart';
 import '../presentation/state/session_controller.dart';
 import 'router.dart';
 
-/// Locations where a tapped reminder must wait (auth / splash / onboarding).
+/// Locations where a tapped reminder / launcher shortcut must wait (auth / splash / onboarding).
 const _notReadyPaths = {'/splash', '/login', '/register', '/onboarding'};
 
 class GhinaApp extends ConsumerWidget {
@@ -37,7 +38,8 @@ class GhinaApp extends ConsumerWidget {
               !_notReadyPaths.contains(
                 router.routerDelegate.currentConfiguration.uri.path,
               ),
-          child: child ?? const SizedBox.shrink(),
+          // Launcher shortcuts (long-press the icon) use the same gate.
+          child: AppShortcutListener(child: child ?? const SizedBox.shrink()),
         ),
       ),
     );

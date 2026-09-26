@@ -2,6 +2,7 @@
 /// in `lib/data/platform/`.
 library;
 
+export 'app_shortcuts.dart';
 export 'audio_playback.dart';
 export 'microphone_permission.dart';
 export 'share_intake.dart';

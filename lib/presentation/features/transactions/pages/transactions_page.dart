@@ -10,6 +10,7 @@ import '../../../../core/result.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
+import '../../shell/app_drawer.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../widgets/tx_visuals.dart';
@@ -241,6 +242,12 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         : walletList.where((w) => w.id == widget.walletId).firstOrNull;
     return Scaffold(
       appBar: AppBar(
+        // The Transaksi tab opens the side drawer; the wallet history page
+        // (pushed, outside the shell) keeps its back button.
+        leading:
+            widget.walletId == null && AppDrawerScope.maybeOf(context) != null
+            ? const AppDrawerButton()
+            : null,
         title: Text(
           widget.walletId == null
               ? 'Transaksi'

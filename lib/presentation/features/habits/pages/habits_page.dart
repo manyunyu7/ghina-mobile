@@ -15,15 +15,22 @@ import '../widgets/habit_cards.dart';
 /// Kebiasaan: today's board — "Membangun" and "Berhenti" — plus reorder and
 /// the archive. Behind "Kunci Kebiasaan" when it's on.
 class HabitsPage extends StatelessWidget {
-  const HabitsPage({super.key});
+  const HabitsPage({super.key, this.pickUrge = false});
+
+  /// Opened from the "Lagi pengen…" launcher shortcut with several quit
+  /// habits: ask which one right away (after unlocking), then open its urge
+  /// screen.
+  final bool pickUrge;
 
   @override
   Widget build(BuildContext context) =>
-      const HabitLockGate(child: _HabitsView());
+      HabitLockGate(child: _HabitsView(pickUrge: pickUrge));
 }
 
 class _HabitsView extends ConsumerStatefulWidget {
-  const _HabitsView();
+  const _HabitsView({this.pickUrge = false});
+
+  final bool pickUrge;
 
   @override
   ConsumerState<_HabitsView> createState() => _HabitsViewState();
@@ -33,6 +40,47 @@ class _HabitsViewState extends ConsumerState<_HabitsView> {
   bool _reorder = false;
   bool _showArchived = false;
   bool _celebrated = false;
+  bool _urgePicked = false;
+
+  void _maybePickUrge(HabitBoard board) {
+    if (!widget.pickUrge || _urgePicked) return;
+    _urgePicked = true;
+    final quit = [for (final t in board.quit) t.habit];
+    if (quit.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final id = await showChunkyBottomSheet<String>(
+        context,
+        title: 'Lagi pengen apa?',
+        builder: (c) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Pilih kebiasaan yang lagi kamu tahan. Kita lewati bareng, ya 💪',
+                style: GhinaType.bodyS.copyWith(
+                  color: context.ghina.textSecondary,
+                ),
+              ),
+            ),
+            for (final h in quit)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: ChunkyTile(
+                  key: ValueKey('urge-pick-${h.id}'),
+                  leading: HabitAvatar(habit: h, size: 40),
+                  title: h.name,
+                  showChevron: true,
+                  onTap: () => Navigator.of(c).pop(h.id),
+                ),
+              ),
+          ],
+        ),
+      );
+      if (id != null && mounted) context.push('/habits/$id/urge');
+    });
+  }
 
   void _maybeCelebrate(HabitBoard board) {
     if (_celebrated || board.isEmpty) return;
@@ -49,7 +97,10 @@ class _HabitsViewState extends ConsumerState<_HabitsView> {
     final board = ref.watch(watchHabitBoardProvider);
     final lock = ref.watch(habitLockProvider);
     final value = board.value;
-    if (value != null) _maybeCelebrate(value);
+    if (value != null) {
+      _maybePickUrge(value);
+      if (!widget.pickUrge) _maybeCelebrate(value);
+    }
 
     return Scaffold(
       appBar: AppBar(

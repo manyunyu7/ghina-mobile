@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/share_intake.dart';
@@ -18,6 +19,7 @@ import 'channel_share_intake.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'just_audio_playback.dart';
+import 'quick_actions_app_shortcuts.dart';
 import 'record_voice_recorder.dart';
 import 'stt_speech_transcriber.dart';
 
@@ -51,3 +53,7 @@ MicrophonePermission createMicrophonePermission() => isMobileDevice
 /// Android only (iOS share extension is out of scope for v1).
 ShareIntake createShareIntake() =>
     _isAndroid ? ChannelShareIntake() : const NoopShareIntake();
+
+/// Launcher shortcuts (Android app shortcuts / iOS quick actions).
+AppShortcuts createAppShortcuts() =>
+    isMobileDevice ? QuickActionsAppShortcuts() : const NoopAppShortcuts();

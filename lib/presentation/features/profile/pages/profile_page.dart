@@ -6,6 +6,7 @@ import '../../../../core/formatters.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/game/game.dart' hide MascotMood;
 import '../../../design_system/design_system.dart';
+import '../../shell/app_drawer.dart';
 import '../../../state/game/game_providers.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -108,6 +109,14 @@ class _Header extends ConsumerWidget {
     final sw = ChunkySwatch.fromColor(color);
     return Row(
       children: [
+        if (AppDrawerScope.maybeOf(context) != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: Transform.translate(
+              offset: const Offset(-10, 0),
+              child: AppDrawerButton(color: g.textSecondary),
+            ),
+          ),
         Container(
           width: 68,
           height: 72,

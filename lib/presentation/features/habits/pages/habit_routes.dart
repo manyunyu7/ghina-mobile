@@ -7,8 +7,14 @@ import 'habits_page.dart';
 
 /// `/habits`, `/habits/new`, `/habits/:id`, `/habits/:id/edit`,
 /// `/habits/:id/urge` — each page sits behind "Kunci Kebiasaan".
+/// `/habits?pick=urge` (the "Lagi pengen…" launcher shortcut with several quit
+/// habits) opens the board with the quit-habit picker.
 final List<GoRoute> habitRoutes = [
-  GoRoute(path: '/habits', builder: (_, _) => const HabitsPage()),
+  GoRoute(
+    path: '/habits',
+    builder: (_, s) =>
+        HabitsPage(pickUrge: s.uri.queryParameters['pick'] == 'urge'),
+  ),
   GoRoute(path: '/habits/new', builder: (_, _) => const HabitFormPage()),
   GoRoute(
     path: '/habits/:id',

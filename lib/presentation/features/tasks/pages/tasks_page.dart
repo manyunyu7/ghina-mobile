@@ -9,6 +9,7 @@ import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../state/session_controller.dart';
+import '../../shell/app_drawer.dart';
 import '../../shell/sync_indicator.dart';
 import '../task_actions.dart';
 import '../widgets/quick_add_sheet.dart';
@@ -516,10 +517,15 @@ class _Header extends StatelessWidget {
     } else {
       sub = null;
     }
+    final drawer = AppDrawerScope.maybeOf(context) != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(GhinaSpace.page, 10, 8, 8),
+      padding: EdgeInsets.fromLTRB(drawer ? 4 : GhinaSpace.page, 10, 8, 8),
       child: Row(
         children: [
+          if (drawer) ...[
+            AppDrawerButton(color: g.textSecondary),
+            const SizedBox(width: 2),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

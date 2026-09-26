@@ -89,6 +89,16 @@ quick-add transaction sheet:
 | Belajar | `/learn` | Duolingo-style lesson path (financial literacy) |
 | Profil | `/profile` | level, XP, streak calendar, achievements, links to everything else, settings |
 
+Side drawer "Semua menu" (`features/shell/app_drawer.dart`, items in `app_menu.dart`):
+every screen grouped Uang · Hidup · Produktif · Lainnya, with search (label + synonyms),
+current-tab highlight, badges and a footer (sync, "Sembunyikan saldo", version). Opened
+by the ☰ on each tab (`AppDrawerButton`) or an edge swipe. Tabs open with `go`, the rest
+with `push`. Beranda's grid shows the 8 most-used screens + a "Semua menu" tile.
+
+Launcher shortcuts (long-press the icon; `quick_actions`, `AppShortcuts` port in
+`domain/services`): Catat pengeluaran, Catatan baru, Tugas baru, Lagi pengen… — routed by
+`AppShortcutListener` through the reminder-tap pending-route gate (waits for login).
+
 Pushed routes (full screen, outside the shell):
 `/login`, `/register`, `/onboarding`,
 `/transactions/new`, `/transactions/:id`,
