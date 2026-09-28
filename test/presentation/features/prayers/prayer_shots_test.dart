@@ -17,10 +17,7 @@ import '../profile/_harness.dart';
 
 final _routes = <RouteBase>[
   GoRoute(path: '/prayers', builder: (_, _) => const PrayersPage()),
-  GoRoute(
-    path: '/prayers/report',
-    builder: (_, _) => const PrayerReportPage(),
-  ),
+  GoRoute(path: '/prayers/report', builder: (_, _) => const PrayerReportPage()),
 ];
 
 /// A realistic, colourful fortnight.
@@ -111,6 +108,7 @@ void main() {
       'prayerq_sheet',
       '/prayers',
       (t) async {
+        await scrollTo(t, find.byKey(const ValueKey('prayer-dzuhur')));
         await t.longPress(find.byKey(const ValueKey('prayer-dzuhur')));
         await settle(t, 8);
       },
@@ -132,11 +130,7 @@ void main() {
         await settle(t, 6);
         await scrollTo(
           t,
-          find.byKey(
-            ValueKey(
-              'map-${dateKey(addDays(harnessNow, -8))}-isya',
-            ),
-          ),
+          find.byKey(ValueKey('map-${dateKey(addDays(harnessNow, -8))}-isya')),
           delta: 400,
         );
       },

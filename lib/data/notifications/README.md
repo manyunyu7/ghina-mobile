@@ -1,4 +1,4 @@
-# Local notifications (task reminders)
+# Local notifications (task reminders + Reminder Sholat)
 
 Implements `ReminderScheduler` (`lib/domain/entities/reminder.dart`) on top of
 `flutter_local_notifications` + `timezone` + `flutter_timezone`. Spec: `docs/tasks.md` → Notifications.
@@ -92,3 +92,31 @@ MaterialApp.router(
   back to a zone with the same offset (WIB/WITA/WIT preferred). The zone is read once per app run.
   It is also stored in the payload, so after a zone change (travelling between WIB, WITA and WIT)
   the next start re-arms every reminder at the new local time.
+
+
+## Reminder Sholat
+
+Offline prayer times (`adhan`) + scheduled notifications for the five fardhu, wired into the
+existing prayer tracker (a tick = a normal prayer row → same XP/streak/sync).
+
+| File | What |
+|---|---|
+| `adhan_prayer_times_calculator.dart` | `PrayerTimesCalculator` on `adhan`; Kemenag = Subuh 20°, Isya 18° + ihtiyat 2 mnt |
+| `prayer_reminder_scheduler.dart` | `LocalPrayerReminderScheduler`: diffs the plan against pending (payload kind `prayer_reminder` only), exact when allowed |
+| `prayer_reminder_codec.dart` | Payload (kind, day, prayer, follow-up #, fireAt, exact, channel, tz) |
+| `prayer_notification_actions.dart` | "✓ Sudah sholat" action: background-isolate entry point, records the prayer, cancels its follow-ups, shows a confirmation |
+| `prayer_reminder_settings_store.dart` | Settings as one JSON value in shared_preferences (`prayerReminder.settings`) |
+
+- Plan (pure, `domain/usecases/prayer_reminder_rules.dart`): adzan for 7 days; pre-reminder and
+  follow-ups for the first 2 days (follow-ups every N min after adzan + delay, at most M, before
+  the next prayer's time); a "buka Ghina" nudge after the last one; ≤ 80 pending. Ids live in
+  their own block (`kPrayerIdBase`…), task reminder ids skip it.
+- Ticking a prayer (app or notification) → the prayer rows stream changes →
+  `PrayerReminderSyncController` re-plans without that prayer's follow-ups → the diff cancels
+  them. The action also cancels them directly (deterministic ids) from the background isolate.
+- Both schedulers share one plugin init (`FlutterNotificationGateway` is init-once, taps fan out
+  to every listener); `LocalReminderScheduler.cancelAll` now cancels task reminders only.
+- Channels: `prayer_reminders` (default sound) and `prayer_reminders_silent`. An adzan sound
+  would be a third channel with a raw resource (not bundled to keep the APK small).
+- GPS mode: one coarse fix at app start / resume after 30 min, never prompting; moving > 20 km
+  saves the new location (→ re-plan), failures keep the last coordinates.

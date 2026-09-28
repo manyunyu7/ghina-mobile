@@ -6,6 +6,8 @@
 	<string>Ghina memakai kamera untuk memotret makananmu di Food Log.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ghina membuka galeri untuk memilih foto makanan di Food Log.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ghina memakai lokasimu (perkiraan) untuk menghitung jadwal sholat di kota tempatmu berada.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ghina memakai mikrofon untuk merekam catatan suara dan dikte.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

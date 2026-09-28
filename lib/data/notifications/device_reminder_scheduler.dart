@@ -73,16 +73,15 @@ class LocalReminderScheduler implements DeviceReminderScheduler {
   Future<void> _doInit() async {
     await _gateway.initialize(_onTap);
     try {
-      _launchRoute = ReminderPayload.tryDecode(
-        await _gateway.launchPayload(),
-      )?.route;
+      _launchRoute = notificationRouteOf(await _gateway.launchPayload());
     } catch (e) {
       debugPrint('Reminder launch details failed: $e');
     }
   }
 
   void _onTap(String? payload) {
-    final route = ReminderPayload.tryDecode(payload)?.route;
+    // Task reminders and Reminder Sholat share the plugin (and its taps).
+    final route = notificationRouteOf(payload);
     if (route != null && !_taps.isClosed) _taps.add(route);
   }
 
@@ -130,8 +129,24 @@ class LocalReminderScheduler implements DeviceReminderScheduler {
   @override
   Future<void> openSystemSettings() => _serial(_gateway.openSettings);
 
+  /// Cancels every task reminder — only ours: Reminder Sholat shares the
+  /// plugin. Falls back to the plugin's cancel-all when pending can't be read.
   @override
-  Future<void> cancelAll() => _serial(_gateway.cancelAll);
+  Future<void> cancelAll() => _serial(() async {
+    List<PendingNotification> pending;
+    try {
+      pending = await _gateway.pending();
+    } catch (e) {
+      debugPrint('Reading pending reminders failed, cancelling all: $e');
+      await _gateway.cancelAll();
+      return;
+    }
+    for (final p in pending) {
+      if (ReminderPayload.tryDecode(p.payload) != null) {
+        await _gateway.cancel(p.id);
+      }
+    }
+  });
 
   @override
   Future<void> replaceAll(List<Reminder> reminders) =>

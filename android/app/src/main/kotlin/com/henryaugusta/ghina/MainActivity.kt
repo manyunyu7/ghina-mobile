@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -108,6 +109,8 @@ class MainActivity : FlutterFragmentActivity() {
                     main.post { result.success(apps) }
                 }
                 "apps.label" -> result.success(appLabel(call.argument<String>("package")))
+                "battery.isIgnoring" -> result.success(isIgnoringBatteryOptimizations())
+                "battery.openSettings" -> result.success(openBatteryOptimizationSettings())
                 else -> result.notImplemented()
             }
         }
@@ -222,6 +225,33 @@ class MainActivity : FlutterFragmentActivity() {
         )
         true
     }.getOrDefault(false)
+
+    // --- battery optimisation (Reminder Sholat) --------------------------------------
+
+    /** Null below Android 6 (no Doze). */
+    private fun isIgnoringBatteryOptimizations(): Boolean? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+        val pm = getSystemService(POWER_SERVICE) as? PowerManager ?: return null
+        return runCatching { pm.isIgnoringBatteryOptimizations(packageName) }.getOrNull()
+    }
+
+    /**
+     * Opens the system "battery optimisation" list (no REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+     * permission: Play restricts it), falling back to the app details page.
+     */
+    private fun openBatteryOptimizationSettings(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val ok = runCatching {
+                startActivity(
+                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                true
+            }.getOrDefault(false)
+            if (ok) return true
+        }
+        return openAppSettings()
+    }
 
     // --- speech --------------------------------------------------------------------
 

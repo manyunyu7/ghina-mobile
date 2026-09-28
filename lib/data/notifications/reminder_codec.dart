@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../../domain/usecases/prayer_reminder_rules.dart'
+    show isPrayerNotificationId;
+
 /// Largest id the plugins accept (Android ids are 32-bit signed ints).
 const int kMaxNotificationId = 0x7fffffff;
 
@@ -19,7 +22,7 @@ int reminderNotificationId(String key) {
 }
 
 /// Assigns a unique id to every key: [reminderNotificationId], linearly probed on
-/// collision. Keys are processed in sorted order so the result only depends on the
+/// collision (and past Reminder Sholat's id block, `isPrayerNotificationId`). Keys are processed in sorted order so the result only depends on the
 /// set of keys, not on their order.
 Map<String, int> assignReminderIds(Iterable<String> keys) {
   final sorted = keys.toSet().toList()..sort();
@@ -27,7 +30,7 @@ Map<String, int> assignReminderIds(Iterable<String> keys) {
   final out = <String, int>{};
   for (final k in sorted) {
     var id = reminderNotificationId(k);
-    while (!used.add(id)) {
+    while (isPrayerNotificationId(id) || !used.add(id)) {
       id = (id + 1) & kMaxNotificationId;
     }
     out[k] = id;
@@ -92,4 +95,21 @@ class ReminderPayload {
       return null;
     }
   }
+}
+
+/// Route to open for a tapped notification: task reminders and Reminder
+/// Sholat (`{"kind":"prayer_reminder","r":"/prayers",…}`). Null otherwise.
+String? notificationRouteOf(String? raw) {
+  final task = ReminderPayload.tryDecode(raw);
+  if (task != null) return task.route;
+  if (raw == null || raw.isEmpty) return null;
+  try {
+    final m = jsonDecode(raw);
+    if (m is Map && m['kind'] == 'prayer_reminder' && m['r'] is String) {
+      return m['r'] as String;
+    }
+  } on FormatException {
+    return null;
+  }
+  return null;
 }

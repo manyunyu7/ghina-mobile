@@ -12,4 +12,5 @@ export 'habits_investments_providers.dart';
 export 'notification_overrides.dart' show reminderOverrides;
 export 'notes_content_providers.dart';
 export 'notification_capture_providers.dart';
+export 'prayer_reminder_providers.dart';
 export 'usecase_providers.dart';

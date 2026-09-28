@@ -16,6 +16,7 @@ import '../data/datasources/remote/auth_api.dart';
 import '../data/datasources/remote/prices_api.dart';
 import '../data/datasources/remote/sync_api.dart';
 import '../data/datasources/remote/token_store.dart';
+import '../data/notifications/notifications.dart' show prayerActionDatabase;
 import '../data/platform/platform.dart'
     show createDeviceNotificationListener, notificationCaptureDatabase;
 import '../data/repositories/auth_repository_impl.dart';
@@ -52,10 +53,13 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   // The notification listener callback reuses this connection when it runs
   // in the UI isolate.
   notificationCaptureDatabase = db;
+  // So does "✓ Sudah sholat" when the platform delivers it to this isolate.
+  prayerActionDatabase = db;
   ref.onDispose(() {
     if (identical(notificationCaptureDatabase, db)) {
       notificationCaptureDatabase = null;
     }
+    if (identical(prayerActionDatabase, db)) prayerActionDatabase = null;
     db.close();
   });
   return db;

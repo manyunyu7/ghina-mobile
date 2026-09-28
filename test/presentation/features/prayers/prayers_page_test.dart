@@ -39,10 +39,16 @@ void main() {
     final h = Harness();
     await pumpScreen(tester, h, location: '/prayers', routes: _routes);
     expect(find.text('Hari ini'), findsWidgets);
+    // Today's schedule (Yogyakarta, Kemenag) with the next prayer on top.
+    expect(find.byKey(const ValueKey('prayer-schedule')), findsOneWidget);
+    expect(find.byKey(const ValueKey('prayer-countdown')), findsOneWidget);
+    expect(find.text('Yogyakarta', findRichText: true), findsNothing);
+    expect(find.textContaining('Yogyakarta'), findsOneWidget);
+    expect(find.text('0/5 SALAT'), findsOneWidget);
     for (final p in Prayer.fardhu) {
+      await scrollTo(tester, find.byKey(ValueKey('prayer-${p.wire}')));
       expect(find.text(p.label), findsOneWidget);
     }
-    expect(find.text('0/5 SALAT'), findsOneWidget);
     await scrollTo(tester, find.byKey(const ValueKey('sunnah-witir')));
     for (final p in Prayer.sunnah) {
       expect(find.byKey(ValueKey('sunnah-${p.wire}')), findsOneWidget);
@@ -146,11 +152,13 @@ void main() {
     });
     await pumpScreen(tester, h, location: '/prayers', routes: _routes);
     expect(find.text('4/5 SALAT'), findsOneWidget);
+    await scrollTo(tester, find.byKey(const ValueKey('prayer-isya')));
     await tester.tap(find.byKey(const ValueKey('prayer-isya')));
     await settle(tester, 15);
     expect(find.text('Lima waktu lengkap! 🕌'), findsOneWidget);
     await _dismissRewards(tester);
     expect(h.prayers.s.items, hasLength(5));
+    await scrollTo(tester, find.text('LENGKAP 5/5'), delta: -300);
     expect(find.text('LENGKAP 5/5'), findsOneWidget);
     await drain(tester);
   });
@@ -194,6 +202,7 @@ void main() {
     await tester.tap(find.byTooltip('Hari sebelumnya'));
     await settle(tester, 5);
     expect(find.text('Kemarin'), findsOneWidget);
+    await scrollTo(tester, find.byKey(const ValueKey('prayer-maghrib')));
     await tester.tap(find.byKey(const ValueKey('prayer-maghrib')));
     await settle(tester, 15);
     await _dismissRewards(tester);

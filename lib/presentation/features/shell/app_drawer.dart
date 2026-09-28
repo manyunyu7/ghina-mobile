@@ -13,7 +13,7 @@ import '../../state/balance_privacy_provider.dart';
 import '../../state/game/game_providers.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_status_provider.dart';
-import '../settings/pages/settings_page.dart' show appVersion;
+import '../settings/pages/settings_page.dart' show ghinaVersionLabel;
 import 'app_menu.dart';
 import 'sync_indicator.dart';
 
@@ -531,7 +531,7 @@ class _Footer extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Ghina v$appVersion',
+                ghinaVersionLabel(ref.watch(appVersionProvider).value),
                 style: GhinaType.caption.copyWith(color: g.textMuted),
               ),
             ],

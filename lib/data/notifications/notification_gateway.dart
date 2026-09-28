@@ -2,6 +2,27 @@
 /// [LocalReminderScheduler] can be unit-tested with a fake.
 library;
 
+/// Which notification channel (Android) a notification goes to. Android fixes
+/// sound/importance per channel, so every sound option is its own channel.
+enum NotificationChannelKind {
+  /// "Pengingat tugas" (tasks, habits, content).
+  taskReminder,
+
+  /// "Reminder Sholat" with the default sound.
+  prayer,
+
+  /// "Reminder Sholat (senyap)".
+  prayerSilent,
+}
+
+/// A button on the notification (Android). Runs in the background without
+/// opening the app (see `ghinaNotificationBackgroundHandler`).
+class NotificationActionSpec {
+  const NotificationActionSpec(this.id, this.label);
+  final String id;
+  final String label;
+}
+
 /// A notification to schedule once at [fireAt].
 class NotificationRequest {
   const NotificationRequest({
@@ -11,6 +32,8 @@ class NotificationRequest {
     required this.fireAt,
     required this.payload,
     required this.exact,
+    this.channel = NotificationChannelKind.taskReminder,
+    this.actions = const [],
   });
 
   final int id;
@@ -23,6 +46,9 @@ class NotificationRequest {
 
   /// Android: exact alarm (`exactAllowWhileIdle`) vs inexact (`inexactAllowWhileIdle`).
   final bool exact;
+
+  final NotificationChannelKind channel;
+  final List<NotificationActionSpec> actions;
 }
 
 /// A notification the OS still has pending.
@@ -56,6 +82,10 @@ abstract interface class NotificationGateway {
   /// Schedules (or replaces, same id) a notification. Throws if the platform
   /// refuses (e.g. exact alarms not permitted).
   Future<void> schedule(NotificationRequest request);
+
+  /// Shows a notification right away ([NotificationRequest.fireAt] ignored).
+  /// Works from the background action isolate too.
+  Future<void> show(NotificationRequest request);
 
   Future<void> cancel(int id);
 

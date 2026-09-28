@@ -7,8 +7,15 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'notification_gateway.dart';
+import 'prayer_notification_actions.dart';
 
 /// [NotificationGateway] backed by `flutter_local_notifications` (Android + iOS).
+///
+/// The plugin is a process-wide singleton, so it is initialised **once** for
+/// every gateway instance (task reminders and Reminder Sholat each hold one):
+/// taps fan out to every [initialize] listener, and notification action buttons
+/// go to [ghinaNotificationBackgroundHandler] (background isolate) or, when the
+/// platform delivers them to the UI isolate, to [handleNotificationAction].
 class FlutterNotificationGateway implements NotificationGateway {
   FlutterNotificationGateway([FlutterLocalNotificationsPlugin? plugin])
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -21,6 +28,13 @@ class FlutterNotificationGateway implements NotificationGateway {
       'Pengingat sebelum tenggat tugas yang punya jam.';
 
   /// `android/app/src/main/res/drawable-*/ic_stat_ghina.png` (kept by res/raw/keep.xml).
+  static const prayerChannelId = 'prayer_reminders';
+  static const prayerChannelName = 'Reminder Sholat';
+  static const prayerChannelDescription =
+      'Adzan, pengingat sebelum waktu sholat dan pengingat susulan.';
+  static const prayerSilentChannelId = 'prayer_reminders_silent';
+  static const prayerSilentChannelName = 'Reminder Sholat (senyap)';
+
   static const smallIcon = 'ic_stat_ghina';
   static const _accent = Color(0xFF58CC02);
 
@@ -34,27 +48,82 @@ class FlutterNotificationGateway implements NotificationGateway {
         IOSFlutterLocalNotificationsPlugin
       >();
 
+  static Future<void>? _init;
+  static final _tapListeners = <void Function(String? payload)>[];
+
   @override
-  Future<void> initialize(void Function(String? payload) onTap) async {
+  Future<void> initialize(void Function(String? payload) onTap) {
+    _tapListeners.add(onTap);
+    return _init ??= _doInit().catchError((Object e) {
+      _init = null; // retry on the next call
+      throw e;
+    });
+  }
+
+  static void _onResponse(NotificationResponse r) {
+    final action = r.actionId;
+    if (action != null && action.isNotEmpty) {
+      handleNotificationAction(action, r.payload);
+      return;
+    }
+    for (final l in List.of(_tapListeners)) {
+      l(r.payload);
+    }
+  }
+
+  Future<void> _doInit() async {
     await _initTimeZone();
     await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings(smallIcon),
+      settings: InitializationSettings(
+        android: const AndroidInitializationSettings(smallIcon),
         // Ask for permission explicitly (ensurePermission), not at init.
         iOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,
           requestSoundPermission: false,
+          notificationCategories: [
+            DarwinNotificationCategory(
+              prayerCategoryId,
+              actions: [
+                DarwinNotificationAction.plain(
+                  prayerDoneActionId,
+                  prayerDoneActionLabel,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-      onDidReceiveNotificationResponse: (r) => onTap(r.payload),
+      onDidReceiveNotificationResponse: _onResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          ghinaNotificationBackgroundHandler,
     );
-    await _android?.createNotificationChannel(
+    final android = _android;
+    if (android == null) return;
+    await android.createNotificationChannel(
       const AndroidNotificationChannel(
         channelId,
         channelName,
         description: channelDescription,
         importance: Importance.high,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        prayerChannelId,
+        prayerChannelName,
+        description: prayerChannelDescription,
+        importance: Importance.high,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        prayerSilentChannelId,
+        prayerSilentChannelName,
+        description: prayerChannelDescription,
+        importance: Importance.high,
+        playSound: false,
+        enableVibration: false,
       ),
     );
   }
@@ -135,21 +204,68 @@ class FlutterNotificationGateway implements NotificationGateway {
     androidScheduleMode: r.exact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle,
-    notificationDetails: NotificationDetails(
-      android: AndroidNotificationDetails(
+    notificationDetails: _details(r),
+  );
+
+  @override
+  Future<void> show(NotificationRequest r) => _plugin.show(
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    payload: r.payload,
+    notificationDetails: _details(r),
+  );
+
+  static NotificationDetails _details(NotificationRequest r) {
+    final (id, name, description) = switch (r.channel) {
+      NotificationChannelKind.taskReminder => (
         channelId,
         channelName,
-        channelDescription: channelDescription,
+        channelDescription,
+      ),
+      NotificationChannelKind.prayer => (
+        prayerChannelId,
+        prayerChannelName,
+        prayerChannelDescription,
+      ),
+      NotificationChannelKind.prayerSilent => (
+        prayerSilentChannelId,
+        prayerSilentChannelName,
+        prayerChannelDescription,
+      ),
+    };
+    final silent = r.channel == NotificationChannelKind.prayerSilent;
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        id,
+        name,
+        channelDescription: description,
         importance: Importance.high,
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
         icon: smallIcon,
         color: _accent,
+        playSound: !silent,
+        enableVibration: !silent,
         styleInformation: BigTextStyleInformation(r.body),
+        actions: [
+          for (final a in r.actions)
+            AndroidNotificationAction(
+              a.id,
+              a.label,
+              // Runs in the background isolate; the notification is dismissed.
+              showsUserInterface: false,
+              cancelNotification: true,
+            ),
+        ],
       ),
-      iOS: const DarwinNotificationDetails(threadIdentifier: channelId),
-    ),
-  );
+      iOS: DarwinNotificationDetails(
+        threadIdentifier: id,
+        presentSound: !silent,
+        categoryIdentifier: r.actions.isEmpty ? null : prayerCategoryId,
+      ),
+    );
+  }
 
   @override
   Future<void> cancel(int id) => _plugin.cancel(id: id);

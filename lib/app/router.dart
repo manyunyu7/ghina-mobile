@@ -27,6 +27,7 @@ import '../presentation/features/habits/pages/habit_routes.dart';
 import '../presentation/features/home/pages/home_page.dart';
 import '../presentation/features/learn/pages/learn_page.dart';
 import '../presentation/features/learn/pages/lesson_page.dart';
+import '../presentation/features/prayers/pages/prayer_reminder_settings_page.dart';
 import '../presentation/features/prayers/pages/prayer_report_page.dart';
 import '../presentation/features/prayers/pages/prayers_page.dart';
 import '../presentation/features/profile/pages/achievements_page.dart';
@@ -255,6 +256,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/prayers/report',
         builder: (_, _) => const PrayerReportPage(),
+      ),
+      GoRoute(
+        path: '/prayers/reminders',
+        builder: (_, _) => const PrayerReminderSettingsPage(),
       ),
       GoRoute(
         path: '/achievements',

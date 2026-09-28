@@ -19,8 +19,10 @@ import '../../habits/lock/habit_lock_gate.dart' show HabitLockSettingTile;
 import '../../shell/sync_indicator.dart';
 import '../widgets/daily_goal_picker.dart';
 
-/// App version shown in the footer (`--dart-define=APP_VERSION=…`; pubspec default).
-const appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+/// "Ghina v1.0.8" from the installed build's version (package_info_plus);
+/// just "Ghina" until it's known.
+String ghinaVersionLabel(String? version) =>
+    version == null || version.isEmpty ? 'Ghina' : 'Ghina v$version';
 
 /// Profile, preferences, daily goal, data & sync, and sign out.
 class SettingsPage extends ConsumerStatefulWidget {
@@ -277,6 +279,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ],
             GhinaSpace.gapXl,
+            const SectionHeader(title: 'Pengingat'),
+            ChunkyCard(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ChunkyTile(
+                key: const ValueKey('settings-prayer-reminders'),
+                framed: false,
+                title: 'Reminder Sholat',
+                subtitle: 'Adzan 5 waktu, pengingat susulan, lokasi & metode',
+                leading: CategoryAvatar(
+                  icon: Icons.mosque_rounded,
+                  color: GhinaColors.green.base,
+                  size: 40,
+                ),
+                showChevron: true,
+                onTap: () => context.push('/prayers/reminders'),
+              ),
+            ),
+            GhinaSpace.gapXl,
             const SectionHeader(title: 'Data & sinkronisasi'),
             ChunkyCard(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -352,7 +372,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             GhinaSpace.gapLg,
             Center(
               child: Text(
-                'Ghina v$appVersion · dibuat dengan 💚',
+                '${ghinaVersionLabel(ref.watch(appVersionProvider).value)} · dibuat dengan 💚',
                 style: GhinaType.caption.copyWith(color: g.textMuted),
               ),
             ),

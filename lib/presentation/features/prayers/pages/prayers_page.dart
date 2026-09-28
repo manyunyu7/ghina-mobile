@@ -10,6 +10,7 @@ import '../../../../domain/game/game.dart' show XpRules;
 import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../widgets/prayer_schedule_card.dart';
 import '../widgets/prayer_sheet.dart';
 import '../widgets/prayer_visuals.dart';
 
@@ -125,6 +126,13 @@ class _PrayersPageState extends ConsumerState<PrayersPage> {
         title: const Text('Salat'),
         actions: [
           IconButton(
+            key: const ValueKey('prayer-reminders'),
+            tooltip: 'Reminder sholat',
+            icon: const Icon(Icons.notifications_rounded),
+            color: GhinaColors.green.base,
+            onPressed: () => context.push('/prayers/reminders'),
+          ),
+          IconButton(
             key: const ValueKey('prayer-report'),
             tooltip: 'Laporan salat',
             icon: const Icon(Icons.insights_rounded),
@@ -151,6 +159,9 @@ class _PrayersPageState extends ConsumerState<PrayersPage> {
               48,
             ),
             children: [
+              // Today's times + countdown (tomorrow / the day after via chips).
+              const PrayerScheduleCard(),
+              const SizedBox(height: 12),
               _DayHeader(
                 day: selected,
                 today: today,

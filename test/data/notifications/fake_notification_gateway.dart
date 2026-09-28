@@ -56,6 +56,15 @@ class FakeNotificationGateway implements NotificationGateway {
     scheduled[r.id] = r;
   }
 
+  /// Notifications shown right away (`show`), newest last.
+  final List<NotificationRequest> shown = [];
+
+  @override
+  Future<void> show(NotificationRequest r) async {
+    log.add('show ${r.id}');
+    shown.add(r);
+  }
+
   @override
   Future<void> cancel(int id) async {
     log.add('cancel $id');

@@ -6,6 +6,7 @@ import '../../../domain/entities/entities.dart';
 import '../../design_system/design_system.dart';
 import '../../state/notifications/notification_providers.dart';
 import '../../state/notifications/reminder_sync_controller.dart';
+import '../../state/prayer_reminders/prayer_reminder_providers.dart';
 import '../../state/sync_status_provider.dart';
 import 'app_drawer.dart';
 import 'notification_capture_listener.dart';
@@ -16,7 +17,7 @@ import 'share_intake_listener.dart';
 /// slim offline strip above the bar while the sync engine can't reach the server.
 ///
 /// Also keeps the task reminders scheduled (`reminderSyncControllerProvider`,
-/// started once here) and refreshes the notification permission and the
+/// started once here) and Reminder Sholat (`prayerReminderSyncControllerProvider`) and refreshes the notification permission and the
 /// schedule when the app comes back to the foreground.
 ///
 /// Owns the side drawer ([AppDrawer], "Semua menu"): the tabs open it with
@@ -43,6 +44,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     onResume: () {
       ref.read(notificationPermissionProvider.notifier).refresh();
       ref.read(reminderSyncControllerProvider.notifier).syncNow();
+      // New day → new window; GPS location refreshed if stale.
+      ref.read(prayerReminderSyncControllerProvider.notifier).syncNow();
     },
   );
 
@@ -61,6 +64,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     ref.watch(reminderSyncControllerProvider);
+    ref.watch(prayerReminderSyncControllerProvider);
     final shell = widget.navigationShell;
     final location =
         shell.route.branches[shell.currentIndex].defaultRoute?.path ?? '';

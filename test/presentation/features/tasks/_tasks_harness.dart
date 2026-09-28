@@ -15,6 +15,7 @@ import 'package:ghina/core/clock.dart';
 import 'package:ghina/data/notifications/notifications.dart';
 import 'package:ghina/di/core_providers.dart';
 import 'package:ghina/di/game_overrides.dart';
+import 'package:ghina/di/prayer_reminder_providers.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/game/game.dart' hide MascotMood;
 import 'package:ghina/domain/repositories/repositories.dart';
@@ -226,6 +227,9 @@ class TasksHarness {
     clockProvider.overrideWithValue(clock),
     tickSourceProvider.overrideWithValue(() => Stream.value(tasksNow)),
     taskRepositoryProvider.overrideWithValue(tasks),
+    prayerReminderSettingsStoreProvider.overrideWithValue(
+      InMemoryPrayerReminderSettingsStore(),
+    ),
     // Notes/content sources (game events, merged reminders) in memory.
     contentItemRepositoryProvider.overrideWithValue(
       FakeContentItemRepository(),

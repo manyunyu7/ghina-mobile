@@ -13,10 +13,13 @@ import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/notification_listener.dart';
+import '../../domain/services/prayer_reminders.dart';
 import '../../domain/services/share_intake.dart';
 import '../../domain/services/speech_transcriber.dart';
 import '../../domain/services/voice_recorder.dart';
+import 'battery_optimization_bridge.dart';
 import 'channel_share_intake.dart';
+import 'device_location.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'just_audio_playback.dart';
@@ -25,6 +28,9 @@ import 'quick_actions_app_shortcuts.dart';
 import 'record_voice_recorder.dart';
 import 'stt_speech_transcriber.dart';
 
+export 'app_info.dart';
+export 'battery_optimization_bridge.dart' show NoopBatteryOptimization;
+export 'device_location.dart' show NoopDeviceLocation;
 export 'fakes.dart';
 export 'notification_listener_bridge.dart'
     show NoopDeviceNotificationListener, notificationCaptureDatabase;
@@ -67,3 +73,12 @@ AppShortcuts createAppShortcuts() =>
 DeviceNotificationListener createDeviceNotificationListener() => _isAndroid
     ? FlutterDeviceNotificationListener()
     : const NoopDeviceNotificationListener();
+
+/// Reminder Sholat "Pakai lokasi GPS" (one-shot coarse fix).
+DeviceLocationService createDeviceLocation() => isMobileDevice
+    ? const GeolocatorDeviceLocation()
+    : const NoopDeviceLocation();
+
+/// Android battery-optimisation shortcut (Reminder Sholat).
+BatteryOptimization createBatteryOptimization() =>
+    _isAndroid ? BridgeBatteryOptimization() : const NoopBatteryOptimization();

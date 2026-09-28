@@ -12,6 +12,17 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Reminder Sholat uses the same notification permissions (exact alarms whenever the
+         user allowed "Alarms & reminders"; inexact otherwise). Location: optional one-shot
+         coarse fix when the user picks "Pakai lokasi GPS" (and once per app open after
+         that) to calculate prayer times offline; coarse (~km) is plenty for that. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- geolocator_android declares it for its optional location foreground service, which
+         Reminder Sholat never starts (one-shot getCurrentPosition only); dropped so Play
+         doesn't ask for a foreground-service-location declaration. -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_LOCATION"
+        tools:node="remove" />
     <!-- Notes: voice clips (record) and dictation (speech_to_text). Runtime permission,
          requested only when the user taps "Rekam suara" / "Dikte". -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

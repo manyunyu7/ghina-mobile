@@ -159,12 +159,51 @@ void main() {
     expect(gw.scheduled, isEmpty);
   });
 
+  test(
+    'cancelAll leaves other features\' notifications (Reminder Sholat)',
+    () async {
+      gw.foreign[7] = const PendingNotification(
+        id: 7,
+        payload: '{"kind":"prayer_reminder"}',
+      );
+      await scheduler.replaceAll([rem('a')]);
+      await scheduler.cancelAll();
+      expect(gw.scheduled, isEmpty);
+      expect(gw.foreign.keys, [7]);
+      expect(gw.log, isNot(contains('cancelAll')));
+    },
+  );
+
+  test(
+    'cancelAll falls back to the plugin\'s cancelAll when pending is unreadable',
+    () async {
+      await scheduler.replaceAll([rem('a')]);
+      gw.failPending = true;
+      await scheduler.cancelAll();
+      expect(gw.log.last, 'cancelAll');
+    },
+  );
+
+  test('taps on Reminder Sholat notifications route to /prayers', () async {
+    final got = <String>[];
+    final sub = scheduler.openedRoutes.listen(got.add);
+    await pumpEventQueue();
+    gw.tap('{"kind":"prayer_reminder","r":"/prayers"}');
+    await pumpEventQueue();
+    expect(got, ['/prayers']);
+    await sub.cancel();
+  });
+
   test('serialises overlapping calls in order', () async {
     final f1 = scheduler.replaceAll([rem('a')]);
     final f2 = scheduler.cancelAll();
     final f3 = scheduler.replaceAll([rem('b')]);
     await Future.wait([f1, f2, f3]);
-    expect(gw.log, ['schedule ${id('a')}', 'cancelAll', 'schedule ${id('b')}']);
+    expect(gw.log, [
+      'schedule ${id('a')}',
+      'cancel ${id('a')}',
+      'schedule ${id('b')}',
+    ]);
   });
 
   group('openedRoutes', () {

@@ -108,7 +108,7 @@ Pushed routes (full screen, outside the shell):
 `/subscriptions`, `/subscriptions/new`, `/subscriptions/:id`,
 `/forecast`, `/forecast/new`, `/forecast/:id`,
 `/reports`,
-`/prayers`, `/prayers/report`, `/wallets/:id/history`, `/health`, `/health/new`, `/health/:id`, `/food`, `/food/new`, `/food/:id`,
+`/prayers`, `/prayers/report`, `/prayers/reminders` (Reminder Sholat, see `lib/data/notifications/README.md`), `/wallets/:id/history`, `/health`, `/health/new`, `/health/:id`, `/food`, `/food/new`, `/food/:id`,
 `/achievements`, `/learn/lesson/:lessonId`, `/settings`, `/sync`,
 `/notification-log`, `/notification-log/rules`, `/notification-log/rules/new`, `/notification-log/rules/:id`
 ("Log Notifikasi", Android only — see `lib/data/platform/notification_listener_bridge.dart`).

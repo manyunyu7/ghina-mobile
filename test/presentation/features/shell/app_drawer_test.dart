@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghina/di/prayer_reminder_providers.dart';
 import 'package:ghina/di/usecase_providers.dart';
 
 import 'package:ghina/presentation/design_system/design_system.dart';
@@ -55,6 +56,7 @@ class _Shell {
       (ref) => Stream.value(sampleSubs()),
     ),
     balancePrivacyStoreProvider.overrideWithValue(privacy),
+    appVersionProvider.overrideWith((ref) async => '1.0.8'),
     sessionControllerProvider.overrideWith(
       () => FakeSession(const SignedIn(testUser)),
     ),
@@ -392,7 +394,8 @@ void main() {
       await settle(tester, 3);
       expect(s.container.read(balancePrivacyProvider).hidden, isTrue);
       expect(s.privacy.value.hidden, isTrue);
-      expect(find.textContaining('Ghina v'), findsOneWidget);
+      // Runtime version (package_info_plus), not a hard-coded one.
+      expect(find.text('Ghina v1.0.8'), findsOneWidget);
     });
 
     testWidgets('"Semua menu" tile on Beranda opens the drawer', (

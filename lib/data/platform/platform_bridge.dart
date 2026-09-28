@@ -14,6 +14,8 @@ import 'package:flutter/services.dart';
 /// * `speech.downloadModel` `{locale}` → `bool`
 /// * `apps.list` → `List<Map>` `{package, label}` of launchable apps
 /// * `apps.label` `{package}` → `String?` (launcher label)
+/// * `battery.isIgnoring` → `bool?` (exempt from battery optimisation; null < Android 6)
+/// * `battery.openSettings` → `bool` (system battery-optimisation list)
 ///
 /// Events on [shareEventChannelName]: every share map — the one that
 /// cold-started the app and those received while running. The activity queues
@@ -53,6 +55,12 @@ class PlatformBridge {
 
   Future<bool> openAppSettings() async =>
       await _call<bool>('app.openSettings') ?? false;
+
+  Future<bool?> isIgnoringBatteryOptimizations() =>
+      _call<bool>('battery.isIgnoring');
+
+  Future<bool> openBatteryOptimizationSettings() async =>
+      await _call<bool>('battery.openSettings') ?? false;
 
   Future<bool> shouldShowMicRationale() async =>
       await _call<bool>('mic.shouldShowRationale') ?? false;

@@ -11,7 +11,10 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/core/clock.dart';
 import 'package:ghina/core/dates.dart';
+import 'package:ghina/data/notifications/notifications.dart'
+    show InMemoryPrayerReminderSettingsStore;
 import 'package:ghina/di/core_providers.dart';
+import 'package:ghina/di/prayer_reminder_providers.dart';
 import 'package:ghina/di/game_overrides.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/game/game.dart' hide MascotMood;
@@ -187,6 +190,7 @@ class Harness {
   final food = FakeFoodRepository();
   final tasks = FakeTaskRepository();
   final sync = FakeSyncService();
+  final prayerReminders = InMemoryPrayerReminderSettingsStore();
 
   /// Seeds a local game state (lesson completions, seen badges, …).
   void seedGame(GameLocalState state) {
@@ -225,6 +229,7 @@ class Harness {
     ),
     syncServiceProvider.overrideWithValue(sync),
     currentUserProvider.overrideWithValue(harnessUser),
+    prayerReminderSettingsStoreProvider.overrideWithValue(prayerReminders),
   ];
 }
 

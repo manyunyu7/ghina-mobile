@@ -18,6 +18,8 @@ export 'notification_rules.dart';
 export 'notification_usecases.dart';
 export 'planned_usecases.dart';
 export 'prayer_quality.dart';
+export 'prayer_reminder_rules.dart';
+export 'prayer_reminder_usecases.dart';
 export 'prayer_usecases.dart';
 export 'report_usecases.dart';
 export 'subscription_usecases.dart';
