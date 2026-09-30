@@ -60,6 +60,10 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Static launcher shortcut "Chat Killa" (res/xml/shortcuts.xml). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
             <!-- Notes share target (docs/notes.md → Capture paths): text/URL and
                  image(s) shared from other apps become a note. Handled in MainActivity.
                  launchMode singleTask: a share always reaches the ONE running instance

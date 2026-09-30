@@ -5,6 +5,7 @@ import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/game/game.dart' hide MascotMood;
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/home/pages/home_page.dart';
+import 'package:ghina/presentation/state/killa_access_provider.dart';
 
 import '../shell/test_utils.dart';
 import '_task_harness.dart';
@@ -212,4 +213,33 @@ void main() {
     await settle(tester, 8);
     expect(find.byType(CelebrationScreen), findsNothing);
   });
+
+  testWidgets('Killa FAB opens the chat', (tester) async {
+    await pumpPage(
+      tester,
+      const HomePage(),
+      overrides: withTasks(pageOverrides()),
+    );
+    expect(find.byTooltip('Killa'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('home-killa-fab')));
+    await settle(tester);
+    expect(find.text('ROUTE:/killa'), findsOneWidget);
+  });
+
+  testWidgets('Killa FAB is hidden when Killa is locked (403)', (tester) async {
+    await pumpPage(
+      tester,
+      const HomePage(),
+      overrides: [
+        ...withTasks(pageOverrides()),
+        killaAccessProvider.overrideWith(_LockedKilla.new),
+      ],
+    );
+    expect(find.byKey(const ValueKey('home-killa-fab')), findsNothing);
+  });
+}
+
+class _LockedKilla extends KillaAccessController {
+  @override
+  KillaAccess build() => KillaAccess.forbidden;
 }

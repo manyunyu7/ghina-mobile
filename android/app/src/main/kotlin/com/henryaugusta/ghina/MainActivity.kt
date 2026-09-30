@@ -35,7 +35,9 @@ import java.util.concurrent.Executors
  *  - Launcher shortcuts come from the quick_actions plugin (dynamic shortcuts set
  *    from Dart; the plugin reads the launch extra on cold start and gets warm
  *    starts through onNewIntent). This activity only makes sure a shortcut
- *    doesn't fire twice (restored from Recents / re-attached plugin).
+ *    doesn't fire twice (restored from Recents / re-attached plugin). The static
+ *    "Chat Killa" shortcut (res/xml/shortcuts.xml) carries the same extra, so it
+ *    takes the same path.
  *  - Log Notifikasi: launchable apps + app labels (apps.list / apps.label), and a
  *    hand-over of the flutter_notification_listener service to a background engine
  *    when this activity's engine dies (see onDestroy).

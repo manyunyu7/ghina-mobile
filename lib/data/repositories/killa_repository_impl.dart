@@ -20,9 +20,14 @@ class RemoteKillaRepository implements KillaRepository {
   @override
   Future<KillaSendResult> send({
     required String text,
-    required KillaModel model,
     List<KillaOutgoingMedia> media = const [],
-  }) => _api.send(text: text, model: model, media: media);
+  }) => _api.send(text: text, media: media);
+
+  @override
+  Future<KillaModelSetting> model() => _api.model();
+
+  @override
+  Future<String?> setModel(String model) => _api.setModel(model);
 
   @override
   Future<KillaMessage> newSession() async {

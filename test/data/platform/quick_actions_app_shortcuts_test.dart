@@ -62,7 +62,7 @@ void main() {
     () async {
       final plugin = _FakePlugin();
       final s = QuickActionsAppShortcuts(plugin: plugin);
-      await s.install(AppShortcut.values); // initializes the plugin
+      await s.install(AppShortcut.dynamicShortcuts); // initializes the plugin
       plugin.handler!('new_note');
       final got = <AppShortcut>[];
       s.launches.listen(got.add);
@@ -74,7 +74,9 @@ void main() {
 
   test('install publishes type, generic label and drawable icon', () async {
     final plugin = _FakePlugin();
-    await QuickActionsAppShortcuts(plugin: plugin).install(AppShortcut.values);
+    await QuickActionsAppShortcuts(
+      plugin: plugin,
+    ).install(AppShortcut.dynamicShortcuts);
     expect(
       [for (final i in plugin.items!) (i.type, i.localizedTitle, i.icon)],
       [

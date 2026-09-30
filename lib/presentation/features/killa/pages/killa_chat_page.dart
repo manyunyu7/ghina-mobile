@@ -176,9 +176,28 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
   }
 
   Future<void> _pickModel() async {
+    final c = ref.read(killaChatControllerProvider.notifier);
     final cur = ref.read(killaChatControllerProvider).model;
-    final m = await showKillaModelSheet(context, cur);
-    if (m != null) ref.read(killaChatControllerProvider.notifier).setModel(m);
+    if (cur == null) {
+      // Not loaded yet (or failed): try again before showing stale options.
+      await c.loadModel();
+      if (!mounted) return;
+    }
+    final setting = ref.read(killaChatControllerProvider).model;
+    if (setting == null) {
+      showErrorToast(context, 'Daftar model belum bisa dimuat. Coba lagi, ya.');
+      return;
+    }
+    final m = await showKillaModelSheet(context, setting);
+    if (m == null || !mounted) return;
+    try {
+      await c.setModel(m);
+      if (mounted) showOkToast(context, 'Model tersimpan (berlaku juga di WA)');
+    } on KillaException catch (e) {
+      if (mounted && e.kind != KillaErrorKind.forbidden) {
+        showErrorToast(context, e.message);
+      }
+    }
   }
 
   Future<void> _newSession() async {
@@ -238,7 +257,11 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
                     Text(
                       s.pending != null
                           ? 'lagi mengetik…'
-                          : 'Model: ${s.model.label}',
+                          : s.savingModel
+                          ? 'Menyimpan model…'
+                          : s.model == null
+                          ? 'Model: …'
+                          : 'Model: ${killaModelLabel(s.model!.model)}',
                       style: GhinaType.caption.copyWith(color: g.textSecondary),
                     ),
                 ],
@@ -251,7 +274,7 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
             IconButton(
               tooltip: 'Pilih model',
               icon: const Icon(Icons.tune_rounded),
-              onPressed: _pickModel,
+              onPressed: s.savingModel ? null : _pickModel,
             ),
             PopupMenuButton<String>(
               tooltip: 'Menu Killa',

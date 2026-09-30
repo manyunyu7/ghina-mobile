@@ -28,7 +28,8 @@ final class KillaChatState {
     this.loadingOlder = false,
     this.pending,
     this.error,
-    this.model = KillaModel.defaultModel,
+    this.model,
+    this.savingModel = false,
     this.stillProcessing = false,
   });
 
@@ -45,7 +46,10 @@ final class KillaChatState {
 
   /// Error of the first load (the page shows it instead of the chat).
   final KillaException? error;
-  final KillaModel model;
+
+  /// The persisted model (shared with the WA chat); null = not loaded yet.
+  final KillaModelSetting? model;
+  final bool savingModel;
 
   /// The last send timed out: the engine may still answer (polling picks it
   /// up).
@@ -61,7 +65,8 @@ final class KillaChatState {
     bool? loadingOlder,
     Object? pending = _keep,
     Object? error = _keep,
-    KillaModel? model,
+    KillaModelSetting? model,
+    bool? savingModel,
     bool? stillProcessing,
   }) => KillaChatState(
     messages: messages ?? this.messages,
@@ -75,6 +80,7 @@ final class KillaChatState {
         : pending as KillaPending?,
     error: identical(error, _keep) ? this.error : error as KillaException?,
     model: model ?? this.model,
+    savingModel: savingModel ?? this.savingModel,
     stillProcessing: stillProcessing ?? this.stillProcessing,
   );
 }
@@ -105,6 +111,7 @@ class KillaChatController extends Notifier<KillaChatState> {
   @override
   KillaChatState build() {
     Future.microtask(load);
+    Future.microtask(loadModel);
     return const KillaChatState();
   }
 
@@ -186,7 +193,37 @@ class KillaChatController extends Notifier<KillaChatState> {
     }
   }
 
-  void setModel(KillaModel m) => state = state.copyWith(model: m);
+  /// Loads the persisted model. Silent: the chat works without it (except a
+  /// 403, which locks the feature like any other call).
+  Future<void> loadModel() async {
+    if (!ref.mounted) return;
+    try {
+      final m = await ref.read(loadKillaModelProvider)();
+      if (!ref.mounted) return;
+      state = state.copyWith(model: m);
+    } on KillaException catch (e) {
+      _seen(e);
+    }
+  }
+
+  /// Persists [model] engine-side (also used by the WA chat); `"default"`
+  /// clears it. Throws a [KillaException].
+  Future<void> setModel(String model) async {
+    if (state.savingModel) return;
+    state = state.copyWith(savingModel: true);
+    try {
+      final stored = await ref.read(setKillaModelProvider)(model);
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        model: (state.model ?? const KillaModelSetting()).withModel(stored),
+        savingModel: false,
+      );
+    } on KillaException catch (e) {
+      _seen(e);
+      if (ref.mounted) state = state.copyWith(savingModel: false);
+      rethrow;
+    }
+  }
 
   Future<KillaSendOutcome> send(
     String text,
@@ -204,7 +241,6 @@ class KillaChatController extends Notifier<KillaChatState> {
     try {
       final r = await ref.read(sendKillaMessageProvider)(
         text: text,
-        model: state.model,
         media: media,
       );
       if (!ref.mounted) return const KillaSent();

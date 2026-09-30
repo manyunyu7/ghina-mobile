@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Static launcher shortcut (res/xml/shortcuts.xml). -->
+    <string name="shortcut_killa_short">Chat Killa</string>
+    <string name="shortcut_killa_long">Chat dengan Killa</string>
+</resources>

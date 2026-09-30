@@ -45,7 +45,6 @@ final class SendKillaMessage {
 
   Future<KillaSendResult> call({
     required String text,
-    KillaModel model = KillaModel.defaultModel,
     List<KillaOutgoingMedia> media = const [],
   }) {
     final t = text.trim();
@@ -66,7 +65,26 @@ final class SendKillaMessage {
         );
       }
     }
-    return _repo.send(text: t, model: model, media: media);
+    return _repo.send(text: t, media: media);
+  }
+}
+
+final class LoadKillaModel {
+  const LoadKillaModel(this._repo);
+  final KillaRepository _repo;
+
+  Future<KillaModelSetting> call() => _repo.model();
+}
+
+/// Persists the model (engine-side, also used by the WA chat); null or
+/// `"default"` clears it → the stored value (null = default).
+final class SetKillaModel {
+  const SetKillaModel(this._repo);
+  final KillaRepository _repo;
+
+  Future<String?> call(String? model) {
+    final m = model?.trim();
+    return _repo.setModel(m == null || m.isEmpty ? killaDefaultModel : m);
   }
 }
 

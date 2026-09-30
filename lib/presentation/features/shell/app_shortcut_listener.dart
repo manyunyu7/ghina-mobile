@@ -31,6 +31,7 @@ String? shortcutRoute(AppShortcut s) => switch (s) {
   AppShortcut.note => '/notes/new',
   AppShortcut.task => '/tasks/new',
   AppShortcut.urge => null,
+  AppShortcut.killa => '/killa',
 };
 
 /// Publishes the launcher shortcuts (long-press the Ghina icon) and opens the
@@ -55,7 +56,7 @@ class _AppShortcutListenerState extends ConsumerState<AppShortcutListener> {
     super.initState();
     final shortcuts = ref.read(appShortcutsProvider);
     _sub = shortcuts.launches.listen(_onLaunch);
-    unawaited(shortcuts.install(AppShortcut.values));
+    unawaited(shortcuts.install(AppShortcut.dynamicShortcuts));
   }
 
   void _onLaunch(AppShortcut s) {

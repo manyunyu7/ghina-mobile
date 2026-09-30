@@ -12,6 +12,7 @@ import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/game/game_providers.dart';
 import '../../../state/game/task_game_providers.dart';
+import '../../../state/killa_access_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/rewards/rewards.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -80,7 +81,21 @@ class _HomePageState extends ConsumerState<HomePage> {
         ? 'Selamat sore'
         : 'Selamat malam';
 
+    // Killa is for allowlisted accounts only: no shortcut after a 403.
+    final killaLocked = ref.watch(killaAccessProvider) == KillaAccess.forbidden;
+
     return Scaffold(
+      floatingActionButton: killaLocked
+          ? null
+          : FloatingActionButton(
+              key: const ValueKey('home-killa-fab'),
+              heroTag: 'home-killa-fab',
+              tooltip: 'Killa',
+              backgroundColor: GhinaColors.purple.base,
+              foregroundColor: Colors.white,
+              onPressed: () => context.push('/killa'),
+              child: const Icon(Icons.chat_bubble_rounded),
+            ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -92,11 +107,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 child: ListView(
                   key: const PageStorageKey('home-list'),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     GhinaSpace.page,
                     GhinaSpace.lg,
                     GhinaSpace.page,
-                    GhinaSpace.xxl,
+                    // Room for the Killa button over the last card.
+                    killaLocked ? GhinaSpace.xxl : GhinaSpace.xxl + 64,
                   ),
                   children: [
                     Text(

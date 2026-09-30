@@ -9,9 +9,15 @@ abstract interface class KillaRepository {
   /// Sends a message and waits for the reply (up to ~5.5 min).
   Future<KillaSendResult> send({
     required String text,
-    required KillaModel model,
     List<KillaOutgoingMedia> media = const [],
   });
+
+  /// The persisted model + the selectable options (shared with the WA chat).
+  Future<KillaModelSetting> model();
+
+  /// Persists [model] (`"default"` clears it) → the stored value (null =
+  /// default).
+  Future<String?> setModel(String model);
 
   /// "Sesi baru" → the divider message.
   Future<KillaMessage> newSession();

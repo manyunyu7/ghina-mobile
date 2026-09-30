@@ -4,24 +4,24 @@ library;
 
 import 'dart:typed_data';
 
-/// Model choice of a chat turn (`model` of `POST chat`).
-enum KillaModel {
-  defaultModel('default', 'Default'),
-  fable('fable', 'Fable'),
-  opus('opus', 'Opus'),
-  sonnet('sonnet', 'Sonnet'),
-  haiku('haiku', 'Haiku');
+/// Wire value that clears the persisted model back to the engine default.
+const killaDefaultModel = 'default';
 
-  const KillaModel(this.wire, this.label);
-  final String wire;
-  final String label;
+/// The engine's persisted model (`GET/POST /api/mobile/killa/model`), shared
+/// with the WhatsApp chat. [model] null = the engine default.
+final class KillaModelSetting {
+  const KillaModelSetting({this.model, this.options = const []});
 
-  static KillaModel fromWire(String? v) {
-    for (final m in values) {
-      if (m.wire == v) return m;
-    }
-    return defaultModel;
-  }
+  final String? model;
+
+  /// Selectable values offered by the server.
+  final List<String> options;
+
+  /// [model] with null shown as [killaDefaultModel].
+  String get active => model ?? killaDefaultModel;
+
+  KillaModelSetting withModel(String? m) =>
+      KillaModelSetting(model: m, options: options);
 }
 
 enum KillaRole { user, assistant, system }

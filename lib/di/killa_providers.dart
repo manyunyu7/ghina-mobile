@@ -31,6 +31,12 @@ final loadKillaChatProvider = Provider(
 final sendKillaMessageProvider = Provider(
   (ref) => SendKillaMessage(ref.watch(killaRepositoryProvider)),
 );
+final loadKillaModelProvider = Provider(
+  (ref) => LoadKillaModel(ref.watch(killaRepositoryProvider)),
+);
+final setKillaModelProvider = Provider(
+  (ref) => SetKillaModel(ref.watch(killaRepositoryProvider)),
+);
 final startKillaSessionProvider = Provider(
   (ref) => StartKillaSession(ref.watch(killaRepositoryProvider)),
 );

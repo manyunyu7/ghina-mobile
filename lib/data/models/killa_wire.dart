@@ -195,3 +195,15 @@ KillaUsage killaUsageFromWire(Object? v) {
     total: killaTotalsFromWire(j['total']),
   );
 }
+
+/// `{model: string|null, options: string[]}` of `GET/POST model` (POST
+/// answers `{ok, model}`: [options] is empty then). `"default"` / empty =
+/// null.
+KillaModelSetting killaModelFromWire(Object? v) {
+  final j = _map(v);
+  final m = _strN(j['model']);
+  return KillaModelSetting(
+    model: m == killaDefaultModel ? null : m,
+    options: <String>{for (final o in _list(j['options'])) ?_strN(o)}.toList(),
+  );
+}

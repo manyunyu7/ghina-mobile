@@ -12,9 +12,14 @@ abstract interface class KillaApi {
   Future<KillaMessagePage> chat({String? before, int limit});
   Future<KillaSendResult> send({
     required String text,
-    required KillaModel model,
     required List<KillaOutgoingMedia> media,
   });
+
+  /// The persisted model (engine-side, shared with the WA chat).
+  Future<KillaModelSetting> model();
+
+  /// Persists [model] (`"default"` clears it) → the stored value.
+  Future<String?> setModel(String model);
   Future<KillaMessage?> newSession();
   Future<KillaMediaFile> media(String path);
   Future<KillaDirListing> listFiles(String path);
@@ -51,14 +56,12 @@ final class DioKillaApi implements KillaApi {
   @override
   Future<KillaSendResult> send({
     required String text,
-    required KillaModel model,
     required List<KillaOutgoingMedia> media,
   }) => killaCall(() async {
     final r = await _dio.post<Object?>(
       '$_base/chat',
       data: {
         'text': text,
-        'model': model.wire,
         if (media.isNotEmpty)
           'media': [for (final m in media) killaMediaToWire(m)],
       },
@@ -68,6 +71,25 @@ final class DioKillaApi implements KillaApi {
       ),
     );
     return killaSendResultFromWire(r.data);
+  });
+
+  @override
+  Future<KillaModelSetting> model() => killaCall(() async {
+    final r = await _dio.get<Object?>('$_base/model');
+    return killaModelFromWire(r.data);
+  });
+
+  @override
+  Future<String?> setModel(String model) => killaCall(() async {
+    final r = await _dio.post<Object?>('$_base/model', data: {'model': model});
+    final d = r.data;
+    if (d is Map && d['ok'] == false) {
+      throw KillaException(
+        KillaErrorKind.invalid,
+        d['error'] is String ? d['error'] as String : 'Model belum tersimpan.',
+      );
+    }
+    return killaModelFromWire(d).model;
   });
 
   @override

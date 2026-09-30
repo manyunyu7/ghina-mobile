@@ -83,6 +83,23 @@ class _Events implements CalendarEventRepository {
 class _Killa implements KillaRepository {
   KillaException? error;
   final messages = <KillaMessage>[];
+  String? storedModel;
+  final modelPosts = <String>[];
+
+  @override
+  Future<KillaModelSetting> model() async {
+    if (error case final e?) throw e;
+    return KillaModelSetting(
+      model: storedModel,
+      options: const ['default', 'opus', 'sonnet', 'haiku'],
+    );
+  }
+
+  @override
+  Future<String?> setModel(String model) async {
+    modelPosts.add(model);
+    return storedModel = model == 'default' ? null : model;
+  }
 
   @override
   Future<KillaMessagePage> chat({String? before, int limit = 50}) async {
@@ -93,7 +110,6 @@ class _Killa implements KillaRepository {
   @override
   Future<KillaSendResult> send({
     required String text,
-    required KillaModel model,
     List<KillaOutgoingMedia> media = const [],
   }) async {
     final u = KillaMessage(
@@ -105,8 +121,8 @@ class _Killa implements KillaRepository {
     final a = KillaMessage(
       id: 'a${messages.length}',
       role: KillaRole.assistant,
-      body: 'Siap, **${model.wire}**!',
-      model: model.wire,
+      body: 'Siap, **${storedModel ?? 'default'}**!',
+      model: storedModel,
       createdAt: _now.add(const Duration(seconds: 5)),
     );
     messages.addAll([u, a]);
@@ -296,6 +312,30 @@ void main() {
     }
     expect(find.text('halo'), findsOneWidget);
     expect(find.textContaining('Siap,'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+  });
+  testWidgets('killa: persisted model is loaded and saved engine-side', (
+    t,
+  ) async {
+    final killa = _Killa()..storedModel = 'opus';
+    await _pump(t, const KillaChatPage(), [
+      killaRepositoryProvider.overrideWithValue(killa),
+      killaMediaPickerProvider.overrideWithValue(const _NoPicker()),
+    ]);
+    expect(find.text('Model: Opus'), findsOneWidget);
+
+    await t.tap(find.byTooltip('Pilih model'));
+    for (var i = 0; i < 8; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byKey(const ValueKey('killa-model-default')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('killa-model-default')));
+    for (var i = 0; i < 8; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(killa.modelPosts, ['default']);
+    expect(find.text('Model: Default'), findsOneWidget);
+    expect(find.text('Model tersimpan (berlaku juga di WA)'), findsOneWidget);
     await t.pumpWidget(const SizedBox());
   });
 }

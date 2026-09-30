@@ -322,7 +322,6 @@ void main() {
       );
       final res = await r.repo.send(
         text: 'hai',
-        model: KillaModel.opus,
         media: [
           KillaOutgoingMedia(
             name: 'x.pdf',
@@ -335,11 +334,70 @@ void main() {
       final req = r.adapter.requests.single;
       final data = req.data as Map;
       expect(data['text'], 'hai');
-      expect(data['model'], 'opus');
+      // The model is persisted engine-side now, never sent per message.
+      expect(data.containsKey('model'), isFalse);
       expect((data['media'] as List).single['dataBase64'], 'JVBERg==');
       expect(
         req.receiveTimeout,
         greaterThanOrEqualTo(const Duration(minutes: 6)),
+      );
+    });
+
+    test('model: GET parses current + options; null → default', () async {
+      final r = _repo(
+        (o) => {
+          'GET /api/mobile/killa/model': (
+            200,
+            {
+              'model': null,
+              'options': ['default', 'opus', 'sonnet', 'opus', 3],
+            },
+          ),
+        },
+      );
+      final m = await r.repo.model();
+      expect(m.model, isNull);
+      expect(m.active, 'default');
+      expect(m.options, ['default', 'opus', 'sonnet']);
+    });
+
+    test('model: POST body and the stored value', () async {
+      final r = _repo(
+        (o) => {
+          'POST /api/mobile/killa/model': (
+            200,
+            {
+              'ok': true,
+              'model': (o.data as Map)['model'] == 'default'
+                  ? null
+                  : (o.data as Map)['model'],
+            },
+          ),
+        },
+      );
+      final set = SetKillaModel(r.repo);
+      expect(await set('haiku'), 'haiku');
+      expect((r.adapter.requests.last.data as Map)['model'], 'haiku');
+      expect(await set(null), isNull);
+      expect((r.adapter.requests.last.data as Map)['model'], 'default');
+    });
+
+    test('model: 400 → invalid KillaException', () async {
+      final r = _repo(
+        (o) => {
+          'POST /api/mobile/killa/model': (
+            400,
+            {'error': 'model tidak dikenal'},
+          ),
+        },
+      );
+      expect(
+        () => r.repo.setModel('gpt'),
+        throwsA(
+          isA<KillaException>()
+              .having((e) => e.kind, 'kind', KillaErrorKind.invalid)
+              .having((e) => e.message, 'message', 'model tidak dikenal'),
+        ),
       );
     });
 

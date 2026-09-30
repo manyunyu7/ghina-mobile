@@ -8,9 +8,13 @@ enum AppShortcut {
   task('new_task', 'Tugas baru', 'ic_shortcut_task'),
 
   /// Habits "Lagi pengen…" (urge / emergency screen of a quit habit).
-  urge('habit_urge', 'Lagi pengen…', 'ic_shortcut_urge');
+  urge('habit_urge', 'Lagi pengen…', 'ic_shortcut_urge'),
 
-  const AppShortcut(this.type, this.label, this.icon);
+  /// Killa chat. A STATIC Android shortcut (`res/xml/shortcuts.xml`, same
+  /// launch extra as the dynamic ones), so it is never passed to [AppShortcuts.install].
+  killa('killa_chat', 'Chat Killa', 'ic_shortcut_killa', isDynamic: false);
+
+  const AppShortcut(this.type, this.label, this.icon, {this.isDynamic = true});
 
   /// Stable id handed to the OS and back on launch.
   final String type;
@@ -18,6 +22,15 @@ enum AppShortcut {
 
   /// Android drawable resource name (`res/drawable/<icon>.xml`).
   final String icon;
+
+  /// Published at runtime (quick_actions); false = declared in the manifest.
+  final bool isDynamic;
+
+  /// The shortcuts to hand to [AppShortcuts.install].
+  static List<AppShortcut> get dynamicShortcuts => [
+    for (final s in values)
+      if (s.isDynamic) s,
+  ];
 
   static AppShortcut? fromType(String type) {
     for (final s in values) {

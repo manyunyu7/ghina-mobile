@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcuts (long-press the Ghina icon). The dynamic ones
+     (Catat pengeluaran, Catatan baru, …) are published from Dart via quick_actions.
+     This one reuses quick_actions' launch extra ("some unique action key" =
+     AppShortcut.type), so the plugin delivers it to Dart exactly like a dynamic
+     shortcut: cold start via getLaunchAction, warm start via onNewIntent
+     (MainActivity is singleTask). Dart routes killa_chat → /killa
+     (lib/presentation/features/shell/app_shortcut_listener.dart). -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="killa_chat"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_killa"
+        android:shortcutShortLabel="@string/shortcut_killa_short"
+        android:shortcutLongLabel="@string/shortcut_killa_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.henryaugusta.ghina"
+            android:targetClass="com.henryaugusta.ghina.MainActivity">
+            <extra
+                android:name="some unique action key"
+                android:value="killa_chat" />
+        </intent>
+    </shortcut>
+</shortcuts>

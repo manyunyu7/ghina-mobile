@@ -142,11 +142,13 @@ void main() {
       expect(shortcutRoute(AppShortcut.note), '/notes/new');
       expect(shortcutRoute(AppShortcut.task), '/tasks/new');
       expect(shortcutRoute(AppShortcut.urge), isNull);
+      expect(shortcutRoute(AppShortcut.killa), '/killa');
       expect(AppShortcut.values.map((s) => s.label), [
         'Catat pengeluaran',
         'Catatan baru',
         'Tugas baru',
         'Lagi pengen…',
+        'Chat Killa',
       ]);
       for (final s in AppShortcut.values) {
         expect(AppShortcut.fromType(s.type), s);
@@ -156,10 +158,18 @@ void main() {
   });
 
   group('launcher shortcuts', () {
-    testWidgets('publishes the four shortcuts at startup', (tester) async {
+    testWidgets('publishes the four dynamic shortcuts at startup', (
+      tester,
+    ) async {
       final app = _App(signedIn: true);
       await app.pump(tester);
-      expect(app.shortcuts.installed, AppShortcut.values);
+      // Killa is a static (manifest) shortcut: never published at runtime.
+      expect(app.shortcuts.installed, [
+        AppShortcut.expense,
+        AppShortcut.note,
+        AppShortcut.task,
+        AppShortcut.urge,
+      ]);
     });
 
     testWidgets('signed out: waits on the login screen, opens after login', (
@@ -189,6 +199,15 @@ void main() {
       expect(find.text('route:/notes/new'), findsOneWidget);
       await app.launch(tester, AppShortcut.task);
       expect(find.text('route:/tasks/new'), findsOneWidget);
+    });
+
+    testWidgets('static "Chat Killa" shortcut opens the Killa chat', (
+      tester,
+    ) async {
+      final app = _App(signedIn: true);
+      await app.pump(tester);
+      await app.launch(tester, AppShortcut.fromType('killa_chat')!);
+      expect(find.text('route:/killa'), findsOneWidget);
     });
 
     testWidgets('only the latest pending shortcut is opened', (tester) async {

@@ -265,39 +265,66 @@ class KillaLockedView extends StatelessWidget {
   }
 }
 
-/// Model picker sheet → the chosen model (null when dismissed).
-Future<KillaModel?> showKillaModelSheet(
+/// Display name of a model value (`"default"` → "Default", `opus` → "Opus").
+String killaModelLabel(String? model) {
+  final m = model ?? killaDefaultModel;
+  return m.isEmpty ? m : '${m[0].toUpperCase()}${m.substring(1)}';
+}
+
+String? _killaModelHint(String model) => switch (model.toLowerCase()) {
+  killaDefaultModel => 'Model bawaan engine',
+  'fable' => 'Paling pintar, paling lama',
+  'opus' => 'Kuat untuk tugas berat',
+  'sonnet' => 'Seimbang: cepat & pintar',
+  'haiku' => 'Paling cepat & hemat',
+  _ => null,
+};
+
+/// "default" first, then the server's options (the active one kept even if
+/// the server no longer lists it).
+List<String> killaModelChoices(KillaModelSetting s) => [
+  killaDefaultModel,
+  for (final o in {...s.options, ?s.model})
+    if (o != killaDefaultModel) o,
+];
+
+/// Picks the persisted model → the chosen value (`"default"` included), or
+/// null when dismissed / unchanged.
+Future<String?> showKillaModelSheet(
   BuildContext context,
-  KillaModel current,
-) => showChunkyBottomSheet<KillaModel>(
+  KillaModelSetting setting,
+) => showChunkyBottomSheet<String>(
   context,
   title: 'Pilih model',
   builder: (c) => Column(
     mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      for (final m in KillaModel.values)
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          'Tersimpan di Killa, berlaku juga untuk chat WhatsApp.',
+          style: GhinaType.bodyS.copyWith(color: c.ghina.textSecondary),
+        ),
+      ),
+      for (final m in killaModelChoices(setting))
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: ChunkyTile(
+            key: ValueKey('killa-model-$m'),
             dense: true,
-            title: m.label,
-            subtitle: switch (m) {
-              KillaModel.defaultModel => 'Model bawaan engine',
-              KillaModel.fable => 'Paling pintar, paling lama',
-              KillaModel.opus => 'Kuat untuk tugas berat',
-              KillaModel.sonnet => 'Seimbang: cepat & pintar',
-              KillaModel.haiku => 'Paling cepat & hemat',
-            },
+            title: killaModelLabel(m),
+            subtitle: _killaModelHint(m),
             leading: Icon(
-              m == current
+              m == setting.active
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_off_rounded,
-              color: m == current ? killaSwatch.base : null,
+              color: m == setting.active ? killaSwatch.base : null,
             ),
-            tinted: m == current ? killaSwatch : null,
+            tinted: m == setting.active ? killaSwatch : null,
             onTap: () {
               HapticFeedback.selectionClick();
-              Navigator.pop(c, m);
+              Navigator.pop(c, m == setting.active ? null : m);
             },
           ),
         ),
