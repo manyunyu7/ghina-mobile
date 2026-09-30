@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
+import '../../domain/services/killa_media_picker.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/notification_listener.dart';
 import '../../domain/services/prayer_reminders.dart';
@@ -23,6 +24,7 @@ import 'device_location.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'just_audio_playback.dart';
+import 'killa_media_picker_impl.dart';
 import 'notification_listener_bridge.dart';
 import 'quick_actions_app_shortcuts.dart';
 import 'record_voice_recorder.dart';
@@ -82,3 +84,7 @@ DeviceLocationService createDeviceLocation() => isMobileDevice
 /// Android battery-optimisation shortcut (Reminder Sholat).
 BatteryOptimization createBatteryOptimization() =>
     _isAndroid ? BridgeBatteryOptimization() : const NoopBatteryOptimization();
+
+/// Killa composer attachments (photos → JPEG ≤ 2048 px, PDFs).
+KillaMediaPicker createKillaMediaPicker() =>
+    isMobileDevice ? DeviceKillaMediaPicker() : const NoopKillaMediaPicker();

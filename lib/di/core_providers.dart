@@ -19,6 +19,7 @@ import '../data/datasources/remote/token_store.dart';
 import '../data/notifications/notifications.dart' show prayerActionDatabase;
 import '../data/platform/platform.dart'
     show createDeviceNotificationListener, notificationCaptureDatabase;
+import '../data/repositories/agenda_repositories.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/content_repositories.dart';
 import '../data/repositories/finance_repositories.dart';
@@ -245,3 +246,9 @@ final portfolioSnapshotRepositoryProvider =
     Provider<PortfolioSnapshotRepository>(
       (ref) => DriftPortfolioSnapshotRepository(ref.watch(appDatabaseProvider)),
     );
+final reminderItemRepositoryProvider = Provider<ReminderItemRepository>(
+  (ref) => DriftReminderItemRepository(ref.watch(localStoreProvider)),
+);
+final calendarEventRepositoryProvider = Provider<CalendarEventRepository>(
+  (ref) => DriftCalendarEventRepository(ref.watch(localStoreProvider)),
+);

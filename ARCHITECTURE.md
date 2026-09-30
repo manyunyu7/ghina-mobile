@@ -111,7 +111,15 @@ Pushed routes (full screen, outside the shell):
 `/prayers`, `/prayers/report`, `/prayers/reminders` (Reminder Sholat, see `lib/data/notifications/README.md`), `/wallets/:id/history`, `/health`, `/health/new`, `/health/:id`, `/food`, `/food/new`, `/food/:id`,
 `/achievements`, `/learn/lesson/:lessonId`, `/settings`, `/sync`,
 `/notification-log`, `/notification-log/rules`, `/notification-log/rules/new`, `/notification-log/rules/:id`
-("Log Notifikasi", Android only — see `lib/data/platform/notification_listener_bridge.dart`).
+("Log Notifikasi", Android only — see `lib/data/platform/notification_listener_bridge.dart`),
+`/reminders`, `/reminders/new`, `/reminders/:id` ("Pengingat", synced `reminders`; a local
+notification at each `dueAt` via `WatchReminders`), `/calendar`, `/calendar/new?date=`,
+`/calendar/:id` ("Kalender", synced `calendarEvents`; all-day dates are read from the ISO date
+part, never converted to local time),
+`/killa`, `/killa/files?path=`, `/killa/file?path=`, `/killa/commits`, `/killa/reminders`,
+`/killa/usage` (Killa, `../docs/killa.md` — **online-only**, not in sync: `KillaApi` in
+`data/datasources/remote/`, errors are `KillaException`s; a 403 locks the screens and hides the
+drawer entry via `presentation/state/killa_access_provider.dart`).
 
 ## Feature parity with the web
 

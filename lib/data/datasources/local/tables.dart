@@ -498,6 +498,47 @@ class AssetTrades extends Table with Timestamps {
   Set<Column> get primaryKey => {id};
 }
 
+/// Synced `reminders` ("Pengingat", docs/mobile-sync.md → "Reminders").
+/// The table class isn't called `Reminders`: `Reminder` is the local
+/// notification entity.
+@DataClassName('ReminderRow')
+@TableIndex(name: 'idx_reminder_due', columns: {#dueAt})
+class ReminderItems extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get notes => text().nullable()();
+  IntColumn get dueAt => integer().map(epochMs)();
+
+  /// `daily | weekly | monthly | yearly`, null = one-off.
+  TextColumn get recurrence => text().nullable()();
+  BoolColumn get done => boolean().withDefault(const Constant(false))();
+  IntColumn get doneAt => integer().map(epochMs).nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `calendarEvents` ("Kalender", docs/mobile-sync.md → "Calendar events").
+///
+/// `startAt`/`endAt` hold the wire instant as epoch ms. For all-day events
+/// that is UTC midnight of the date: read the date back in UTC, never in the
+/// device zone (see `agenda_mappers.dart`).
+@DataClassName('CalendarEventRow')
+@TableIndex(name: 'idx_event_start', columns: {#startAt})
+class CalendarEvents extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  IntColumn get startAt => integer()();
+  IntColumn get endAt => integer().nullable()();
+  BoolColumn get allDay => boolean().withDefault(const Constant(false))();
+  TextColumn get color => text().nullable()();
+  TextColumn get location => text().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Device-only cache of `GET /api/mobile/prices` (not synced, not user data).
 @DataClassName('CachedPriceRow')
 class CachedPrices extends Table {

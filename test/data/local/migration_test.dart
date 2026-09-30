@@ -11,6 +11,7 @@ import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/data/datasources/local/app_database.dart';
+import 'package:ghina/data/models/agenda_wire.dart';
 import 'package:ghina/data/models/habits_investments_mappers.dart';
 import 'package:ghina/data/models/mappers.dart';
 import 'package:ghina/data/models/notes_content_mappers.dart';
@@ -21,6 +22,7 @@ import 'generated_migrations/schema_v1.dart' as v1;
 import 'generated_migrations/schema_v2.dart' as v2;
 import 'generated_migrations/schema_v3.dart' as v3;
 import 'generated_migrations/schema_v4.dart' as v4;
+import 'generated_migrations/schema_v6.dart' as v6;
 
 void main() {
   late SchemaVerifier verifier;
@@ -103,6 +105,79 @@ void main() {
     final schema = await verifier.schemaAt(6);
     final db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, 6);
+    await db.close();
+  });
+
+  for (final from in [1, 2, 3, 4, 5, 6]) {
+    test('upgrade v$from → v7 yields exactly the v7 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 7);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v7 schema', () async {
+    final schema = await verifier.schemaAt(7);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 7);
+    await db.close();
+  });
+
+  test('v6 data survives v6 → v7 on a real file; reminders/calendar are '
+      'created and a full pull is scheduled', () async {
+    final dir = await Directory.systemTemp.createTemp('ghina_migration_v7');
+    final file = File('${dir.path}/ghina.sqlite');
+    addTearDown(() => dir.delete(recursive: true));
+
+    final old = v6.DatabaseAtV6(NativeDatabase(file));
+    await old.customStatement(
+      "INSERT INTO wallets (id, name, type, balance, currency, color, icon, archived, created_at, updated_at) "
+      "VALUES ('w1', 'Tunai', 'cash', 150000, 'IDR', '#22c55e', 'wallet', 0, 1, 1)",
+    );
+    await old.customStatement(
+      "INSERT INTO sync_meta (id, cursor, full_pull_required) VALUES (1, 1790000000000, 0)",
+    );
+    await old.close();
+
+    final db = AppDatabase(NativeDatabase(file));
+    expect((await db.select(db.wallets).getSingle()).balance, 150000);
+    final meta = await db.getMeta();
+    expect(meta.cursor, 1790000000000);
+    expect(meta.fullPullRequired, isTrue);
+
+    final now = DateTime(2026, 10, 1, 9);
+    await db
+        .into(db.reminderItems)
+        .insert(
+          ReminderItem(
+            id: 'r1',
+            title: 'Minum obat',
+            dueAt: now,
+            recurrence: ReminderRecurrence.daily,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.calendarEvents)
+        .insert(
+          CalendarEvent(
+            id: 'e1',
+            title: 'Libur',
+            startAt: DateTime(2026, 10, 5),
+            endAt: DateTime(2026, 10, 7),
+            allDay: true,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    final r = (await db.select(db.reminderItems).getSingle()).toEntity();
+    expect(r.recurrence, ReminderRecurrence.daily);
+    final e = (await db.select(db.calendarEvents).getSingle()).toEntity();
+    expect(e.startAt, DateTime(2026, 10, 5));
+    expect(e.endAt, DateTime(2026, 10, 7));
+    expect(db.syncedTables, containsAll([db.reminderItems, db.calendarEvents]));
     await db.close();
   });
 

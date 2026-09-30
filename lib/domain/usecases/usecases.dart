@@ -2,6 +2,8 @@
 library;
 
 export 'account_usecases.dart';
+export 'agenda_rules.dart';
+export 'agenda_usecases.dart';
 export 'budget_usecases.dart';
 export 'category_usecases.dart';
 export 'content_rules.dart';
@@ -11,6 +13,7 @@ export 'habit_rules.dart';
 export 'habit_usecases.dart';
 export 'investment_rules.dart';
 export 'investment_usecases.dart';
+export 'killa_usecases.dart';
 export 'life_usecases.dart';
 export 'notes_rules.dart';
 export 'notes_usecases.dart';

@@ -6,6 +6,8 @@ library;
 import '../../core/dates.dart';
 import '../entities/entities.dart';
 
+export 'killa_repository.dart';
+
 /// Runs several repository calls atomically (one local DB transaction).
 abstract interface class UnitOfWork {
   Future<T> run<T>(Future<T> Function() action);
@@ -394,4 +396,26 @@ abstract interface class SyncService {
 
   /// Wipe local synced data + outbox and do a full pull.
   Future<void> resetLocalData();
+}
+
+/// Synced reminders ("Pengingat", `docs/mobile-sync.md` → "Reminders").
+abstract interface class ReminderItemRepository {
+  /// Every reminder (done ones too), sorted by `dueAt`.
+  Stream<List<ReminderItem>> watchAll();
+  Future<List<ReminderItem>> getAll();
+  Stream<ReminderItem?> watchById(String id);
+  Future<ReminderItem?> getById(String id);
+  Future<void> save(ReminderItem reminder);
+  Future<void> delete(String id);
+}
+
+/// Synced calendar events ("Kalender", `docs/mobile-sync.md` → "Calendar events").
+abstract interface class CalendarEventRepository {
+  /// Every event, sorted by `startAt`.
+  Stream<List<CalendarEvent>> watchAll();
+  Future<List<CalendarEvent>> getAll();
+  Stream<CalendarEvent?> watchById(String id);
+  Future<CalendarEvent?> getById(String id);
+  Future<void> save(CalendarEvent event);
+  Future<void> delete(String id);
 }

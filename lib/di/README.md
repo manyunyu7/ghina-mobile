@@ -471,3 +471,17 @@ currency.
 Tests that override repositories with fakes must also override the habits/investments
 ones: `...habitsInvestmentsFakeOverrides()` (`test/di/habits_investments_test_overrides.dart`)
 — the dashboard/report net worth, the reminders and the game's activity stream read them.
+
+## Reminders, calendar & Killa API
+
+- `agenda_providers.dart`: `watchReminderGroupsProvider` (`ReminderGroups`: overdue / upcoming /
+  done, re-evaluated every minute), `watchReminderItemProvider(id)`, `create/update/complete/
+  reopen/restore/deleteReminderProvider` (`ReminderInput`); `watchCalendarEventsProvider`,
+  `watchCalendarEventProvider(id)`, `create/update/deleteCalendarEventProvider`
+  (`CalendarEventInput`). Pure rules (next occurrence, grouping, event days, validation) in
+  `domain/usecases/agenda_rules.dart`. Reminders feed the notification scheduler through
+  `watchRemindersUseCaseProvider` (`agenda:`).
+- `killa_providers.dart`: online-only use cases over `killaRepositoryProvider` (override it in
+  tests) and `killaMediaPickerProvider`. They **throw** `KillaException` (`kind`: forbidden,
+  engineOff, timeout, tooLarge, unsupported, network, …; `message` is Indonesian) instead of
+  returning `Result`.

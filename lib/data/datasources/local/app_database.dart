@@ -31,6 +31,8 @@ part 'app_database.g.dart';
     HabitLogs,
     Assets,
     AssetTrades,
+    ReminderItems,
+    CalendarEvents,
     CachedPrices,
     PortfolioSnapshots,
     CapturedNotifications,
@@ -65,13 +67,15 @@ class AppDatabase extends _$AppDatabase {
   /// portfolio snapshots (device-only).
   /// v6: device-only `captured_notifications` + `notification_rules`
   /// ("Log Notifikasi", Android).
+  /// v7: `reminder_items` + `calendar_events` (synced, docs/mobile-sync.md
+  /// "Reminders" / "Calendar events").
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -148,6 +152,16 @@ class AppDatabase extends _$AppDatabase {
         await m.createIndex(idxNotifPackage);
         await m.createIndex(idxNotifProcessed);
       }
+      if (from < 7 && to >= 7) {
+        // Additive only: two synced tables. The v6 app pulled past reminders
+        // and calendar events without storing them: re-download everything
+        // once (pending outbox rows still win).
+        await m.createTable(reminderItems);
+        await m.createTable(calendarEvents);
+        await m.createIndex(idxReminderDue);
+        await m.createIndex(idxEventStart);
+        await customStatement('UPDATE sync_meta SET full_pull_required = 1');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = OFF');
@@ -177,6 +191,8 @@ class AppDatabase extends _$AppDatabase {
     habitLogs,
     assets,
     assetTrades,
+    reminderItems,
+    calendarEvents,
   ];
 
   /// Device-only tables derived from the user's data (wiped with it).

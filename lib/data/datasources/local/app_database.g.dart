@@ -14056,6 +14056,1170 @@ class AssetTradesCompanion extends UpdateCompanion<AssetTradeRow> {
   }
 }
 
+class $ReminderItemsTable extends ReminderItems
+    with TableInfo<$ReminderItemsTable, ReminderRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReminderItemsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ReminderItemsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ReminderItemsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> dueAt =
+      GeneratedColumn<int>(
+        'due_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ReminderItemsTable.$converterdueAt);
+  static const VerificationMeta _recurrenceMeta = const VerificationMeta(
+    'recurrence',
+  );
+  @override
+  late final GeneratedColumn<String> recurrence = GeneratedColumn<String>(
+    'recurrence',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+    'done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> doneAt =
+      GeneratedColumn<int>(
+        'done_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($ReminderItemsTable.$converterdoneAtn);
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    notes,
+    dueAt,
+    recurrence,
+    done,
+    doneAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reminder_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReminderRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('recurrence')) {
+      context.handle(
+        _recurrenceMeta,
+        recurrence.isAcceptableOrUnknown(data['recurrence']!, _recurrenceMeta),
+      );
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+        _doneMeta,
+        done.isAcceptableOrUnknown(data['done']!, _doneMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ReminderRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReminderRow(
+      createdAt: $ReminderItemsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $ReminderItemsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      dueAt: $ReminderItemsTable.$converterdueAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}due_at'],
+        )!,
+      ),
+      recurrence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recurrence'],
+      ),
+      done: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done'],
+      )!,
+      doneAt: $ReminderItemsTable.$converterdoneAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}done_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $ReminderItemsTable createAlias(String alias) {
+    return $ReminderItemsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterdueAt = epochMs;
+  static TypeConverter<DateTime, int> $converterdoneAt = epochMs;
+  static TypeConverter<DateTime?, int?> $converterdoneAtn =
+      NullAwareTypeConverter.wrap($converterdoneAt);
+}
+
+class ReminderRow extends DataClass implements Insertable<ReminderRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String title;
+  final String? notes;
+  final DateTime dueAt;
+
+  /// `daily | weekly | monthly | yearly`, null = one-off.
+  final String? recurrence;
+  final bool done;
+  final DateTime? doneAt;
+  const ReminderRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.title,
+    this.notes,
+    required this.dueAt,
+    this.recurrence,
+    required this.done,
+    this.doneAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $ReminderItemsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $ReminderItemsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    {
+      map['due_at'] = Variable<int>(
+        $ReminderItemsTable.$converterdueAt.toSql(dueAt),
+      );
+    }
+    if (!nullToAbsent || recurrence != null) {
+      map['recurrence'] = Variable<String>(recurrence);
+    }
+    map['done'] = Variable<bool>(done);
+    if (!nullToAbsent || doneAt != null) {
+      map['done_at'] = Variable<int>(
+        $ReminderItemsTable.$converterdoneAtn.toSql(doneAt),
+      );
+    }
+    return map;
+  }
+
+  ReminderItemsCompanion toCompanion(bool nullToAbsent) {
+    return ReminderItemsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      title: Value(title),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      dueAt: Value(dueAt),
+      recurrence: recurrence == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrence),
+      done: Value(done),
+      doneAt: doneAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneAt),
+    );
+  }
+
+  factory ReminderRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReminderRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      dueAt: serializer.fromJson<DateTime>(json['dueAt']),
+      recurrence: serializer.fromJson<String?>(json['recurrence']),
+      done: serializer.fromJson<bool>(json['done']),
+      doneAt: serializer.fromJson<DateTime?>(json['doneAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'notes': serializer.toJson<String?>(notes),
+      'dueAt': serializer.toJson<DateTime>(dueAt),
+      'recurrence': serializer.toJson<String?>(recurrence),
+      'done': serializer.toJson<bool>(done),
+      'doneAt': serializer.toJson<DateTime?>(doneAt),
+    };
+  }
+
+  ReminderRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? title,
+    Value<String?> notes = const Value.absent(),
+    DateTime? dueAt,
+    Value<String?> recurrence = const Value.absent(),
+    bool? done,
+    Value<DateTime?> doneAt = const Value.absent(),
+  }) => ReminderRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    title: title ?? this.title,
+    notes: notes.present ? notes.value : this.notes,
+    dueAt: dueAt ?? this.dueAt,
+    recurrence: recurrence.present ? recurrence.value : this.recurrence,
+    done: done ?? this.done,
+    doneAt: doneAt.present ? doneAt.value : this.doneAt,
+  );
+  ReminderRow copyWithCompanion(ReminderItemsCompanion data) {
+    return ReminderRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      dueAt: data.dueAt.present ? data.dueAt.value : this.dueAt,
+      recurrence: data.recurrence.present
+          ? data.recurrence.value
+          : this.recurrence,
+      done: data.done.present ? data.done.value : this.done,
+      doneAt: data.doneAt.present ? data.doneAt.value : this.doneAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    notes,
+    dueAt,
+    recurrence,
+    done,
+    doneAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReminderRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.notes == this.notes &&
+          other.dueAt == this.dueAt &&
+          other.recurrence == this.recurrence &&
+          other.done == this.done &&
+          other.doneAt == this.doneAt);
+}
+
+class ReminderItemsCompanion extends UpdateCompanion<ReminderRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String?> notes;
+  final Value<DateTime> dueAt;
+  final Value<String?> recurrence;
+  final Value<bool> done;
+  final Value<DateTime?> doneAt;
+  final Value<int> rowid;
+  const ReminderItemsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.dueAt = const Value.absent(),
+    this.recurrence = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReminderItemsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String title,
+    this.notes = const Value.absent(),
+    required DateTime dueAt,
+    this.recurrence = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       title = Value(title),
+       dueAt = Value(dueAt);
+  static Insertable<ReminderRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? notes,
+    Expression<int>? dueAt,
+    Expression<String>? recurrence,
+    Expression<bool>? done,
+    Expression<int>? doneAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (notes != null) 'notes': notes,
+      if (dueAt != null) 'due_at': dueAt,
+      if (recurrence != null) 'recurrence': recurrence,
+      if (done != null) 'done': done,
+      if (doneAt != null) 'done_at': doneAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReminderItemsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? title,
+    Value<String?>? notes,
+    Value<DateTime>? dueAt,
+    Value<String?>? recurrence,
+    Value<bool>? done,
+    Value<DateTime?>? doneAt,
+    Value<int>? rowid,
+  }) {
+    return ReminderItemsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      title: title ?? this.title,
+      notes: notes ?? this.notes,
+      dueAt: dueAt ?? this.dueAt,
+      recurrence: recurrence ?? this.recurrence,
+      done: done ?? this.done,
+      doneAt: doneAt ?? this.doneAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $ReminderItemsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $ReminderItemsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (dueAt.present) {
+      map['due_at'] = Variable<int>(
+        $ReminderItemsTable.$converterdueAt.toSql(dueAt.value),
+      );
+    }
+    if (recurrence.present) {
+      map['recurrence'] = Variable<String>(recurrence.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    if (doneAt.present) {
+      map['done_at'] = Variable<int>(
+        $ReminderItemsTable.$converterdoneAtn.toSql(doneAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReminderItemsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('dueAt: $dueAt, ')
+          ..write('recurrence: $recurrence, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CalendarEventsTable extends CalendarEvents
+    with TableInfo<$CalendarEventsTable, CalendarEventRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CalendarEventsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($CalendarEventsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($CalendarEventsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startAtMeta = const VerificationMeta(
+    'startAt',
+  );
+  @override
+  late final GeneratedColumn<int> startAt = GeneratedColumn<int>(
+    'start_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endAtMeta = const VerificationMeta('endAt');
+  @override
+  late final GeneratedColumn<int> endAt = GeneratedColumn<int>(
+    'end_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _allDayMeta = const VerificationMeta('allDay');
+  @override
+  late final GeneratedColumn<bool> allDay = GeneratedColumn<bool>(
+    'all_day',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("all_day" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+    'color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    startAt,
+    endAt,
+    allDay,
+    color,
+    location,
+    notes,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'calendar_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CalendarEventRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('start_at')) {
+      context.handle(
+        _startAtMeta,
+        startAt.isAcceptableOrUnknown(data['start_at']!, _startAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startAtMeta);
+    }
+    if (data.containsKey('end_at')) {
+      context.handle(
+        _endAtMeta,
+        endAt.isAcceptableOrUnknown(data['end_at']!, _endAtMeta),
+      );
+    }
+    if (data.containsKey('all_day')) {
+      context.handle(
+        _allDayMeta,
+        allDay.isAcceptableOrUnknown(data['all_day']!, _allDayMeta),
+      );
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+        _colorMeta,
+        color.isAcceptableOrUnknown(data['color']!, _colorMeta),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CalendarEventRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CalendarEventRow(
+      createdAt: $CalendarEventsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $CalendarEventsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      startAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}start_at'],
+      )!,
+      endAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}end_at'],
+      ),
+      allDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}all_day'],
+      )!,
+      color: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}color'],
+      ),
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+    );
+  }
+
+  @override
+  $CalendarEventsTable createAlias(String alias) {
+    return $CalendarEventsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+}
+
+class CalendarEventRow extends DataClass
+    implements Insertable<CalendarEventRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String title;
+  final int startAt;
+  final int? endAt;
+  final bool allDay;
+  final String? color;
+  final String? location;
+  final String? notes;
+  const CalendarEventRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.title,
+    required this.startAt,
+    this.endAt,
+    required this.allDay,
+    this.color,
+    this.location,
+    this.notes,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $CalendarEventsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $CalendarEventsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    map['start_at'] = Variable<int>(startAt);
+    if (!nullToAbsent || endAt != null) {
+      map['end_at'] = Variable<int>(endAt);
+    }
+    map['all_day'] = Variable<bool>(allDay);
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<String>(color);
+    }
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    return map;
+  }
+
+  CalendarEventsCompanion toCompanion(bool nullToAbsent) {
+    return CalendarEventsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      title: Value(title),
+      startAt: Value(startAt),
+      endAt: endAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endAt),
+      allDay: Value(allDay),
+      color: color == null && nullToAbsent
+          ? const Value.absent()
+          : Value(color),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+    );
+  }
+
+  factory CalendarEventRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CalendarEventRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      startAt: serializer.fromJson<int>(json['startAt']),
+      endAt: serializer.fromJson<int?>(json['endAt']),
+      allDay: serializer.fromJson<bool>(json['allDay']),
+      color: serializer.fromJson<String?>(json['color']),
+      location: serializer.fromJson<String?>(json['location']),
+      notes: serializer.fromJson<String?>(json['notes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'startAt': serializer.toJson<int>(startAt),
+      'endAt': serializer.toJson<int?>(endAt),
+      'allDay': serializer.toJson<bool>(allDay),
+      'color': serializer.toJson<String?>(color),
+      'location': serializer.toJson<String?>(location),
+      'notes': serializer.toJson<String?>(notes),
+    };
+  }
+
+  CalendarEventRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? title,
+    int? startAt,
+    Value<int?> endAt = const Value.absent(),
+    bool? allDay,
+    Value<String?> color = const Value.absent(),
+    Value<String?> location = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+  }) => CalendarEventRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    title: title ?? this.title,
+    startAt: startAt ?? this.startAt,
+    endAt: endAt.present ? endAt.value : this.endAt,
+    allDay: allDay ?? this.allDay,
+    color: color.present ? color.value : this.color,
+    location: location.present ? location.value : this.location,
+    notes: notes.present ? notes.value : this.notes,
+  );
+  CalendarEventRow copyWithCompanion(CalendarEventsCompanion data) {
+    return CalendarEventRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      startAt: data.startAt.present ? data.startAt.value : this.startAt,
+      endAt: data.endAt.present ? data.endAt.value : this.endAt,
+      allDay: data.allDay.present ? data.allDay.value : this.allDay,
+      color: data.color.present ? data.color.value : this.color,
+      location: data.location.present ? data.location.value : this.location,
+      notes: data.notes.present ? data.notes.value : this.notes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CalendarEventRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('startAt: $startAt, ')
+          ..write('endAt: $endAt, ')
+          ..write('allDay: $allDay, ')
+          ..write('color: $color, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    startAt,
+    endAt,
+    allDay,
+    color,
+    location,
+    notes,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CalendarEventRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.startAt == this.startAt &&
+          other.endAt == this.endAt &&
+          other.allDay == this.allDay &&
+          other.color == this.color &&
+          other.location == this.location &&
+          other.notes == this.notes);
+}
+
+class CalendarEventsCompanion extends UpdateCompanion<CalendarEventRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> title;
+  final Value<int> startAt;
+  final Value<int?> endAt;
+  final Value<bool> allDay;
+  final Value<String?> color;
+  final Value<String?> location;
+  final Value<String?> notes;
+  final Value<int> rowid;
+  const CalendarEventsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.startAt = const Value.absent(),
+    this.endAt = const Value.absent(),
+    this.allDay = const Value.absent(),
+    this.color = const Value.absent(),
+    this.location = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CalendarEventsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String title,
+    required int startAt,
+    this.endAt = const Value.absent(),
+    this.allDay = const Value.absent(),
+    this.color = const Value.absent(),
+    this.location = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       title = Value(title),
+       startAt = Value(startAt);
+  static Insertable<CalendarEventRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<int>? startAt,
+    Expression<int>? endAt,
+    Expression<bool>? allDay,
+    Expression<String>? color,
+    Expression<String>? location,
+    Expression<String>? notes,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (startAt != null) 'start_at': startAt,
+      if (endAt != null) 'end_at': endAt,
+      if (allDay != null) 'all_day': allDay,
+      if (color != null) 'color': color,
+      if (location != null) 'location': location,
+      if (notes != null) 'notes': notes,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CalendarEventsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? title,
+    Value<int>? startAt,
+    Value<int?>? endAt,
+    Value<bool>? allDay,
+    Value<String?>? color,
+    Value<String?>? location,
+    Value<String?>? notes,
+    Value<int>? rowid,
+  }) {
+    return CalendarEventsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      title: title ?? this.title,
+      startAt: startAt ?? this.startAt,
+      endAt: endAt ?? this.endAt,
+      allDay: allDay ?? this.allDay,
+      color: color ?? this.color,
+      location: location ?? this.location,
+      notes: notes ?? this.notes,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $CalendarEventsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $CalendarEventsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (startAt.present) {
+      map['start_at'] = Variable<int>(startAt.value);
+    }
+    if (endAt.present) {
+      map['end_at'] = Variable<int>(endAt.value);
+    }
+    if (allDay.present) {
+      map['all_day'] = Variable<bool>(allDay.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CalendarEventsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('startAt: $startAt, ')
+          ..write('endAt: $endAt, ')
+          ..write('allDay: $allDay, ')
+          ..write('color: $color, ')
+          ..write('location: $location, ')
+          ..write('notes: $notes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedPricesTable extends CachedPrices
     with TableInfo<$CachedPricesTable, CachedPriceRow> {
   @override
@@ -18082,6 +19246,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $HabitLogsTable habitLogs = $HabitLogsTable(this);
   late final $AssetsTable assets = $AssetsTable(this);
   late final $AssetTradesTable assetTrades = $AssetTradesTable(this);
+  late final $ReminderItemsTable reminderItems = $ReminderItemsTable(this);
+  late final $CalendarEventsTable calendarEvents = $CalendarEventsTable(this);
   late final $CachedPricesTable cachedPrices = $CachedPricesTable(this);
   late final $PortfolioSnapshotsTable portfolioSnapshots =
       $PortfolioSnapshotsTable(this);
@@ -18167,6 +19333,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_trade_cash_tx',
     'CREATE INDEX idx_trade_cash_tx ON asset_trades (cash_transaction_id)',
   );
+  late final Index idxReminderDue = Index(
+    'idx_reminder_due',
+    'CREATE INDEX idx_reminder_due ON reminder_items (due_at)',
+  );
+  late final Index idxEventStart = Index(
+    'idx_event_start',
+    'CREATE INDEX idx_event_start ON calendar_events (start_at)',
+  );
   late final Index idxNotifPosted = Index(
     'idx_notif_posted',
     'CREATE INDEX idx_notif_posted ON captured_notifications (posted_at)',
@@ -18209,6 +19383,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     habitLogs,
     assets,
     assetTrades,
+    reminderItems,
+    calendarEvents,
     cachedPrices,
     portfolioSnapshots,
     capturedNotifications,
@@ -18234,6 +19410,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxAssetSymbol,
     idxTradeAsset,
     idxTradeCashTx,
+    idxReminderDue,
+    idxEventStart,
     idxNotifPosted,
     idxNotifPackage,
     idxNotifProcessed,
@@ -25231,6 +26409,609 @@ typedef $$AssetTradesTableProcessedTableManager =
       AssetTradeRow,
       PrefetchHooks Function()
     >;
+typedef $$ReminderItemsTableCreateCompanionBuilder =
+    ReminderItemsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String title,
+      Value<String?> notes,
+      required DateTime dueAt,
+      Value<String?> recurrence,
+      Value<bool> done,
+      Value<DateTime?> doneAt,
+      Value<int> rowid,
+    });
+typedef $$ReminderItemsTableUpdateCompanionBuilder =
+    ReminderItemsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> title,
+      Value<String?> notes,
+      Value<DateTime> dueAt,
+      Value<String?> recurrence,
+      Value<bool> done,
+      Value<DateTime?> doneAt,
+      Value<int> rowid,
+    });
+
+class $$ReminderItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ReminderItemsTable> {
+  $$ReminderItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get dueAt =>
+      $composableBuilder(
+        column: $table.dueAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get doneAt =>
+      $composableBuilder(
+        column: $table.doneAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$ReminderItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReminderItemsTable> {
+  $$ReminderItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dueAt => $composableBuilder(
+    column: $table.dueAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ReminderItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReminderItemsTable> {
+  $$ReminderItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get dueAt =>
+      $composableBuilder(column: $table.dueAt, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrence => $composableBuilder(
+    column: $table.recurrence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get doneAt =>
+      $composableBuilder(column: $table.doneAt, builder: (column) => column);
+}
+
+class $$ReminderItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ReminderItemsTable,
+          ReminderRow,
+          $$ReminderItemsTableFilterComposer,
+          $$ReminderItemsTableOrderingComposer,
+          $$ReminderItemsTableAnnotationComposer,
+          $$ReminderItemsTableCreateCompanionBuilder,
+          $$ReminderItemsTableUpdateCompanionBuilder,
+          (
+            ReminderRow,
+            BaseReferences<_$AppDatabase, $ReminderItemsTable, ReminderRow>,
+          ),
+          ReminderRow,
+          PrefetchHooks Function()
+        > {
+  $$ReminderItemsTableTableManager(_$AppDatabase db, $ReminderItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReminderItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReminderItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReminderItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> dueAt = const Value.absent(),
+                Value<String?> recurrence = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderItemsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                notes: notes,
+                dueAt: dueAt,
+                recurrence: recurrence,
+                done: done,
+                doneAt: doneAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String title,
+                Value<String?> notes = const Value.absent(),
+                required DateTime dueAt,
+                Value<String?> recurrence = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReminderItemsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                notes: notes,
+                dueAt: dueAt,
+                recurrence: recurrence,
+                done: done,
+                doneAt: doneAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ReminderItemsTable, ReminderRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ReminderItemsTable,
+                    ReminderRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ReminderItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ReminderItemsTable,
+      ReminderRow,
+      $$ReminderItemsTableFilterComposer,
+      $$ReminderItemsTableOrderingComposer,
+      $$ReminderItemsTableAnnotationComposer,
+      $$ReminderItemsTableCreateCompanionBuilder,
+      $$ReminderItemsTableUpdateCompanionBuilder,
+      (
+        ReminderRow,
+        BaseReferences<_$AppDatabase, $ReminderItemsTable, ReminderRow>,
+      ),
+      ReminderRow,
+      PrefetchHooks Function()
+    >;
+typedef $$CalendarEventsTableCreateCompanionBuilder =
+    CalendarEventsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String title,
+      required int startAt,
+      Value<int?> endAt,
+      Value<bool> allDay,
+      Value<String?> color,
+      Value<String?> location,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+typedef $$CalendarEventsTableUpdateCompanionBuilder =
+    CalendarEventsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> title,
+      Value<int> startAt,
+      Value<int?> endAt,
+      Value<bool> allDay,
+      Value<String?> color,
+      Value<String?> location,
+      Value<String?> notes,
+      Value<int> rowid,
+    });
+
+class $$CalendarEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startAt => $composableBuilder(
+    column: $table.startAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get endAt => $composableBuilder(
+    column: $table.endAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get allDay => $composableBuilder(
+    column: $table.allDay,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CalendarEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startAt => $composableBuilder(
+    column: $table.startAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get endAt => $composableBuilder(
+    column: $table.endAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get allDay => $composableBuilder(
+    column: $table.allDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get color => $composableBuilder(
+    column: $table.color,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CalendarEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get startAt =>
+      $composableBuilder(column: $table.startAt, builder: (column) => column);
+
+  GeneratedColumn<int> get endAt =>
+      $composableBuilder(column: $table.endAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get allDay =>
+      $composableBuilder(column: $table.allDay, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+}
+
+class $$CalendarEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CalendarEventsTable,
+          CalendarEventRow,
+          $$CalendarEventsTableFilterComposer,
+          $$CalendarEventsTableOrderingComposer,
+          $$CalendarEventsTableAnnotationComposer,
+          $$CalendarEventsTableCreateCompanionBuilder,
+          $$CalendarEventsTableUpdateCompanionBuilder,
+          (
+            CalendarEventRow,
+            BaseReferences<
+              _$AppDatabase,
+              $CalendarEventsTable,
+              CalendarEventRow
+            >,
+          ),
+          CalendarEventRow,
+          PrefetchHooks Function()
+        > {
+  $$CalendarEventsTableTableManager(
+    _$AppDatabase db,
+    $CalendarEventsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CalendarEventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CalendarEventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CalendarEventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> startAt = const Value.absent(),
+                Value<int?> endAt = const Value.absent(),
+                Value<bool> allDay = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CalendarEventsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                startAt: startAt,
+                endAt: endAt,
+                allDay: allDay,
+                color: color,
+                location: location,
+                notes: notes,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String title,
+                required int startAt,
+                Value<int?> endAt = const Value.absent(),
+                Value<bool> allDay = const Value.absent(),
+                Value<String?> color = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CalendarEventsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                startAt: startAt,
+                endAt: endAt,
+                allDay: allDay,
+                color: color,
+                location: location,
+                notes: notes,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CalendarEventsTable, CalendarEventRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $CalendarEventsTable,
+                    CalendarEventRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CalendarEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CalendarEventsTable,
+      CalendarEventRow,
+      $$CalendarEventsTableFilterComposer,
+      $$CalendarEventsTableOrderingComposer,
+      $$CalendarEventsTableAnnotationComposer,
+      $$CalendarEventsTableCreateCompanionBuilder,
+      $$CalendarEventsTableUpdateCompanionBuilder,
+      (
+        CalendarEventRow,
+        BaseReferences<_$AppDatabase, $CalendarEventsTable, CalendarEventRow>,
+      ),
+      CalendarEventRow,
+      PrefetchHooks Function()
+    >;
 typedef $$CachedPricesTableCreateCompanionBuilder =
     CachedPricesCompanion Function({
       required String key,
@@ -27278,6 +29059,10 @@ class $AppDatabaseManager {
       $$AssetsTableTableManager(_db, _db.assets);
   $$AssetTradesTableTableManager get assetTrades =>
       $$AssetTradesTableTableManager(_db, _db.assetTrades);
+  $$ReminderItemsTableTableManager get reminderItems =>
+      $$ReminderItemsTableTableManager(_db, _db.reminderItems);
+  $$CalendarEventsTableTableManager get calendarEvents =>
+      $$CalendarEventsTableTableManager(_db, _db.calendarEvents);
   $$CachedPricesTableTableManager get cachedPrices =>
       $$CachedPricesTableTableManager(_db, _db.cachedPrices);
   $$PortfolioSnapshotsTableTableManager get portfolioSnapshots =>

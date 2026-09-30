@@ -9,6 +9,8 @@ import '../presentation/features/auth/pages/login_page.dart';
 import '../presentation/features/auth/pages/onboarding_page.dart';
 import '../presentation/features/auth/pages/register_page.dart';
 import '../presentation/features/budgets/pages/budget_form_page.dart';
+import '../presentation/features/calendar/pages/calendar_page.dart';
+import '../presentation/features/calendar/pages/event_form_page.dart';
 import '../presentation/features/budgets/pages/budgets_page.dart';
 import '../presentation/features/categories/pages/categories_page.dart';
 import '../presentation/features/categories/pages/category_form_page.dart';
@@ -25,6 +27,12 @@ import '../presentation/features/investments/pages/portfolio_page.dart';
 import '../presentation/features/investments/pages/trade_form_page.dart';
 import '../presentation/features/habits/pages/habit_routes.dart';
 import '../presentation/features/home/pages/home_page.dart';
+import '../presentation/features/killa/pages/killa_chat_page.dart';
+import '../presentation/features/killa/pages/killa_commits_page.dart';
+import '../presentation/features/killa/pages/killa_file_page.dart';
+import '../presentation/features/killa/pages/killa_files_page.dart';
+import '../presentation/features/killa/pages/killa_reminders_page.dart';
+import '../presentation/features/killa/pages/killa_usage_page.dart';
 import '../presentation/features/learn/pages/learn_page.dart';
 import '../presentation/features/learn/pages/lesson_page.dart';
 import '../presentation/features/prayers/pages/prayer_reminder_settings_page.dart';
@@ -32,6 +40,8 @@ import '../presentation/features/prayers/pages/prayer_report_page.dart';
 import '../presentation/features/prayers/pages/prayers_page.dart';
 import '../presentation/features/profile/pages/achievements_page.dart';
 import '../presentation/features/profile/pages/profile_page.dart';
+import '../presentation/features/reminders/pages/reminder_form_page.dart';
+import '../presentation/features/reminders/pages/reminders_page.dart';
 import '../presentation/features/reports/pages/reports_page.dart';
 import '../presentation/features/settings/pages/settings_page.dart';
 import '../presentation/features/settings/pages/sync_page.dart';
@@ -252,6 +262,42 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // Kebiasaan (docs/habits.md).
       ...habitRoutes,
+      // Pengingat + Kalender (docs/mobile-sync.md "Reminders" / "Calendar events").
+      ..._crud(
+        '/reminders',
+        const RemindersPage(),
+        (id) => ReminderFormPage(id: id),
+      ),
+      GoRoute(path: '/calendar', builder: (_, _) => const CalendarPage()),
+      GoRoute(
+        path: '/calendar/new',
+        builder: (_, s) => EventFormPage(initialDate: initialDateOf(s)),
+      ),
+      GoRoute(
+        path: '/calendar/:id',
+        builder: (_, s) => EventFormPage(id: s.pathParameters['id']),
+      ),
+      // Killa (docs/killa.md) — online-only.
+      GoRoute(path: '/killa', builder: (_, _) => const KillaChatPage()),
+      GoRoute(
+        path: '/killa/files',
+        builder: (_, s) =>
+            KillaFilesPage(path: s.uri.queryParameters['path'] ?? ''),
+      ),
+      GoRoute(
+        path: '/killa/file',
+        builder: (_, s) =>
+            KillaFilePage(path: s.uri.queryParameters['path'] ?? ''),
+      ),
+      GoRoute(
+        path: '/killa/commits',
+        builder: (_, _) => const KillaCommitsPage(),
+      ),
+      GoRoute(
+        path: '/killa/reminders',
+        builder: (_, _) => const KillaRemindersPage(),
+      ),
+      GoRoute(path: '/killa/usage', builder: (_, _) => const KillaUsagePage()),
       GoRoute(path: '/prayers', builder: (_, _) => const PrayersPage()),
       GoRoute(
         path: '/prayers/report',

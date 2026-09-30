@@ -9,6 +9,7 @@ import '../../core/result.dart';
 import '../../core/streams.dart';
 import '../entities/entities.dart';
 import '../repositories/repositories.dart';
+import 'agenda_rules.dart' show computeAgendaReminders;
 import 'category_usecases.dart' show categoryIcons;
 import 'content_rules.dart' show computeContentReminders, sortAndCapReminders;
 import 'habit_rules.dart' show computeHabitReminders;
@@ -871,6 +872,7 @@ final class WatchReminders {
     this._accounts,
     this._habits,
     this._habitLogs,
+    this._agenda,
   });
   final TaskRepository _tasks;
   final TaskAreaRepository _areas;
@@ -881,12 +883,18 @@ final class WatchReminders {
   final HabitRepository? _habits;
   final HabitLogRepository? _habitLogs;
 
+  /// Synced reminders ("Pengingat"): one notification at each `dueAt`.
+  final ReminderItemRepository? _agenda;
+
   Stream<List<Reminder>> call({String currency = 'IDR'}) {
     final posts = _posts, items = _items, accounts = _accounts;
     final habits = _habits, habitLogs = _habitLogs;
+    final agenda = _agenda;
     final content = posts != null && items != null && accounts != null;
     final withHabits = habits != null && habitLogs != null;
+    final withAgenda = agenda != null;
     final h = content ? 6 : 3;
+    final a = h + (withHabits ? 2 : 0);
     return combineLatestList(
       [
         _tasks.watchAll(),
@@ -898,6 +906,7 @@ final class WatchReminders {
           accounts.watchAll(),
         ],
         if (withHabits) ...[habits.watchAll(), habitLogs.watch()],
+        if (withAgenda) agenda.watchAll(),
       ],
       (v) {
         final now = v[2] as DateTime;
@@ -907,7 +916,7 @@ final class WatchReminders {
           now,
           currency: currency,
         );
-        if (!content && !withHabits) return tasks;
+        if (!content && !withHabits && !withAgenda) return tasks;
         return sortAndCapReminders([
           ...tasks,
           if (content)
@@ -923,6 +932,8 @@ final class WatchReminders {
               v[h + 1] as List<HabitLog>,
               now,
             ),
+          if (withAgenda)
+            ...computeAgendaReminders(v[a] as List<ReminderItem>, now),
         ], maxTaskNotifications);
       },
     ).distinct(_listEq);

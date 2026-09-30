@@ -204,6 +204,32 @@ const kAppMenu = <AppMenuItem>[
     group: AppMenuGroup.productive,
     synonyms: ['content', 'sosmed', 'instagram', 'tiktok', 'posting', 'post'],
   ),
+  AppMenuItem(
+    label: 'Pengingat',
+    icon: Icons.alarm_rounded,
+    color: GhinaColors.red,
+    path: '/reminders',
+    group: AppMenuGroup.productive,
+    longPressPath: '/reminders/new',
+    synonyms: ['reminder', 'alarm', 'ingat', 'jadwal minum obat'],
+  ),
+  AppMenuItem(
+    label: 'Kalender',
+    icon: Icons.calendar_month_rounded,
+    color: GhinaColors.blue,
+    path: '/calendar',
+    group: AppMenuGroup.productive,
+    longPressPath: '/calendar/new',
+    synonyms: ['calendar', 'acara', 'event', 'agenda', 'janji', 'jadwal'],
+  ),
+  AppMenuItem(
+    label: 'Killa',
+    icon: Icons.auto_awesome_rounded,
+    color: GhinaColors.purple,
+    path: '/killa',
+    group: AppMenuGroup.productive,
+    synonyms: ['ai', 'asisten', 'claude', 'chat', 'agen', 'bot'],
+  ),
   // ---- LAINNYA
   AppMenuItem(
     label: 'Belajar',

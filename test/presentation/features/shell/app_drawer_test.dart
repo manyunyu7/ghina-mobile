@@ -214,7 +214,7 @@ void main() {
             'Kategori',
           ],
           ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan'],
-          ['Tugas', 'Catatan', 'Konten'],
+          ['Tugas', 'Catatan', 'Konten', 'Pengingat', 'Kalender', 'Killa'],
           [
             'Belajar',
             'Pencapaian',

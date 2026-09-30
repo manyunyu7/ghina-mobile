@@ -4,6 +4,7 @@ library;
 
 export 'app_shortcuts.dart';
 export 'audio_playback.dart';
+export 'killa_media_picker.dart';
 export 'microphone_permission.dart';
 export 'notification_listener.dart';
 export 'prayer_reminders.dart';

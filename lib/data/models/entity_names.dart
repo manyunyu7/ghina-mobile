@@ -21,6 +21,8 @@ abstract final class SyncEntity {
   static const habitLogs = 'habitLogs';
   static const assets = 'assets';
   static const assetTrades = 'assetTrades';
+  static const reminders = 'reminders';
+  static const calendarEvents = 'calendarEvents';
 
   /// Apply order for pulls (referenced entities first).
   static const all = [
@@ -45,6 +47,8 @@ abstract final class SyncEntity {
     habitLogs,
     assets,
     assetTrades,
+    reminders,
+    calendarEvents,
   ];
 
   /// Notes module (`docs/notes.md`): a pull carrying [noteLabels] comes from a
@@ -64,4 +68,7 @@ abstract final class SyncEntity {
 
   /// Investments (`docs/investments.md`).
   static const investmentsModule = [assets, assetTrades];
+
+  /// Reminders + calendar ("Pengingat", "Kalender").
+  static const agendaModule = [reminders, calendarEvents];
 }

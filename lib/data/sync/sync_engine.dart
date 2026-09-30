@@ -23,6 +23,7 @@ import '../models/notes_content_mappers.dart';
 import '../models/notes_content_wire.dart';
 import '../models/wire.dart';
 import '../repositories/photo_store.dart';
+import 'agenda_sync.dart';
 import 'habits_investments_sync.dart';
 import 'local_cascades.dart';
 import 'outbox.dart';
@@ -51,6 +52,7 @@ class SyncEngine implements SyncService {
        _outbox = outbox,
        _cascades = LocalCascades(db, outbox) {
     _hi = HabitsInvestmentsSync(db, outbox, _cascades, _clock);
+    _agenda = AgendaSync(db);
   }
 
   final AppDatabase _db;
@@ -64,6 +66,9 @@ class SyncEngine implements SyncService {
   /// Hooks of the habits/investments entities (duplicates, remaps, rejected
   /// trades' cash effect).
   late final HabitsInvestmentsSync _hi;
+
+  /// Reminders + calendar events (plain rows, no links).
+  late final AgendaSync _agenda;
 
   /// Delay between a local write and the sync it triggers.
   final Duration debounce;
@@ -1304,8 +1309,11 @@ class SyncEngine implements SyncService {
             .into(_db.contentPosts)
             .insertOnConflictUpdate(post.toCompanion());
       default:
-        // Habits/investments, else an unknown entity (newer server): ignore.
-        await _hi.upsertPulled(entity, j);
+        // Habits/investments, reminders/calendar, else an unknown entity
+        // (newer server): ignore.
+        if (!await _hi.upsertPulled(entity, j)) {
+          await _agenda.upsertPulled(entity, j);
+        }
     }
   }
 
@@ -1339,7 +1347,7 @@ class SyncEngine implements SyncService {
     SyncEntity.contentPillars => _db.contentPillars,
     SyncEntity.contentItems => _db.contentItems,
     SyncEntity.contentPosts => _db.contentPosts,
-    _ => _hi.table(entity),
+    _ => _hi.table(entity) ?? _agenda.table(entity),
   };
 
   /// Deletes one local row without queuing anything. Returns rows deleted.

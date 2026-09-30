@@ -1,6 +1,7 @@
 /// All domain entities, value objects and read models.
 library;
 
+export 'agenda.dart';
 export 'app_user.dart';
 export 'budget.dart';
 export 'category.dart';
@@ -13,6 +14,7 @@ export 'habit_views.dart';
 export 'health_entry.dart';
 export 'investment.dart';
 export 'investment_views.dart';
+export 'killa.dart';
 export 'note.dart';
 export 'notification_capture.dart';
 export 'planned_transaction.dart';

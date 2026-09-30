@@ -496,7 +496,8 @@ final watchTaskBoardUseCaseProvider = Provider(
   ),
 );
 
-/// Task reminders merged with content post and habit reminders (≤ 60 total).
+/// Task reminders merged with content post, habit and "Pengingat"
+/// reminders (≤ 60 total).
 final watchRemindersUseCaseProvider = Provider(
   (ref) => WatchReminders(
     ref.watch(taskRepositoryProvider),
@@ -507,6 +508,7 @@ final watchRemindersUseCaseProvider = Provider(
     accounts: ref.watch(socialAccountRepositoryProvider),
     habits: ref.watch(habitRepositoryProvider),
     habitLogs: ref.watch(habitLogRepositoryProvider),
+    agenda: ref.watch(reminderItemRepositoryProvider),
   ),
 );
 final watchSyncStatusUseCaseProvider = Provider(
