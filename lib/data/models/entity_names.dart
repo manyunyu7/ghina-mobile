@@ -23,6 +23,12 @@ abstract final class SyncEntity {
   static const assetTrades = 'assetTrades';
   static const reminders = 'reminders';
   static const calendarEvents = 'calendarEvents';
+  static const people = 'people';
+  static const personCategories = 'personCategories';
+  static const personFields = 'personFields';
+  static const personDates = 'personDates';
+  static const habitFields = 'habitFields';
+  static const habitEvents = 'habitEvents';
 
   /// Apply order for pulls (referenced entities first).
   static const all = [
@@ -49,6 +55,14 @@ abstract final class SyncEntity {
     assetTrades,
     reminders,
     calendarEvents,
+    // Referenced entities first: categories/field defs before people before
+    // their dates; habit fields after habits.
+    personCategories,
+    personFields,
+    people,
+    personDates,
+    habitFields,
+    habitEvents,
   ];
 
   /// Notes module (`docs/notes.md`): a pull carrying [noteLabels] comes from a
@@ -71,4 +85,16 @@ abstract final class SyncEntity {
 
   /// Reminders + calendar ("Pengingat", "Kalender").
   static const agendaModule = [reminders, calendarEvents];
+
+  /// People ("Orang", `docs/people.md`).
+  static const peopleModule = [
+    personCategories,
+    personFields,
+    people,
+    personDates,
+  ];
+
+  /// Habit enrichment (`docs/habits-food-enrichment.md`): a pull carrying
+  /// [habitFields] comes from an enrichment-aware server.
+  static const enrichmentModule = [habitFields, habitEvents];
 }

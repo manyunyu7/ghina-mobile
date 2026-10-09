@@ -13,6 +13,7 @@ import 'agenda_rules.dart' show computeAgendaReminders;
 import 'category_usecases.dart' show categoryIcons;
 import 'content_rules.dart' show computeContentReminders, sortAndCapReminders;
 import 'habit_rules.dart' show computeHabitReminders;
+import 'people_rules.dart' show computePeopleReminders;
 import 'task_rules.dart';
 import 'transaction_usecases.dart';
 import 'validation.dart';
@@ -873,6 +874,8 @@ final class WatchReminders {
     this._habits,
     this._habitLogs,
     this._agenda,
+    this._people,
+    this._personDates,
   });
   final TaskRepository _tasks;
   final TaskAreaRepository _areas;
@@ -886,6 +889,11 @@ final class WatchReminders {
   /// Synced reminders ("Pengingat"): one notification at each `dueAt`.
   final ReminderItemRepository? _agenda;
 
+  /// People ("Orang"): birthdays and important dates at 09:00 local, sharing
+  /// this cap (`computePeopleReminders`). Both repositories or neither.
+  final PersonRepository? _people;
+  final PersonDateRepository? _personDates;
+
   Stream<List<Reminder>> call({String currency = 'IDR'}) {
     final posts = _posts, items = _items, accounts = _accounts;
     final habits = _habits, habitLogs = _habitLogs;
@@ -893,8 +901,11 @@ final class WatchReminders {
     final content = posts != null && items != null && accounts != null;
     final withHabits = habits != null && habitLogs != null;
     final withAgenda = agenda != null;
+    final people = _people, personDates = _personDates;
+    final withPeople = people != null && personDates != null;
     final h = content ? 6 : 3;
     final a = h + (withHabits ? 2 : 0);
+    final pe = a + (withAgenda ? 1 : 0);
     return combineLatestList(
       [
         _tasks.watchAll(),
@@ -907,6 +918,7 @@ final class WatchReminders {
         ],
         if (withHabits) ...[habits.watchAll(), habitLogs.watch()],
         if (withAgenda) agenda.watchAll(),
+        if (withPeople) ...[people.watchAll(), personDates.watchAll()],
       ],
       (v) {
         final now = v[2] as DateTime;
@@ -916,7 +928,7 @@ final class WatchReminders {
           now,
           currency: currency,
         );
-        if (!content && !withHabits && !withAgenda) return tasks;
+        if (!content && !withHabits && !withAgenda && !withPeople) return tasks;
         return sortAndCapReminders([
           ...tasks,
           if (content)
@@ -934,6 +946,12 @@ final class WatchReminders {
             ),
           if (withAgenda)
             ...computeAgendaReminders(v[a] as List<ReminderItem>, now),
+          if (withPeople)
+            ...computePeopleReminders(
+              v[pe] as List<Person>,
+              v[pe + 1] as List<PersonDate>,
+              now,
+            ),
         ], maxTaskNotifications);
       },
     ).distinct(_listEq);

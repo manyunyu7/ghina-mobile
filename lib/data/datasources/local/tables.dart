@@ -181,6 +181,12 @@ class Food extends Table with Timestamps {
   TextColumn get name => text()();
   TextColumn get meal => text().nullable()();
   IntColumn get calories => integer().nullable()();
+
+  /// v8: upper bound of a calorie range (null = not a range).
+  IntColumn get caloriesMax => integer().nullable()();
+
+  /// v8: JSON array of tags (≤ 10).
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get photoUrl => text().nullable()();
 
   /// Device-only: photo waiting to be uploaded. Never sent on the wire.
@@ -420,6 +426,13 @@ class Habits extends Table with Timestamps {
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
+  /// v8: JSON array of `{title, detail, kind}` (coping playbook).
+  TextColumn get tools => text().withDefault(const Constant('[]'))();
+
+  /// v8: read-only server mirrors of the markdown notes (never pushed).
+  BoolColumn get hasNotes => boolean().withDefault(const Constant(false))();
+  IntColumn get notesLength => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -442,6 +455,9 @@ class HabitLogs extends Table with Timestamps {
   /// JSON array of trigger tags.
   TextColumn get triggers => text().withDefault(const Constant('[]'))();
   IntColumn get at => integer().map(epochMs).nullable()();
+
+  /// v8: JSON object of user-defined dimensions (key → string|number|bool).
+  TextColumn get extra => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -534,6 +550,141 @@ class CalendarEvents extends Table with Timestamps {
   TextColumn get color => text().nullable()();
   TextColumn get location => text().nullable()();
   TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+// --- schema v8: people (`docs/people.md`) and habit enrichment ---
+
+/// Synced `people`. No notes column: the markdown notes are online-only.
+@DataClassName('PersonRow')
+@TableIndex(name: 'idx_person_category', columns: {#category})
+class People extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get fullName => text().nullable()();
+
+  /// A `person_categories.key`.
+  TextColumn get category => text().withDefault(const Constant('other'))();
+  TextColumn get relation => text().nullable()();
+  TextColumn get vibe => text().withDefault(const Constant('unknown'))();
+  TextColumn get status => text().nullable()();
+  TextColumn get howMet => text().nullable()();
+  TextColumn get summary => text().nullable()();
+  IntColumn get birthYear => integer().nullable()();
+  IntColumn get birthMonth => integer().nullable()();
+  IntColumn get birthDay => integer().nullable()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get instagram => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get address => text().nullable()();
+  TextColumn get organization => text().nullable()();
+  TextColumn get dataStatus => text().withDefault(const Constant('sparse'))();
+  BoolColumn get sensitive => boolean().withDefault(const Constant(false))();
+
+  /// JSON array of strings.
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+
+  /// JSON object: custom-field key → string|number|bool.
+  TextColumn get fields => text().withDefault(const Constant('{}'))();
+
+  /// Read-only server mirrors of the notes (never pushed).
+  BoolColumn get hasNotes => boolean().withDefault(const Constant(false))();
+  IntColumn get notesLength => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('PersonCategoryRow')
+class PersonCategories extends Table with Timestamps {
+  TextColumn get id => text()();
+
+  /// Immutable slug; unique per user (the server answers `duplicate`).
+  TextColumn get key => text()();
+  TextColumn get label => text()();
+  TextColumn get emoji => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `personFields` (custom-field definitions).
+@DataClassName('PersonFieldRow')
+class PersonFields extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get key => text()();
+  TextColumn get label => text()();
+  TextColumn get type => text().withDefault(const Constant('text'))();
+
+  /// JSON array (select) or null.
+  TextColumn get options => text().nullable()();
+
+  /// JSON array of category keys, null = all.
+  TextColumn get appliesTo => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get showInList => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('PersonDateRow')
+@TableIndex(name: 'idx_person_date_person', columns: {#personId})
+class PersonDates extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get personId => text()();
+  TextColumn get label => text()();
+
+  /// `anniversary | memorial | custom`
+  TextColumn get kind => text().withDefault(const Constant('custom'))();
+  IntColumn get month => integer()();
+  IntColumn get day => integer()();
+  IntColumn get year => integer().nullable()();
+  IntColumn get remindDaysBefore => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `habitFields` (per-event dimensions).
+@DataClassName('HabitFieldRow')
+class HabitFields extends Table with Timestamps {
+  TextColumn get id => text()();
+
+  /// null = every habit.
+  TextColumn get habitId => text().nullable()();
+  TextColumn get key => text()();
+  TextColumn get label => text()();
+  TextColumn get type => text().withDefault(const Constant('text'))();
+  TextColumn get options => text().nullable()();
+  IntColumn get scaleMin => integer().nullable()();
+  IntColumn get scaleMax => integer().nullable()();
+  TextColumn get appliesTo => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `habitEvents` (journal days, milestones, neutral events).
+@DataClassName('HabitEventRow')
+@TableIndex(name: 'idx_habit_event_habit', columns: {#habitId, #date})
+class HabitEvents extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get habitId => text()();
+
+  /// Local `YYYY-MM-DD`.
+  TextColumn get date => text()();
+
+  /// `journal | milestone | event`
+  TextColumn get kind => text()();
+  TextColumn get label => text()();
+  TextColumn get note => text().nullable()();
+  IntColumn get at => integer().map(epochMs).nullable()();
+  TextColumn get extra => text().withDefault(const Constant('{}'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -698,6 +849,13 @@ class SyncMeta extends Table {
   /// v4: a pull from a content-aware server succeeded — the server owns seeding
   /// the default pillars from then on; the app never seeds them again.
   BoolColumn get contentSeeded =>
+      boolean().withDefault(const Constant(false))();
+
+  /// v8: a pull from an enrichment-aware server succeeded (it sent
+  /// `habitFields`). Until then rows may still carry v7 defaults for
+  /// `habits.tools`, `habitLogs.extra`, `food.tags/caloriesMax`, so pushes
+  /// leave those keys out ("absent = unchanged") rather than wipe the server's.
+  BoolColumn get enrichmentSeen =>
       boolean().withDefault(const Constant(false))();
 
   @override

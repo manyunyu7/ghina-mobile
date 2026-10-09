@@ -6,6 +6,7 @@ import 'package:ghina/data/models/wire.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/usecases/investment_rules.dart' as inv;
 import 'package:ghina/domain/usecases/notes_rules.dart' as notes;
+import 'package:ghina/domain/usecases/people_rules.dart' as ppl;
 import 'package:ghina/domain/usecases/prayer_quality.dart';
 
 typedef Tomb = ({String entity, String id, int deletedAt});
@@ -55,6 +56,14 @@ class FakeServer implements SyncApi {
   /// habits/assets keys on pull, those entities unknown on push, and the
   /// `investment` transaction type rejected.
   bool preHabits = false;
+
+  /// Pretend to be a v7-era server: no people / `habitFields` / `habitEvents`
+  /// keys on pull, those entities unknown on push, and the enrichment keys
+  /// (`tools`, `extra`, `tags`, `caloriesMax`) ignored.
+  bool preEnrichment = false;
+
+  /// Markdown notes of people (never travel through sync).
+  final personNotes = <String, String>{};
 
   /// Upload of these file paths returns this URL instead (e.g. an image where
   /// audio was expected).
@@ -148,7 +157,10 @@ class FakeServer implements SyncApi {
                   !SyncEntity.contentModule.contains(e))) &&
           (!(legacy || preNotes || preHabits) ||
               (!SyncEntity.habitsModule.contains(e) &&
-                  !SyncEntity.investmentsModule.contains(e))))
+                  !SyncEntity.investmentsModule.contains(e))) &&
+          (!(legacy || preNotes || preHabits || preEnrichment) ||
+              (!SyncEntity.peopleModule.contains(e) &&
+                  !SyncEntity.enrichmentModule.contains(e))))
         e,
   ];
 
@@ -194,6 +206,21 @@ class FakeServer implements SyncApi {
   Json _public(String entity, Json r) {
     final out = Map<String, dynamic>.from(r);
     if (legacy && entity == SyncEntity.transactions) out.remove('photos');
+    if (entity == SyncEntity.people) {
+      // The pulled row never carries the notes, only the read-only mirrors.
+      final n = personNotes[r['id']] ?? '';
+      out['hasNotes'] = n.isNotEmpty;
+      out['notesLength'] = n.length;
+      out.remove('notes');
+    }
+    if (preEnrichment) {
+      out.remove('tools');
+      out.remove('hasNotes');
+      out.remove('notesLength');
+      out.remove('extra');
+      out.remove('caloriesMax');
+      if (entity == SyncEntity.food) out.remove('tags');
+    }
     return out;
   }
 
@@ -344,6 +371,69 @@ class FakeServer implements SyncApi {
     if (e == SyncEntity.habits && out['kind'] == 'quit') {
       out['schedule'] = {'type': 'daily'};
       out['target'] = {'type': 'check'};
+    }
+    // Optional new keys (docs/mobile-sync.md): absent = unchanged, null clears.
+    if (!preEnrichment) {
+      void keep(String key, Object empty) {
+        if (!out.containsKey(key)) {
+          out[key] = existing?[key] ?? empty;
+        } else if (out[key] == null) {
+          out[key] = empty;
+        }
+      }
+
+      if (e == SyncEntity.habits) {
+        keep('tools', <Object?>[]);
+        out.remove('hasNotes');
+        out.remove('notesLength');
+        out['hasNotes'] = existing?['hasNotes'] ?? false;
+        out['notesLength'] = existing?['notesLength'] ?? 0;
+      }
+      if (e == SyncEntity.habitLogs) keep('extra', <String, Object?>{});
+      if (e == SyncEntity.habitEvents) keep('extra', <String, Object?>{});
+      if (e == SyncEntity.food) {
+        keep('tags', <Object?>[]);
+        if (!out.containsKey('caloriesMax')) {
+          out['caloriesMax'] = existing?['caloriesMax'];
+        }
+        final cal = out['calories'] as num?;
+        final max = out['caloriesMax'] as num?;
+        if (max != null && (cal == null || max < cal)) {
+          out['caloriesMax'] = null;
+        }
+      }
+    } else if (e == SyncEntity.habits) {
+      out.remove('tools');
+    }
+    if (e == SyncEntity.people) {
+      // `notes` is dropped: a sync upsert can never write them. Full replace
+      // of the metadata: missing optional fields become null / [] / {}.
+      out.remove('notes');
+      out.remove('hasNotes');
+      out.remove('notesLength');
+      out['category'] ??= 'other';
+      out['vibe'] ??= 'unknown';
+      out['dataStatus'] ??= 'sparse';
+      out['sensitive'] ??= false;
+      out['tags'] ??= <Object?>[];
+      out['fields'] ??= <String, Object?>{};
+      for (final k in [
+        'fullName',
+        'relation',
+        'status',
+        'howMet',
+        'summary',
+        'birthYear',
+        'birthMonth',
+        'birthDay',
+        'phone',
+        'instagram',
+        'email',
+        'address',
+        'organization',
+      ]) {
+        out.putIfAbsent(k, () => null);
+      }
     }
     if (e == SyncEntity.assets) {
       if (out['kind'] != 'stock' && out['kind'] != 'crypto') {
@@ -548,6 +638,105 @@ class FakeServer implements SyncApi {
               ? 'Kebiasaan membangun hanya bisa dicatat selesai atau libur'
               : 'Kebiasaan berhenti tidak bisa diberi hari libur';
         }
+        for (final k in (d['extra'] as Map? ?? const {}).keys) {
+          final known = rows[SyncEntity.habitFields]!.values.any(
+            (f) =>
+                f['key'] == k &&
+                (f['habitId'] == null || f['habitId'] == d['habitId']),
+          );
+          if (!known) return 'Unknown dimension "$k"';
+        }
+      case SyncEntity.people:
+        final name = (d['name'] as String? ?? '').trim();
+        if (name.isEmpty || name.length > 120) return 'Invalid name';
+        final cat = d['category'] as String? ?? 'other';
+        if (!rows[SyncEntity.personCategories]!.values.any(
+          (c) => c['key'] == cat,
+        )) {
+          return 'Unknown category "$cat"';
+        }
+        final berr = ppl.birthdayError(
+          year: d['birthYear'] as int?,
+          month: d['birthMonth'] as int?,
+          day: d['birthDay'] as int?,
+          currentYear: DateTime.fromMillisecondsSinceEpoch(
+            now,
+            isUtc: true,
+          ).year,
+        );
+        if (berr != null) return berr;
+        final tags = d['tags'];
+        if (tags is! List || tags.length > 20) return 'Invalid tags';
+        final fields = d['fields'];
+        if (fields is! Map) return 'Invalid fields';
+        for (final k in fields.keys) {
+          final def = rows[SyncEntity.personFields]!.values
+              .where((f) => f['key'] == k)
+              .firstOrNull;
+          if (def == null) return 'Unknown field "$k"';
+          final v = fields[k];
+          final ok = switch (def['type']) {
+            'number' => v is num,
+            'boolean' => v is bool,
+            _ => v is String,
+          };
+          if (!ok) return '${def['label']} does not fit its type';
+        }
+      case SyncEntity.personCategories:
+        if (!ppl.keyRe.hasMatch(d['key'] as String? ?? '')) {
+          return 'Invalid key';
+        }
+        final prev = rows[SyncEntity.personCategories]![_currentId];
+        if (prev != null && prev['key'] != d['key']) return 'Key is immutable';
+      case SyncEntity.personFields:
+        if (!ppl.keyRe.hasMatch(d['key'] as String? ?? '')) {
+          return 'Invalid key';
+        }
+        final prev = rows[SyncEntity.personFields]![_currentId];
+        if (prev != null && prev['key'] != d['key']) return 'Key is immutable';
+        if (prev != null && prev['type'] != d['type']) {
+          final used = rows[SyncEntity.people]!.values.any(
+            (p) => (p['fields'] as Map).containsKey(d['key']),
+          );
+          if (used) return 'Type change does not fit stored values';
+        }
+      case SyncEntity.personDates:
+        if (!_owned(SyncEntity.people, d['personId'] as String?)) {
+          return 'Not found';
+        }
+        final err = ppl.dateError(
+          month: d['month'] as int,
+          day: d['day'] as int,
+          year: d['year'] as int?,
+          currentYear: DateTime.fromMillisecondsSinceEpoch(
+            now,
+            isUtc: true,
+          ).year,
+        );
+        if (err != null) return err;
+      case SyncEntity.habitFields:
+        if (!ppl.keyRe.hasMatch(d['key'] as String? ?? '')) {
+          return 'Invalid key';
+        }
+        final hid = d['habitId'] as String?;
+        if (hid != null && !_owned(SyncEntity.habits, hid)) {
+          return 'Kebiasaan tidak ditemukan';
+        }
+      case SyncEntity.habitEvents:
+        if (!_owned(SyncEntity.habits, d['habitId'] as String?)) {
+          return 'Kebiasaan tidak ditemukan';
+        }
+        final label = (d['label'] as String? ?? '').trim();
+        if (label.isEmpty || label.length > 60) return 'Invalid label';
+        final extra = d['extra'] as Map? ?? const {};
+        for (final k in extra.keys) {
+          final ok = rows[SyncEntity.habitFields]!.values.any(
+            (f) =>
+                f['key'] == k &&
+                (f['habitId'] == null || f['habitId'] == d['habitId']),
+          );
+          if (!ok) return 'Unknown dimension "$k"';
+        }
       case SyncEntity.assets:
         final kind = AssetKind.fromWire(d['kind'] as String?);
         try {
@@ -653,6 +842,9 @@ class FakeServer implements SyncApi {
             r['date'] == d['date'] &&
             r['type'] == d['type'],
       ),
+      SyncEntity.personCategories ||
+      SyncEntity.personFields ||
+      SyncEntity.habitFields => clash((r) => r['key'] == d['key']),
       SyncEntity.assets => clash(
         (r) =>
             r['kind'] == d['kind'] &&
@@ -725,7 +917,62 @@ class FakeServer implements SyncApi {
       _detachTransaction(id);
       _nullRef(SyncEntity.assetTrades, 'cashTransactionId', id);
     }
+    if (e == SyncEntity.people) {
+      personNotes.remove(id);
+      for (final dId
+          in rows[SyncEntity.personDates]!.values
+              .where((d) => d['personId'] == id)
+              .map((d) => d['id'] as String)
+              .toList()) {
+        rows[SyncEntity.personDates]!.remove(dId);
+        _tomb(SyncEntity.personDates, dId);
+      }
+    }
+    if (e == SyncEntity.personCategories) {
+      for (final p in rows[SyncEntity.people]!.values) {
+        if (p['category'] == row['key']) {
+          p['category'] = 'other';
+          p['updatedAt'] = iso(tick());
+        }
+      }
+    }
+    if (e == SyncEntity.personFields) {
+      for (final p in rows[SyncEntity.people]!.values) {
+        final f = p['fields'] as Map;
+        if (f.containsKey(row['key'])) {
+          p['fields'] = {...f}..remove(row['key']);
+          p['updatedAt'] = iso(tick());
+        }
+      }
+    }
+    if (e == SyncEntity.habitFields) {
+      for (final ent in [SyncEntity.habitLogs, SyncEntity.habitEvents]) {
+        for (final r in rows[ent]!.values) {
+          final x = r['extra'] as Map? ?? const {};
+          if (x.containsKey(row['key'])) {
+            r['extra'] = {...x}..remove(row['key']);
+            r['updatedAt'] = iso(tick());
+          }
+        }
+      }
+    }
     if (e == SyncEntity.habits) {
+      for (final ev
+          in rows[SyncEntity.habitEvents]!.values
+              .where((x) => x['habitId'] == id)
+              .map((x) => x['id'] as String)
+              .toList()) {
+        rows[SyncEntity.habitEvents]!.remove(ev);
+        _tomb(SyncEntity.habitEvents, ev);
+      }
+      for (final f
+          in rows[SyncEntity.habitFields]!.values
+              .where((x) => x['habitId'] == id)
+              .map((x) => x['id'] as String)
+              .toList()) {
+        rows[SyncEntity.habitFields]!.remove(f);
+        _tomb(SyncEntity.habitFields, f);
+      }
       for (final l
           in rows[SyncEntity.habitLogs]!.values
               .where((l) => l['habitId'] == id)
@@ -839,6 +1086,44 @@ class FakeServer implements SyncApi {
         i['updatedAt'] = iso(tick());
       }
     }
+  }
+
+  // ---------------------------------------------------------------- people notes
+
+  /// `GET /api/mobile/people/{id}`: the notes and the row's `updatedAt`.
+  (String notes, String updatedAt) notesGet(String id) {
+    final r = rows[SyncEntity.people]![id];
+    if (r == null) throw const NotFoundFailure('Not found');
+    return (personNotes[id] ?? '', r['updatedAt'] as String);
+  }
+
+  /// `PUT …/notes` (409 → [ConflictFailure] on a stale `expectedUpdatedAt`).
+  /// Like every notes write it moves the row's `updatedAt` forward.
+  (String updatedAt, int length) notesPut(
+    String id,
+    String notes, {
+    String? expectedUpdatedAt,
+  }) {
+    final r = rows[SyncEntity.people]![id];
+    if (r == null) throw const NotFoundFailure('Not found');
+    if (expectedUpdatedAt != null && expectedUpdatedAt != r['updatedAt']) {
+      throw const ConflictFailure('conflict');
+    }
+    personNotes[id] = notes;
+    r['updatedAt'] = iso(tick());
+    return (r['updatedAt'] as String, notes.length);
+  }
+
+  (String updatedAt, int length) notesAppend(
+    String id,
+    String text, {
+    String? heading,
+  }) {
+    final cur = personNotes[id] ?? '';
+    final add =
+        '${cur.isEmpty ? '' : '\n\n'}'
+        '${heading == null ? '' : '## $heading\n'}$text';
+    return notesPut(id, cur + add);
   }
 
   // ---------------------------------------------------------------- "web" helpers

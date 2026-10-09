@@ -287,7 +287,10 @@ void main() {
           role: KillaRole.user,
           body: 'dari WA',
           channel: KillaChannel.wa,
-          createdAt: _now.subtract(const Duration(days: 1)),
+          // The chat page reads the real clock for its day separators, so
+          // "yesterday" must be relative to the real today (this used to
+          // hard-code 2026-10-01 and only passed on 2026-10-02).
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
         ),
         KillaMessage(
           id: 's1',

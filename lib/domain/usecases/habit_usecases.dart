@@ -122,6 +122,7 @@ Habit _buildHabit(
   required String startDate,
   bool archived = false,
   int sortOrder = 0,
+  Habit? previous,
 }) {
   final quit = input.kind == HabitKind.quit;
   return Habit(
@@ -138,6 +139,10 @@ Habit _buildHabit(
     startDate: requireHabitDate(startDate, field: 'startDate'),
     archived: archived,
     sortOrder: sortOrder,
+    // Not part of the habit form: kept from the stored row.
+    tools: previous?.tools ?? const [],
+    hasNotes: previous?.hasNotes ?? false,
+    notesLength: previous?.notesLength ?? 0,
     createdAt: createdAt,
     updatedAt: now,
   );
@@ -217,6 +222,7 @@ final class UpdateHabit {
           : dateKey(input.startDate!),
       archived: e.archived,
       sortOrder: e.sortOrder,
+      previous: e,
     );
     await _habits.save(h);
     return h;

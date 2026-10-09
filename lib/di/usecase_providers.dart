@@ -509,6 +509,8 @@ final watchRemindersUseCaseProvider = Provider(
     habits: ref.watch(habitRepositoryProvider),
     habitLogs: ref.watch(habitLogRepositoryProvider),
     agenda: ref.watch(reminderItemRepositoryProvider),
+    people: ref.watch(personRepositoryProvider),
+    personDates: ref.watch(personDateRepositoryProvider),
   ),
 );
 final watchSyncStatusUseCaseProvider = Provider(

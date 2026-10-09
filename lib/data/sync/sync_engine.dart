@@ -27,6 +27,7 @@ import 'agenda_sync.dart';
 import 'habits_investments_sync.dart';
 import 'local_cascades.dart';
 import 'outbox.dart';
+import 'people_sync.dart';
 
 /// Something that calls [SyncEngine.requestSync] on app events (lifecycle, network,
 /// timers). See `FlutterSyncTriggers`.
@@ -53,6 +54,7 @@ class SyncEngine implements SyncService {
        _cascades = LocalCascades(db, outbox) {
     _hi = HabitsInvestmentsSync(db, outbox, _cascades, _clock);
     _agenda = AgendaSync(db);
+    _people = PeopleSync(db, outbox, _cascades);
   }
 
   final AppDatabase _db;
@@ -69,6 +71,9 @@ class SyncEngine implements SyncService {
 
   /// Reminders + calendar events (plain rows, no links).
   late final AgendaSync _agenda;
+
+  /// People + habit enrichment (categories/defs unique by key, cascades).
+  late final PeopleSync _people;
 
   /// Delay between a local write and the sync it triggers.
   final Duration debounce;
@@ -283,7 +288,15 @@ class SyncEngine implements SyncService {
               entity: e.entity,
               op: MutationOp.values.byName(e.op),
               entityId: e.entityId,
-              data: Outbox.decode(e.data),
+              // Until a pull from an enrichment-aware server refreshed the
+              // rows, the new keys (tools / extra / tags / caloriesMax) are
+              // left out: "absent = unchanged" on the server.
+              data: meta.enrichmentSeen
+                  ? Outbox.decode(e.data)
+                  : PeopleSync.withoutEnrichment(
+                      e.entity,
+                      Outbox.decode(e.data),
+                    ),
               clientUpdatedAt: DateTime.fromMillisecondsSinceEpoch(
                 e.clientUpdatedAt,
               ),
@@ -1008,6 +1021,14 @@ class SyncEngine implements SyncService {
     // A notes/content-aware server seeds the default label and pillars itself
     // (once — never again after the user deleted them), so from now on the app
     // must not seed them locally (see SeedDefaultNoteLabel).
+    // An enrichment-aware server sends `habitFields`: from now on the local
+    // rows carry the server's tools / extra / tags / caloriesMax, so pushes
+    // may include those keys (see PeopleSync.withoutEnrichment).
+    if (res.changes.containsKey(SyncEntity.habitFields)) {
+      await _db.updateMeta(
+        const SyncMetaCompanion(enrichmentSeen: Value(true)),
+      );
+    }
     final notesAware = res.changes.containsKey(SyncEntity.noteLabels);
     final contentAware = res.changes.containsKey(SyncEntity.contentPillars);
     if (notesAware || contentAware) {
@@ -1099,6 +1120,7 @@ class SyncEngine implements SyncService {
               _db.contentPillars,
             )..where((p) => p.id.equals(t.id))).getSingleOrNull())?.name
           : null;
+      final tombKey = await _people.beforeTombstone(t.entity, t.id);
       final n = await _deleteRow(t.entity, t.id);
       if (n == 0) continue;
       if (t.entity == SyncEntity.wallets) await _cascades.walletDeleted(t.id);
@@ -1124,6 +1146,7 @@ class SyncEngine implements SyncService {
       }
       if (pillarName != null) await _cascades.pillarDeleted(pillarName);
       await _hi.onTombstone(t.entity, t.id);
+      await _people.onTombstone(t.entity, t.id, tombKey);
     }
 
     for (final entity in SyncEntity.all) {
@@ -1309,10 +1332,11 @@ class SyncEngine implements SyncService {
             .into(_db.contentPosts)
             .insertOnConflictUpdate(post.toCompanion());
       default:
-        // Habits/investments, reminders/calendar, else an unknown entity
-        // (newer server): ignore.
-        if (!await _hi.upsertPulled(entity, j)) {
-          await _agenda.upsertPulled(entity, j);
+        // Habits/investments, reminders/calendar, people/habit enrichment,
+        // else an unknown entity (newer server): ignore.
+        if (!await _hi.upsertPulled(entity, j) &&
+            !await _agenda.upsertPulled(entity, j)) {
+          await _people.upsertPulled(entity, j);
         }
     }
   }
@@ -1347,7 +1371,7 @@ class SyncEngine implements SyncService {
     SyncEntity.contentPillars => _db.contentPillars,
     SyncEntity.contentItems => _db.contentItems,
     SyncEntity.contentPosts => _db.contentPosts,
-    _ => _hi.table(entity) ?? _agenda.table(entity),
+    _ => _hi.table(entity) ?? _agenda.table(entity) ?? _people.table(entity),
   };
 
   /// Deletes one local row without queuing anything. Returns rows deleted.

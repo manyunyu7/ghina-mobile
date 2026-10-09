@@ -145,15 +145,88 @@ final class FoodInput {
     required this.date,
     required this.name,
     this.meal,
+    this.mealLabel,
     this.calories,
+    this.caloriesMax,
+    this.clearCaloriesMax = false,
+    this.tags,
     this.note,
   });
 
   final DateTime date;
   final String name;
   final MealType? meal;
+
+  /// Free-text meal (≤ 24, one line), used when [meal] is null. On an update a
+  /// null here keeps the stored label (an imported "makan malam" survives a
+  /// form that only knows the canonical meals).
+  final String? mealLabel;
   final num? calories;
+
+  /// Upper bound of a calorie range (≥ [calories]). On an update null keeps
+  /// the stored max (dropped when it no longer fits [calories]); set
+  /// [clearCaloriesMax] to remove the range.
+  final num? caloriesMax;
+  final bool clearCaloriesMax;
+
+  /// ≤ 10 tags of ≤ 30. Null = unchanged (create: none).
+  final List<String>? tags;
   final String? note;
+}
+
+String? _mealLabel(String? v) {
+  final s = v?.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (s == null || s.isEmpty) return null;
+  if (s.length > 24) {
+    throw const ValidationFailure(
+      'Label makan terlalu panjang (maks 24 karakter)',
+      field: 'meal',
+    );
+  }
+  return s;
+}
+
+List<String> _foodTags(List<String> raw) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final t in raw) {
+    final v = t.trim();
+    if (v.isEmpty || !seen.add(v.toLowerCase())) continue;
+    if (v.length > 30) {
+      throw const ValidationFailure(
+        'Tag terlalu panjang (maks 30 karakter)',
+        field: 'tags',
+      );
+    }
+    out.add(v);
+  }
+  if (out.length > 10) {
+    throw const ValidationFailure('Maksimal 10 tag', field: 'tags');
+  }
+  return out;
+}
+
+/// `caloriesMax` of a food log: explicit values must fit, a kept one that no
+/// longer fits (calories lowered or removed) is dropped like the server does.
+int? _caloriesMax(int? calories, num? max, {required bool explicit}) {
+  if (max == null) return null;
+  if (!max.isFinite || max < 0 || max > 20000) {
+    throw const ValidationFailure(
+      'Kalori maksimum sepertinya salah (0–20000)',
+      field: 'caloriesMax',
+    );
+  }
+  final m = max.round();
+  if (calories == null || m < calories) {
+    if (!explicit) return null;
+    throw ValidationFailure(
+      calories == null
+          ? 'Isi kalori dulu sebelum rentang'
+          : 'Kalori maksimum harus ≥ kalori minimum',
+      field: 'caloriesMax',
+    );
+  }
+  return m;
 }
 
 int? _calories(num? c) {
@@ -190,22 +263,27 @@ final class CreateFoodLog {
   final FoodRepository _repo;
   final Clock _clock;
 
-  Future<Result<FoodLog>> call(FoodInput input, {String? photoPath}) =>
-      guard(() async {
-        final now = _clock.now();
-        final log = FoodLog(
-          id: newId(),
-          date: input.date,
-          name: requireName(input.name, max: 120),
-          meal: input.meal,
-          calories: _calories(input.calories),
-          note: optionalText(input.note),
-          createdAt: now,
-          updatedAt: now,
-        );
-        await _repo.save(log, newPhotoPath: photoPath);
-        return log;
-      });
+  Future<Result<FoodLog>> call(FoodInput input, {String? photoPath}) => guard(
+    () async {
+      final now = _clock.now();
+      final calories = _calories(input.calories);
+      final log = FoodLog(
+        id: newId(),
+        date: input.date,
+        name: requireName(input.name, max: 120),
+        meal: input.meal,
+        mealLabel: input.meal == null ? _mealLabel(input.mealLabel) : null,
+        calories: calories,
+        caloriesMax: _caloriesMax(calories, input.caloriesMax, explicit: true),
+        tags: _foodTags(input.tags ?? const []),
+        note: optionalText(input.note),
+        createdAt: now,
+        updatedAt: now,
+      );
+      await _repo.save(log, newPhotoPath: photoPath);
+      return log;
+    },
+  );
 }
 
 /// Updates a food log. Pass [photoPath] to replace the photo, or [removePhoto].
@@ -223,12 +301,25 @@ final class UpdateFoodLog {
     final old = await _repo.getById(id);
     if (old == null) throw const NotFoundFailure('Catatan tidak ditemukan');
     final keepPhoto = !removePhoto && photoPath == null;
+    final calories = _calories(input.calories);
+    final explicitMax = input.caloriesMax != null;
     final log = FoodLog(
       id: id,
       date: input.date,
       name: requireName(input.name, max: 120),
       meal: input.meal,
-      calories: _calories(input.calories),
+      mealLabel: input.meal != null
+          ? null
+          : (_mealLabel(input.mealLabel) ?? old.mealLabel),
+      calories: calories,
+      caloriesMax: input.clearCaloriesMax
+          ? null
+          : _caloriesMax(
+              calories,
+              explicitMax ? input.caloriesMax : old.caloriesMax,
+              explicit: explicitMax,
+            ),
+      tags: input.tags == null ? old.tags : _foodTags(input.tags!),
       photoUrl: keepPhoto ? old.photoUrl : null,
       localPhotoPath: keepPhoto ? old.localPhotoPath : null,
       note: optionalText(input.note),

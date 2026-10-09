@@ -30,6 +30,9 @@ Json habitToWire(Habit h) => {
   'startDate': h.startDate,
   'archived': h.archived,
   'sortOrder': h.sortOrder,
+  // Enrichment (docs/habits-food-enrichment.md): replaces the whole value.
+  // `hasNotes`/`notesLength` are read-only server mirrors and never sent.
+  'tools': [for (final t in h.tools) t.toJson()],
 };
 
 Json habitLogToWire(HabitLog l) => {
@@ -40,6 +43,7 @@ Json habitLogToWire(HabitLog l) => {
   'note': l.note,
   'triggers': l.triggers,
   'at': l.at == null ? null : isoUtc(l.at!),
+  'extra': l.extra,
 };
 
 Json assetToWire(Asset a) => {
@@ -119,9 +123,32 @@ Habit habitFromWire(Json j) => Habit(
   startDate: _strN(j['startDate']) ?? _str(j['createdAt']).split('T').first,
   archived: _bool(j['archived']),
   sortOrder: _intN(j['sortOrder']) ?? 0,
+  tools: habitToolsFromJson(j['tools']),
+  hasNotes: _bool(j['hasNotes']),
+  notesLength: _intN(j['notesLength']) ?? 0,
   createdAt: _created(j),
   updatedAt: _updated(j),
 );
+
+/// `habits.tools`: invalid entries are left out (lenient pull).
+List<HabitTool> habitToolsFromJson(Object? raw) {
+  final x = _jsonValue(raw);
+  if (x is! List) return const [];
+  return List.unmodifiable([for (final e in x) ?HabitTool.tryParse(e)]);
+}
+
+/// A key → `String | num | bool` map (`habitLogs.extra`, `habitEvents.extra`,
+/// `people.fields`); other value types are dropped.
+Map<String, Object> scalarMapFromJson(Object? raw) {
+  final x = _jsonValue(raw);
+  if (x is! Map) return const {};
+  return Map.unmodifiable({
+    for (final e in x.entries)
+      if (e.key is String &&
+          (e.value is String || e.value is num || e.value is bool))
+        e.key as String: e.value as Object,
+  });
+}
 
 /// Null for an unknown `type` (a newer server).
 HabitLog? habitLogFromWire(Json j) {
@@ -136,6 +163,7 @@ HabitLog? habitLogFromWire(Json j) {
     note: _strN(j['note']),
     triggers: _strings(j['triggers']),
     at: _dateN(j['at']),
+    extra: scalarMapFromJson(j['extra']),
     createdAt: _created(j),
     updatedAt: _updated(j),
   );

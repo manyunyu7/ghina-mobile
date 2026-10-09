@@ -10,6 +10,7 @@ import '../../../../domain/entities/entities.dart';
 import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../people/people_format.dart';
 import '../calendar_format.dart';
 
 enum _View { month, agenda }
@@ -110,6 +111,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget _body(List<CalendarEvent> events) {
     final byDay = eventsByDay(events);
     final today = startOfDay(ref.watch(clockProvider).now());
+    // Birthdays and important dates of People: a read-only overlay computed
+    // from the people, never stored as events (🎂 💍 🕊️ 📌).
+    final gridDays = monthGridDays(_month);
+    final range = _view == _View.month
+        ? (from: dateKey(gridDays.first), to: dateKey(gridDays.last))
+        : (from: dateKey(today), to: dateKey(addDays(today, 59)));
+    final overlay = occurrencesByDay(
+      ref.watch(watchPeopleEventsInRangeProvider(range)).value ??
+          const <EventOccurrence>[],
+    );
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         GhinaSpace.page,
@@ -150,25 +161,33 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             selected: _selected,
             today: today,
             byDay: byDay,
+            overlay: overlay,
             onSelect: _select,
           ),
           const SizedBox(height: 24),
           SectionHeader(
             title: dayTitle(_selected, today),
-            subtitle: switch (byDay[dateKey(_selected)]?.length ?? 0) {
+            subtitle: switch ((byDay[dateKey(_selected)]?.length ?? 0) +
+                (overlay[dateKey(_selected)]?.length ?? 0)) {
               0 => 'Kosong',
               final n => '$n acara',
             },
           ),
-          ..._dayEvents(byDay[dateKey(_selected)] ?? const []),
+          ..._dayEvents(
+            byDay[dateKey(_selected)] ?? const [],
+            overlay[dateKey(_selected)] ?? const [],
+          ),
         ] else
-          ..._agenda(events, byDay, today),
+          ..._agenda(events, byDay, overlay, today),
       ],
     );
   }
 
-  List<Widget> _dayEvents(List<CalendarEvent> events) {
-    if (events.isEmpty) {
+  List<Widget> _dayEvents(
+    List<CalendarEvent> events,
+    List<EventOccurrence> people,
+  ) {
+    if (events.isEmpty && people.isEmpty) {
       return [
         EmptyState(
           compact: true,
@@ -192,6 +211,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             ),
           ),
         ),
+      for (final o in people)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: PersonOccurrenceTile(
+            occurrence: o,
+            onTap: () => context.push('/people/${o.personId}'),
+          ),
+        ),
     ];
   }
 
@@ -199,13 +226,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   List<Widget> _agenda(
     List<CalendarEvent> events,
     Map<String, List<CalendarEvent>> byDay,
+    Map<String, List<EventOccurrence>> overlay,
     DateTime today,
   ) {
     final out = <Widget>[];
     for (var i = 0; i < 60; i++) {
       final day = addDays(today, i);
-      final list = byDay[dateKey(day)];
-      if (list == null || list.isEmpty) continue;
+      final list = byDay[dateKey(day)] ?? const <CalendarEvent>[];
+      final people = overlay[dateKey(day)] ?? const <EventOccurrence>[];
+      if (list.isEmpty && people.isEmpty) continue;
       out
         ..add(
           Padding(
@@ -220,6 +249,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               child: EventTile(
                 event: e,
                 onTap: () => context.push('/calendar/${e.id}'),
+              ),
+            ),
+          for (final o in people)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: PersonOccurrenceTile(
+                occurrence: o,
+                onTap: () => context.push('/people/${o.personId}'),
               ),
             ),
         ]);
@@ -298,6 +335,7 @@ class MonthGrid extends StatelessWidget {
     required this.selected,
     required this.today,
     required this.byDay,
+    this.overlay = const {},
     required this.onSelect,
   });
 
@@ -305,6 +343,9 @@ class MonthGrid extends StatelessWidget {
   final DateTime selected;
   final DateTime today;
   final Map<String, List<CalendarEvent>> byDay;
+
+  /// Birthdays / important dates of People by day key (read-only dots).
+  final Map<String, List<EventOccurrence>> overlay;
   final ValueChanged<DateTime> onSelect;
 
   @override
@@ -346,6 +387,9 @@ class MonthGrid extends StatelessWidget {
                       events:
                           byDay[dateKey(days[w * 7 + d])] ??
                           const <CalendarEvent>[],
+                      people:
+                          overlay[dateKey(days[w * 7 + d])] ??
+                          const <EventOccurrence>[],
                       onTap: () => onSelect(days[w * 7 + d]),
                     ),
                   ),
@@ -364,6 +408,7 @@ class _DayCell extends StatelessWidget {
     required this.isToday,
     required this.isSelected,
     required this.events,
+    this.people = const [],
     required this.onTap,
   });
 
@@ -372,6 +417,7 @@ class _DayCell extends StatelessWidget {
   final bool isToday;
   final bool isSelected;
   final List<CalendarEvent> events;
+  final List<EventOccurrence> people;
   final VoidCallback onTap;
 
   @override
@@ -387,7 +433,7 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: '${Fmt.dateFull(day)}, ${events.length} acara',
+      label: '${Fmt.dateFull(day)}, ${events.length + people.length} acara',
       child: InkWell(
         key: ValueKey('cal-day-${dateKey(day)}'),
         onTap: onTap,
@@ -432,6 +478,26 @@ class _DayCell extends StatelessWidget {
                           color: CategoryColors.parse(
                             e.displayColor,
                           ).withValues(alpha: inMonth ? 1 : 0.4),
+                        ),
+                      ),
+                    // People's birthdays / dates: pink dots after the events.
+                    for (
+                      var i = 0;
+                      i < people.length && events.length + i < 3;
+                      i++
+                    )
+                      Container(
+                        key: i == 0
+                            ? ValueKey('cal-people-${dateKey(day)}')
+                            : null,
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: GhinaColors.pink.base.withValues(
+                            alpha: inMonth ? 1 : 0.4,
+                          ),
                         ),
                       ),
                   ],
@@ -534,6 +600,65 @@ class EventTile extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: g.textMuted),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A birthday / important date of a person on the calendar — read-only (the
+/// overlay never creates events); a tap opens the person.
+class PersonOccurrenceTile extends StatelessWidget {
+  const PersonOccurrenceTile({super.key, required this.occurrence, this.onTap});
+
+  final EventOccurrence occurrence;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    final o = occurrence;
+    return ChunkySurface(
+      key: ValueKey('cal-person-${o.dateId ?? o.personId}-${o.dateKey}'),
+      color: g.surface,
+      edgeColor: g.borderEdge,
+      borderColor: g.border,
+      depth: GhinaDepth.sm,
+      borderRadius: GhinaRadii.rLg,
+      onTap: onTap,
+      semanticLabel: occurrenceTitle(o),
+      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 40,
+            decoration: BoxDecoration(
+              color: GhinaColors.pink.base,
+              borderRadius: GhinaRadii.rPill,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  occurrenceTitle(o),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GhinaType.h3.copyWith(color: g.textPrimary),
+                ),
+                Text(
+                  occurrenceSubtitle(o),
+                  style: GhinaType.bodyS
+                      .w(700)
+                      .copyWith(color: g.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: g.textMuted),
+        ],
       ),
     );
   }

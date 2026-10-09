@@ -7,6 +7,7 @@ import 'package:drift/drift.dart';
 
 import '../../domain/entities/entities.dart';
 import '../datasources/local/app_database.dart';
+import 'habits_investments_mappers.dart' show decodeStringList;
 
 extension WalletRowX on WalletRow {
   /// [pendingDelta] = effect of unsynced transaction mutations on this wallet.
@@ -272,7 +273,11 @@ extension FoodRowX on FoodRow {
     date: date,
     name: name,
     meal: MealType.fromWire(meal),
+    // The column holds free text: anything that isn't canonical is a label.
+    mealLabel: meal != null && MealType.fromWire(meal) == null ? meal : null,
     calories: calories,
+    caloriesMax: caloriesMax,
+    tags: decodeStringList(tags),
     photoUrl: photoUrl,
     localPhotoPath: localPhotoPath,
     note: note,
@@ -286,8 +291,10 @@ extension FoodX on FoodLog {
     id: id,
     date: date,
     name: name,
-    meal: Value(meal?.wire),
+    meal: Value(meal?.wire ?? mealLabel),
     calories: Value(calories),
+    caloriesMax: Value(caloriesMax),
+    tags: Value(jsonEncode(tags)),
     photoUrl: Value(photoUrl),
     localPhotoPath: Value(localPhotoPath),
     note: Value(note),

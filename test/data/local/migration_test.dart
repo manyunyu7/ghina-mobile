@@ -15,6 +15,7 @@ import 'package:ghina/data/models/agenda_wire.dart';
 import 'package:ghina/data/models/habits_investments_mappers.dart';
 import 'package:ghina/data/models/mappers.dart';
 import 'package:ghina/data/models/notes_content_mappers.dart';
+import 'package:ghina/data/models/people_wire.dart';
 import 'package:ghina/domain/entities/entities.dart';
 
 import 'generated_migrations/schema.dart';
@@ -23,6 +24,7 @@ import 'generated_migrations/schema_v2.dart' as v2;
 import 'generated_migrations/schema_v3.dart' as v3;
 import 'generated_migrations/schema_v4.dart' as v4;
 import 'generated_migrations/schema_v6.dart' as v6;
+import 'generated_migrations/schema_v7.dart' as v7;
 
 void main() {
   late SchemaVerifier verifier;
@@ -121,6 +123,197 @@ void main() {
     final schema = await verifier.schemaAt(7);
     final db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, 7);
+    await db.close();
+  });
+
+  for (final from in [1, 2, 3, 4, 5, 6, 7]) {
+    test('upgrade v$from → v8 yields exactly the v8 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 8);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v8 schema', () async {
+    final schema = await verifier.schemaAt(8);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 8);
+    await db.close();
+  });
+
+  test('v7 data survives v7 → v8 on a real file; people and enrichment '
+      'columns are created and a full pull is scheduled', () async {
+    final dir = await Directory.systemTemp.createTemp('ghina_migration_v8');
+    final file = File('${dir.path}/ghina.sqlite');
+    addTearDown(() => dir.delete(recursive: true));
+
+    // 1. A v7 database like the one on the phone: habits, a log, food and a
+    //    pending outbox entry; the cursor says "everything up to now is pulled".
+    final old = v7.DatabaseAtV7(NativeDatabase(file));
+    for (final sql in [
+      "INSERT INTO habits (id, name, color, kind, schedule, target, reminders, is_private, start_date, archived, sort_order, created_at, updated_at) "
+          "VALUES ('h1', 'Berhenti begadang', '#58CC02', 'quit', '{\"type\":\"daily\"}', '{\"type\":\"check\"}', '[]', 0, '2026-07-01', 0, 0, 1, 1)",
+      "INSERT INTO habit_logs (id, habit_id, date, type, value, triggers, created_at, updated_at) "
+          "VALUES ('l1', 'h1', '2026-10-01', 'relapse', 1, '[\"bosan\"]', 1, 1)",
+      "INSERT INTO food (id, date, name, meal, calories, created_at, updated_at) "
+          "VALUES ('f1', 1000, 'Soto', 'makan malam', 450, 1, 1)",
+      "INSERT INTO outbox (mutation_id, entity, op, entity_id, data, is_create, in_flight, client_updated_at) "
+          "VALUES ('m1', 'habits', 'upsert', 'h1', '{\"name\":\"Berhenti begadang\"}', 0, 0, 2000)",
+      "INSERT INTO sync_meta (id, cursor, epoch, user_id, full_pull_required) "
+          "VALUES (1, 1790000000000, 'epoch-1', 'u1', 0)",
+    ]) {
+      await old.customStatement(sql);
+    }
+    await old.close();
+
+    // 2. Open with the current app → onUpgrade(7, 8).
+    final db = AppDatabase(NativeDatabase(file));
+    final h = await db.select(db.habits).getSingle();
+    expect(h.name, 'Berhenti begadang');
+    expect(h.tools, '[]');
+    expect(h.hasNotes, isFalse);
+    expect(h.notesLength, 0);
+    expect(h.toEntity().tools, isEmpty);
+    final l = await db.select(db.habitLogs).getSingle();
+    expect(l.extra, '{}');
+    expect(l.toEntityOrNull()!.extra, isEmpty);
+    final f = await db.select(db.food).getSingle();
+    expect(f.tags, '[]');
+    expect(f.caloriesMax, isNull);
+    // The free-text meal of a v7 row is a label, not lost.
+    final food = f.toEntity();
+    expect(food.meal, isNull);
+    expect(food.mealLabel, 'makan malam');
+    expect((await db.select(db.outbox).getSingle()).entityId, 'h1');
+
+    // The v7 app skipped people / dates / dimensions / events and the new
+    // keys: the migration forces a full re-pull like v7 did, keeps the cursor
+    // and the enrichment flag is still off.
+    final meta = await db.getMeta();
+    expect(meta.fullPullRequired, isTrue);
+    expect(meta.cursor, 1790000000000);
+    expect(meta.enrichmentSeen, isFalse);
+
+    // The six new tables exist, are empty, writable and part of the wipe.
+    for (final t in <TableInfo<Table, dynamic>>[
+      db.people,
+      db.personCategories,
+      db.personFields,
+      db.personDates,
+      db.habitFields,
+      db.habitEvents,
+    ]) {
+      expect(await db.select(t).get(), isEmpty);
+      expect(db.syncedTables, contains(t));
+    }
+    final now = DateTime(2026, 10, 10, 9);
+    await db
+        .into(db.people)
+        .insert(
+          Person(
+            id: 'p1',
+            name: 'Siti Sample',
+            category: 'family',
+            vibe: PersonVibe.positive,
+            birthMonth: 2,
+            birthDay: 29,
+            tags: const ['inti'],
+            fields: const {'ukuran_sepatu': 38, 'hobi': 'berkebun'},
+            hasNotes: true,
+            notesLength: 35,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    final p = (await db.select(db.people).getSingle()).toEntity();
+    expect(p.fields, {'ukuran_sepatu': 38, 'hobi': 'berkebun'});
+    expect(p.tags, ['inti']);
+    expect(p.hasNotes, isTrue);
+    expect(p.hasBirthday, isTrue);
+    await db
+        .into(db.personCategories)
+        .insert(
+          PersonCategory(
+            id: 'pc1',
+            key: 'family',
+            label: 'Keluarga',
+            emoji: '👨‍👩‍👧',
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.personFields)
+        .insert(
+          PersonFieldDef(
+            id: 'pf1',
+            key: 'ukuran_sepatu',
+            label: 'Ukuran sepatu',
+            type: PersonFieldType.number,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.personDates)
+        .insert(
+          PersonDate(
+            id: 'pd1',
+            personId: 'p1',
+            label: 'Hari jadi',
+            kind: PersonDateKind.anniversary,
+            month: 6,
+            day: 12,
+            remindDaysBefore: 7,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.habitFields)
+        .insert(
+          HabitFieldDef(
+            id: 'hf1',
+            key: 'tingkat_stres',
+            label: 'Tingkat stres',
+            type: HabitFieldType.scale,
+            min: 1,
+            max: 10,
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    await db
+        .into(db.habitEvents)
+        .insert(
+          HabitEvent(
+            id: 'he1',
+            habitId: 'h1',
+            date: '2026-09-15',
+            kind: HabitEventKind.event,
+            label: 'Lembur proyek contoh',
+            extra: const {'tingkat_stres': 6},
+            createdAt: now,
+            updatedAt: now,
+          ).toCompanion(),
+        );
+    expect(
+      (await db.select(db.habitFields).getSingle()).toEntityOrNull()!.max,
+      10,
+    );
+    expect(
+      (await db.select(db.habitEvents).getSingle()).toEntityOrNull()!.extra,
+      {'tingkat_stres': 6},
+    );
+    expect(
+      (await db.select(db.personDates).getSingle()).toEntity().kind,
+      PersonDateKind.anniversary,
+    );
+
+    await db.wipe();
+    expect(await db.select(db.people).get(), isEmpty);
+    expect(await db.select(db.habitEvents).get(), isEmpty);
     await db.close();
   });
 

@@ -485,3 +485,41 @@ ones: `...habitsInvestmentsFakeOverrides()` (`test/di/habits_investments_test_ov
   tests) and `killaMediaPickerProvider`. They **throw** `KillaException` (`kind`: forbidden,
   engineOff, timeout, tooLarge, unsupported, network, …; `message` is Indonesian) instead of
   returning `Result`.
+
+## People (Orang) & habit enrichment API (`docs/people.md`, `docs/habits-food-enrichment.md`)
+
+Offline-first like everything else, except the **notes**, which are online-only. Providers live in
+`di/people_providers.dart` (exported by `di/di.dart`); types come from `domain/entities/entities.dart`
+(`people.dart`, `habit_enrichment.dart`), rules/inputs from `domain/usecases/usecases.dart`
+(`people_rules.dart`, `people_usecases.dart`). `people_rules.dart` is a port of `src/lib/people.ts`
+(messages in Indonesian, same limits).
+
+| Provider | Value |
+|---|---|
+| `watchPeopleOverviewProvider` | `PeopleOverview`: `people` (by name), `categories`, `defs`, `dates`. Filter/group in memory with `groupPeople(people, categories, defs:, query:, tag:)`, `allTags(people)`, `personMatches` |
+| `watchPersonDetailProvider(id)` | `PersonDetail?`: `person`, `category`, `defs` (those applying to the category), `dates` |
+| `watchPersonCategoriesProvider` / `watchPersonFieldsProvider` | `List<PersonCategory>` / `List<PersonFieldDef>` in order |
+| `watchUpcomingPeopleProvider` | `List<UpcomingEvent>` for the next 60 days (birthdays + important dates; `yearsSince` is null when the year is unknown) |
+| `watchPeopleEventsInRangeProvider((from:, to:))` | `List<EventOccurrence>` — the read-only calendar overlay (`occurrencesByDay`), never stored as events |
+
+| Write | Notes |
+|---|---|
+| `savePersonProvider(id:, input: PersonInput, dates: [PersonDateInput])` → `Person` | create/update + diff of the important dates in one unit of work. Errors carry `field` (name, birthday, category, tags, fields, label, date, remindDaysBefore…). The stored `hasNotes`/`notesLength` mirrors are kept |
+| `deletePersonProvider(id)` | also deletes its dates |
+| `createPersonCategoryProvider(label:, emoji:)`, `updatePersonCategoryProvider(id, label:, emoji:)`, `reorderPersonCategoriesProvider(ids)` | the `key` is a slug of the label and never changes |
+| `createPersonFieldProvider(PersonFieldInput(label, type, options, appliesTo, showInList))`, `updatePersonFieldProvider(id, label:, appliesTo:, showInList:)`, `reorderPersonFieldsProvider(ids)` | no retype/delete in the app (destructive) |
+| `getPersonNotesProvider(id)` → `PersonNotes(notes, updatedAt)` | `GET /api/mobile/people/{id}`; call it only when the notes are about to be shown (a `sensitive` person: on tap) |
+| `replacePersonNotesProvider(id, text, expectedUpdatedAt:)`, `appendPersonNotesProvider(id, text, heading:)` | `ConflictFailure` (Indonesian message) when the notes changed elsewhere; success re-stamps a queued edit of the person and syncs |
+
+Pure helpers: `upcomingEvents`, `eventsInRange`, `nextAnnualOccurrence`, `birthdayInYear` (Feb 29 →
+Feb 28 in common years), `birthdayError`, `formatBirthday`, `computePeopleReminders`, `peopleRoute(id)`.
+Local notifications (09:00 on the day, plus `remindDaysBefore`) are merged into
+`watchRemindersUseCaseProvider` (shared cap of 60, keys `person:birthday:<id>:<yyyymmdd>` /
+`person:date:<id>:<yyyymmdd>[:b<n>]`, route `/people/<id>`).
+
+Habit enrichment (phase A: data layer only, no screens yet): `Habit.tools` (`HabitTool`),
+`HabitLog.extra`, `HabitFieldDef`, `HabitEvent` with `habitFieldRepositoryProvider` /
+`habitEventRepositoryProvider` (in `core_providers.dart`); `FoodLog.caloriesMax`, `tags`, `mealLabel`
+(`FoodInput` null = keep on update). Tests that override repositories with fakes and watch the
+calendar or the reminders also need `...peopleFakeOverrides()` (`test/di/people_test_overrides.dart`).
+

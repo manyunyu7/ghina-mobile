@@ -7,6 +7,7 @@ import '../../core/dates.dart';
 import '../entities/entities.dart';
 
 export 'killa_repository.dart';
+export 'people_notes_repository.dart';
 
 /// Runs several repository calls atomically (one local DB transaction).
 abstract interface class UnitOfWork {
@@ -417,5 +418,71 @@ abstract interface class CalendarEventRepository {
   Stream<CalendarEvent?> watchById(String id);
   Future<CalendarEvent?> getById(String id);
   Future<void> save(CalendarEvent event);
+  Future<void> delete(String id);
+}
+
+/// Synced people (`docs/people.md`). No notes: see [PeopleNotesRepository].
+abstract interface class PersonRepository {
+  /// Every person, sorted by name (case-insensitive).
+  Stream<List<Person>> watchAll();
+  Future<List<Person>> getAll();
+  Stream<Person?> watchById(String id);
+  Future<Person?> getById(String id);
+
+  /// Saves the metadata (the stored `hasNotes`/`notesLength` mirrors are kept
+  /// by the entity) and queues the upsert — notes never travel.
+  Future<void> save(Person person);
+
+  /// Deletes the person and (cascade, like the server) its important dates.
+  Future<void> delete(String id);
+
+  /// Re-stamps a pending (not yet pushed) edit of the person with the current
+  /// time. A notes write moves the server row's `updatedAt` forward, which
+  /// would otherwise make a queued metadata edit lose last-write-wins.
+  Future<void> refreshPending(String id);
+}
+
+abstract interface class PersonCategoryRepository {
+  /// By `sortOrder`, then label.
+  Stream<List<PersonCategory>> watchAll();
+  Future<List<PersonCategory>> getAll();
+  Future<PersonCategory?> getById(String id);
+  Future<void> save(PersonCategory category);
+}
+
+abstract interface class PersonFieldRepository {
+  /// By `sortOrder`, then label.
+  Stream<List<PersonFieldDef>> watchAll();
+  Future<List<PersonFieldDef>> getAll();
+  Future<PersonFieldDef?> getById(String id);
+  Future<void> save(PersonFieldDef def);
+}
+
+abstract interface class PersonDateRepository {
+  /// Every important date of every person (calendar, notifications).
+  Stream<List<PersonDate>> watchAll();
+  Future<List<PersonDate>> getAll();
+  Stream<List<PersonDate>> watchForPerson(String personId);
+  Future<List<PersonDate>> getForPerson(String personId);
+  Future<PersonDate?> getById(String id);
+  Future<void> save(PersonDate date);
+  Future<void> delete(String id);
+}
+
+/// Habit dimensions (`docs/habits-food-enrichment.md`).
+abstract interface class HabitFieldRepository {
+  Stream<List<HabitFieldDef>> watchAll();
+  Future<List<HabitFieldDef>> getAll();
+  Future<HabitFieldDef?> getById(String id);
+  Future<void> save(HabitFieldDef def);
+}
+
+/// Habit journal days, milestones and neutral events.
+abstract interface class HabitEventRepository {
+  /// Newest first; optionally of one habit.
+  Stream<List<HabitEvent>> watch({String? habitId});
+  Future<List<HabitEvent>> getAll({String? habitId});
+  Future<HabitEvent?> getById(String id);
+  Future<void> save(HabitEvent event);
   Future<void> delete(String id);
 }

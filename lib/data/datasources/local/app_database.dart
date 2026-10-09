@@ -33,6 +33,12 @@ part 'app_database.g.dart';
     AssetTrades,
     ReminderItems,
     CalendarEvents,
+    People,
+    PersonCategories,
+    PersonFields,
+    PersonDates,
+    HabitFields,
+    HabitEvents,
     CachedPrices,
     PortfolioSnapshots,
     CapturedNotifications,
@@ -69,13 +75,17 @@ class AppDatabase extends _$AppDatabase {
   /// ("Log Notifikasi", Android).
   /// v7: `reminder_items` + `calendar_events` (synced, docs/mobile-sync.md
   /// "Reminders" / "Calendar events").
+  /// v8: people (`people`, `person_categories`, `person_fields`,
+  /// `person_dates`) and habit enrichment (`habit_fields`, `habit_events`,
+  /// `habits.tools/hasNotes/notesLength`, `habit_logs.extra`,
+  /// `food.caloriesMax/tags`, `sync_meta.enrichment_seen`).
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -127,8 +137,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5 && to >= 5) {
         // Additive only: four synced tables + two device-only ones.
-        await m.createTable(habits);
-        await m.createTable(habitLogs);
+        // Created in their v5 shape (not `createTable`, which would use the
+        // current definition): the v8 step below adds the later columns, so a
+        // v1…v4 upgrade ends up identical to a v5 one.
+        await customStatement(_habitsV5);
+        await customStatement(_habitLogsV5);
         await m.createTable(assets);
         await m.createTable(assetTrades);
         await m.createTable(cachedPrices);
@@ -162,11 +175,39 @@ class AppDatabase extends _$AppDatabase {
         await m.createIndex(idxEventStart);
         await customStatement('UPDATE sync_meta SET full_pull_required = 1');
       }
+      if (from < 8 && to >= 8) {
+        // Additive only: six synced tables and new columns with defaults. The
+        // v7 app pulled past people/dates/fields/events and the enrichment
+        // keys without storing them: re-download everything once (pending
+        // outbox rows still win), exactly like v7.
+        await m.addColumn(habits, habits.tools);
+        await m.addColumn(habits, habits.hasNotes);
+        await m.addColumn(habits, habits.notesLength);
+        await m.addColumn(habitLogs, habitLogs.extra);
+        await m.addColumn(food, food.caloriesMax);
+        await m.addColumn(food, food.tags);
+        await m.addColumn(syncMeta, syncMeta.enrichmentSeen);
+        await m.createTable(people);
+        await m.createTable(personCategories);
+        await m.createTable(personFields);
+        await m.createTable(personDates);
+        await m.createTable(habitFields);
+        await m.createTable(habitEvents);
+        await m.createIndex(idxPersonCategory);
+        await m.createIndex(idxPersonDatePerson);
+        await m.createIndex(idxHabitEventHabit);
+        await customStatement('UPDATE sync_meta SET full_pull_required = 1');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = OFF');
     },
   );
+
+  static const _habitsV5 =
+      'CREATE TABLE "habits" ("created_at" INTEGER NOT NULL, "updated_at" INTEGER NOT NULL, "id" TEXT NOT NULL, "name" TEXT NOT NULL, "emoji" TEXT NULL, "color" TEXT NOT NULL DEFAULT \'#58CC02\', "kind" TEXT NOT NULL DEFAULT \'build\', "schedule" TEXT NOT NULL DEFAULT \'{"type":"daily"}\', "target" TEXT NOT NULL DEFAULT \'{"type":"check"}\', "reminders" TEXT NOT NULL DEFAULT \'[]\', "is_private" INTEGER NOT NULL DEFAULT 0 CHECK ("is_private" IN (0, 1)), "why" TEXT NULL, "start_date" TEXT NOT NULL, "archived" INTEGER NOT NULL DEFAULT 0 CHECK ("archived" IN (0, 1)), "sort_order" INTEGER NOT NULL DEFAULT 0, PRIMARY KEY ("id"))';
+  static const _habitLogsV5 =
+      'CREATE TABLE "habit_logs" ("created_at" INTEGER NOT NULL, "updated_at" INTEGER NOT NULL, "id" TEXT NOT NULL, "habit_id" TEXT NOT NULL, "date" TEXT NOT NULL, "type" TEXT NOT NULL, "value" REAL NULL, "note" TEXT NULL, "triggers" TEXT NOT NULL DEFAULT \'[]\', "at" INTEGER NULL, PRIMARY KEY ("id"), UNIQUE ("habit_id", "date", "type"))';
 
   /// The synced tables.
   List<TableInfo<Table, dynamic>> get syncedTables => [
@@ -193,6 +234,12 @@ class AppDatabase extends _$AppDatabase {
     assetTrades,
     reminderItems,
     calendarEvents,
+    people,
+    personCategories,
+    personFields,
+    personDates,
+    habitFields,
+    habitEvents,
   ];
 
   /// Device-only tables derived from the user's data (wiped with it).

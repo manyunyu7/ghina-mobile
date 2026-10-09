@@ -177,6 +177,25 @@ const kAppMenu = <AppMenuItem>[
     group: AppMenuGroup.life,
     synonyms: ['food', 'makan', 'kalori', 'diet', 'catatan makan'],
   ),
+  AppMenuItem(
+    label: 'Orang',
+    icon: Icons.people_alt_rounded,
+    color: GhinaColors.pink,
+    path: '/people',
+    group: AppMenuGroup.life,
+    longPressPath: '/people/new',
+    synonyms: [
+      'kontak',
+      'contact',
+      'teman',
+      'keluarga',
+      'relasi',
+      'ulang tahun',
+      'birthday',
+      'ultah',
+      'people',
+    ],
+  ),
   // ---- PRODUKTIF
   AppMenuItem(
     label: 'Tugas',

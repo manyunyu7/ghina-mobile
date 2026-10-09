@@ -213,7 +213,7 @@ void main() {
             'Investasi',
             'Kategori',
           ],
-          ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan'],
+          ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan', 'Orang'],
           ['Tugas', 'Catatan', 'Konten', 'Pengingat', 'Kalender', 'Killa'],
           [
             'Belajar',
@@ -234,7 +234,13 @@ void main() {
       }
       expect(labels('anggaran'), ['Budget']);
       expect(labels('lapor'), ['Laporan']);
-      expect(labels('hidup'), ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan']);
+      expect(labels('hidup'), [
+        'Sholat',
+        'Kebiasaan',
+        'Kesehatan',
+        'Makanan',
+        'Orang',
+      ]);
       expect(labels('xyzzy'), isEmpty);
       // Word prefixes first ("sa" → saldo, saham, salat) …
       expect(labels('sa'), ['Dompet', 'Investasi', 'Sholat']);

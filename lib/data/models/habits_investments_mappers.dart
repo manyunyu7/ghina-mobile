@@ -7,6 +7,8 @@ import 'package:drift/drift.dart';
 
 import '../../domain/entities/entities.dart';
 import '../datasources/local/app_database.dart';
+import 'habits_investments_wire.dart'
+    show habitToolsFromJson, scalarMapFromJson;
 
 Object? _json(String? s) {
   if (s == null || s.isEmpty) return null;
@@ -43,6 +45,9 @@ extension HabitRowX on HabitRow {
     startDate: startDate,
     archived: archived,
     sortOrder: sortOrder,
+    tools: habitToolsFromJson(tools),
+    hasNotes: hasNotes,
+    notesLength: notesLength,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
@@ -63,6 +68,9 @@ extension HabitX on Habit {
     startDate: startDate,
     archived: Value(archived),
     sortOrder: Value(sortOrder),
+    tools: Value(jsonEncode([for (final t in tools) t.toJson()])),
+    hasNotes: Value(hasNotes),
+    notesLength: Value(notesLength),
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
@@ -82,6 +90,7 @@ extension HabitLogRowX on HabitLogRow {
       note: note,
       triggers: decodeStringList(triggers),
       at: at,
+      extra: scalarMapFromJson(extra),
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -98,6 +107,7 @@ extension HabitLogX on HabitLog {
     note: Value(note),
     triggers: Value(jsonEncode(triggers)),
     at: Value(at),
+    extra: Value(jsonEncode(extra)),
     createdAt: createdAt,
     updatedAt: updatedAt,
   );

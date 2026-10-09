@@ -159,8 +159,10 @@ Json healthToWire(HealthEntry h) => {
 Json foodToWire(FoodLog f) => {
   'date': isoUtc(f.date),
   'name': f.name,
-  'meal': f.meal?.wire,
+  'meal': f.meal?.wire ?? f.mealLabel,
   'calories': f.calories,
+  'caloriesMax': f.caloriesMax,
+  'tags': f.tags,
   'photoUrl': f.photoUrl,
   'note': f.note,
 };
@@ -370,12 +372,31 @@ FoodCompanion foodFromWire(Json j) => FoodCompanion(
   name: Value(j['name'] as String),
   meal: Value(_strN(j['meal'])),
   calories: Value(_intN(j['calories'])),
+  caloriesMax: Value(_intN(j['caloriesMax'])),
+  tags: Value(jsonEncode(foodTagsFromJson(j['tags']))),
   photoUrl: Value(_strN(j['photoUrl'])),
   localPhotoPath: const Value(null),
   note: Value(_strN(j['note'])),
   createdAt: _created(j),
   updatedAt: _updated(j),
 );
+
+/// `food.tags`: strings only (lenient pull).
+List<String> foodTagsFromJson(Object? raw) {
+  Object? x = raw;
+  if (x is String) {
+    try {
+      x = jsonDecode(x);
+    } catch (_) {
+      return const [];
+    }
+  }
+  if (x is! List) return const [];
+  return [
+    for (final e in x)
+      if (e is String && e.isNotEmpty) e,
+  ];
+}
 
 /// Pulled row → companion for [entity].
 Insertable<dynamic> companionFromWire(String entity, Json j) =>

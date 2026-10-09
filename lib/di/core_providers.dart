@@ -29,6 +29,8 @@ import '../data/repositories/life_repositories.dart';
 import '../data/repositories/local_store.dart';
 import '../data/repositories/notes_repositories.dart';
 import '../data/repositories/notification_log_repositories.dart';
+import '../data/repositories/people_notes_repository_impl.dart';
+import '../data/repositories/people_repositories.dart';
 import '../data/repositories/photo_store.dart';
 import '../data/repositories/task_repositories.dart';
 import '../data/sync/outbox.dart';
@@ -251,4 +253,28 @@ final reminderItemRepositoryProvider = Provider<ReminderItemRepository>(
 );
 final calendarEventRepositoryProvider = Provider<CalendarEventRepository>(
   (ref) => DriftCalendarEventRepository(ref.watch(localStoreProvider)),
+);
+final personRepositoryProvider = Provider<PersonRepository>(
+  (ref) => DriftPersonRepository(ref.watch(localStoreProvider)),
+);
+final personCategoryRepositoryProvider = Provider<PersonCategoryRepository>(
+  (ref) => DriftPersonCategoryRepository(ref.watch(localStoreProvider)),
+);
+final personFieldRepositoryProvider = Provider<PersonFieldRepository>(
+  (ref) => DriftPersonFieldRepository(ref.watch(localStoreProvider)),
+);
+final personDateRepositoryProvider = Provider<PersonDateRepository>(
+  (ref) => DriftPersonDateRepository(ref.watch(localStoreProvider)),
+);
+final habitFieldRepositoryProvider = Provider<HabitFieldRepository>(
+  (ref) => DriftHabitFieldRepository(ref.watch(localStoreProvider)),
+);
+final habitEventRepositoryProvider = Provider<HabitEventRepository>(
+  (ref) => DriftHabitEventRepository(ref.watch(localStoreProvider)),
+);
+
+/// The online-only People notes (`/api/mobile/people/{id}[/notes]`); tests
+/// override it with a fake.
+final peopleNotesRepositoryProvider = Provider<PeopleNotesRepository>(
+  (ref) => ApiPeopleNotesRepository(ref.watch(apiClientProvider)),
 );

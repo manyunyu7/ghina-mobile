@@ -240,6 +240,8 @@ class HabitsInvestmentsSync {
           ].take(10).toList(),
           note: server.note ?? local.note,
           at: at,
+          // Dimensions: ours fill what the server's row doesn't have.
+          extra: {...local.extra, ...server.extra},
           updatedAt: _clock.now(),
         );
         if (merged == server) continue;

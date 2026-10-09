@@ -269,7 +269,7 @@ class Outbox {
         await (_db.update(_db.outbox)
               ..where((o) => o.seq.isIn(rows.map((r) => r.seq))))
             .write(const OutboxCompanion(inFlight: Value(true)));
-        int rank(OutboxRow r) {
+        num rank(OutboxRow r) {
           if (r.op != MutationOp.upsert.name) {
             return switch (r.entity) {
               // Unique keys (label name, area code, budget/prayer slot): a
@@ -300,6 +300,17 @@ class Outbox {
             SyncEntity.notes => 5,
             // Logs need their habit; trades their asset and cash transaction.
             SyncEntity.habitLogs || SyncEntity.assetTrades => 5,
+            // Habit fields need their habit (rank 4) and must precede the logs
+            // and events that use them (rank 5).
+            SyncEntity.habitFields => 4.5,
+            SyncEntity.habitEvents => 5,
+            // People: a person needs its category and the defs of its custom
+            // fields, a date needs its person. Fixed ranks (not queue order):
+            // re-saving a category moves its entry to the end of the queue.
+            SyncEntity.personCategories => 4.1,
+            SyncEntity.personFields => 4.2,
+            SyncEntity.people => 4.3,
+            SyncEntity.personDates => 4.4,
             SyncEntity.contentItems => 6,
             SyncEntity.contentPosts => 7,
             // After the items: a rename renames the pillar on the server's

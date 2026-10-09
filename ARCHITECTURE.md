@@ -116,6 +116,10 @@ Pushed routes (full screen, outside the shell):
 notification at each `dueAt` via `WatchReminders`), `/calendar`, `/calendar/new?date=`,
 `/calendar/:id` ("Kalender", synced `calendarEvents`; all-day dates are read from the ISO date
 part, never converted to local time),
+`/people`, `/people/new`, `/people/manage`, `/people/:id`, `/people/:id/edit` ("Orang", synced
+`people` / `personCategories` / `personFields` / `personDates`, `../docs/people.md`; the markdown
+**notes are online-only**, fetched with `GET /api/mobile/people/{id}` and never stored; birthdays
+and important dates notify at 09:00 through the existing scheduler and show read-only on `/calendar`),
 `/killa`, `/killa/files?path=`, `/killa/file?path=`, `/killa/commits`, `/killa/reminders`,
 `/killa/usage` (Killa, `../docs/killa.md` — **online-only**, not in sync: `KillaApi` in
 `data/datasources/remote/`, errors are `KillaException`s; a 403 locks the screens and hides the
@@ -147,3 +151,29 @@ sign out, reset local data).
 - Respect the dependency rule; `domain/` must compile without Flutter.
 - `flutter analyze` must be clean for your files; add tests for logic.
 - No network calls outside `data/datasources/remote/`. Screens use use cases (via `di/` providers) and `presentation/state/` only — never repositories or drift directly.
+
+## People & habit enrichment (schema v8)
+
+Drift v8 adds `people`, `person_categories`, `person_fields` (definitions), `person_dates`,
+`habit_fields`, `habit_events` and the columns `habits.tools / has_notes / notes_length`,
+`habit_logs.extra`, `food.calories_max / tags`, `sync_meta.enrichment_seen`. The v7 → v8 upgrade
+forces one full re-pull (like v7) so rows the old app skipped are downloaded. Pieces, in the usual
+layers: `domain/entities/people.dart` + `habit_enrichment.dart`; the Dart port of `src/lib/people.ts`
+in `domain/usecases/people_rules.dart` (birthday / next occurrence incl. Feb 29 → Feb 28, partial
+birthdays, validation, custom-field typing, search, notification schedule); `people_usecases.dart`;
+`data/models/people_wire.dart`, `data/repositories/people_repositories.dart`,
+`data/sync/people_sync.dart` (+ cascades in `local_cascades.dart`); `di/people_providers.dart`;
+screens in `presentation/features/people/`.
+
+- Push order is enforced by **ranks** in `Outbox.takeBatch`, not by queue order (re-saving an entry
+  moves it to the end of the queue): personCategories → personFields → people → personDates, and
+  habits → habitFields → habitLogs / habitEvents. Deletes of the new entities go last.
+- Enrichment keys on existing rows (`tools`, `extra`, `caloriesMax`, `tags`) are left out of pushes
+  until a pull from an enrichment-aware server (one that sends `habitFields`) set
+  `sync_meta.enrichment_seen`, so an upgraded device that edits before its first re-pull can't wipe
+  the server's values ("absent = unchanged").
+- `FoodLog.meal` is the canonical `MealType?`; any other meal text (≤ 24) is `FoodLog.mealLabel`
+  and survives round trips.
+- Notes writes (`ReplacePersonNotes` / `AppendPersonNotes`) re-stamp a queued edit of the same
+  person so the server's moved `updatedAt` can't make it lose last-write-wins.
+

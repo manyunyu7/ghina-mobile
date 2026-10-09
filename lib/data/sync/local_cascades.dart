@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 
 import '../datasources/local/app_database.dart';
 import '../models/entity_names.dart';
+import '../models/habits_investments_wire.dart' show scalarMapFromJson;
 import '../models/notes_content_mappers.dart';
 import 'outbox.dart';
 
@@ -123,7 +124,8 @@ class LocalCascades {
 
   // ---------------------------------------------------------------- habits & investments
 
-  /// Habit deleted → its logs are deleted (the server tombstones them).
+  /// Habit deleted → its logs, events and habit-scoped field defs are deleted
+  /// (the server tombstones them).
   Future<void> habitDeleted(String habitId) async {
     final logs = await (_db.select(
       _db.habitLogs,
@@ -131,6 +133,84 @@ class LocalCascades {
     for (final l in logs) {
       await (_db.delete(_db.habitLogs)..where((x) => x.id.equals(l.id))).go();
       await _outbox.dropQueued(SyncEntity.habitLogs, l.id);
+    }
+    final events = await (_db.select(
+      _db.habitEvents,
+    )..where((e) => e.habitId.equals(habitId))).get();
+    for (final e in events) {
+      await (_db.delete(_db.habitEvents)..where((x) => x.id.equals(e.id))).go();
+      await _outbox.dropQueued(SyncEntity.habitEvents, e.id);
+    }
+    final fields = await (_db.select(
+      _db.habitFields,
+    )..where((f) => f.habitId.equals(habitId))).get();
+    for (final f in fields) {
+      await (_db.delete(_db.habitFields)..where((x) => x.id.equals(f.id))).go();
+      await _outbox.dropQueued(SyncEntity.habitFields, f.id);
+    }
+  }
+
+  /// Habit field def [key] deleted → the key is removed from every log's and
+  /// event's `extra` (the server updates those rows too, so they re-sync).
+  Future<void> habitFieldDeleted(String key) async {
+    for (final r in await _db.select(_db.habitLogs).get()) {
+      final extra = scalarMapFromJson(r.extra);
+      if (!extra.containsKey(key)) continue;
+      final next = {...extra}..remove(key);
+      await (_db.update(_db.habitLogs)..where((x) => x.id.equals(r.id))).write(
+        HabitLogsCompanion(extra: Value(jsonEncode(next))),
+      );
+      await _outbox.patchQueued(SyncEntity.habitLogs, r.id, {'extra': next});
+    }
+    for (final r in await _db.select(_db.habitEvents).get()) {
+      final extra = scalarMapFromJson(r.extra);
+      if (!extra.containsKey(key)) continue;
+      final next = {...extra}..remove(key);
+      await (_db.update(_db.habitEvents)..where((x) => x.id.equals(r.id)))
+          .write(HabitEventsCompanion(extra: Value(jsonEncode(next))));
+      await _outbox.patchQueued(SyncEntity.habitEvents, r.id, {'extra': next});
+    }
+  }
+
+  // ---------------------------------------------------------------- people
+
+  /// Person deleted → its important dates are deleted (the server tombstones
+  /// them).
+  Future<void> personDeleted(String personId) async {
+    final dates = await (_db.select(
+      _db.personDates,
+    )..where((d) => d.personId.equals(personId))).get();
+    for (final d in dates) {
+      await (_db.delete(_db.personDates)..where((x) => x.id.equals(d.id))).go();
+      await _outbox.dropQueued(SyncEntity.personDates, d.id);
+    }
+  }
+
+  /// Person category [key] deleted → its people move to `other` (the server
+  /// updates them too, so they re-sync).
+  Future<void> personCategoryDeleted(String key) async {
+    final rows = await (_db.select(
+      _db.people,
+    )..where((p) => p.category.equals(key))).get();
+    for (final r in rows) {
+      await (_db.update(_db.people)..where((x) => x.id.equals(r.id))).write(
+        const PeopleCompanion(category: Value('other')),
+      );
+      await _outbox.patchQueued(SyncEntity.people, r.id, {'category': 'other'});
+    }
+  }
+
+  /// Person field def [key] deleted → the key is removed from every person's
+  /// `fields` (the server updates those rows too, so they re-sync).
+  Future<void> personFieldDeleted(String key) async {
+    for (final r in await _db.select(_db.people).get()) {
+      final fields = scalarMapFromJson(r.fields);
+      if (!fields.containsKey(key)) continue;
+      final next = {...fields}..remove(key);
+      await (_db.update(_db.people)..where((x) => x.id.equals(r.id))).write(
+        PeopleCompanion(fields: Value(jsonEncode(next))),
+      );
+      await _outbox.patchQueued(SyncEntity.people, r.id, {'fields': next});
     }
   }
 

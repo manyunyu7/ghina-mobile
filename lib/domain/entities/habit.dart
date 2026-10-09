@@ -4,6 +4,7 @@ library;
 
 import 'dart:convert';
 
+import 'habit_enrichment.dart';
 import 'value_equality.dart';
 
 const _unset = Object();
@@ -248,6 +249,9 @@ final class Habit with ValueEquality {
     required this.startDate,
     this.archived = false,
     this.sortOrder = 0,
+    this.tools = const [],
+    this.hasNotes = false,
+    this.notesLength = 0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -283,6 +287,13 @@ final class Habit with ValueEquality {
   final String startDate;
   final bool archived;
   final int sortOrder;
+
+  /// Coping playbook for the urge screen (`docs/habits-food-enrichment.md`).
+  final List<HabitTool> tools;
+
+  /// Read-only server mirrors of the markdown notes (never pushed).
+  final bool hasNotes;
+  final int notesLength;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -309,6 +320,7 @@ final class Habit with ValueEquality {
     String? startDate,
     bool? archived,
     int? sortOrder,
+    List<HabitTool>? tools,
     DateTime? updatedAt,
   }) => Habit(
     id: id,
@@ -324,6 +336,9 @@ final class Habit with ValueEquality {
     startDate: startDate ?? this.startDate,
     archived: archived ?? this.archived,
     sortOrder: sortOrder ?? this.sortOrder,
+    tools: tools ?? this.tools,
+    hasNotes: hasNotes,
+    notesLength: notesLength,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -343,6 +358,9 @@ final class Habit with ValueEquality {
     startDate,
     archived,
     sortOrder,
+    tools,
+    hasNotes,
+    notesLength,
     createdAt,
     updatedAt,
   ];
@@ -401,6 +419,7 @@ final class HabitLog with ValueEquality {
     this.note,
     this.triggers = const [],
     this.at,
+    this.extra = const {},
     required this.createdAt,
     required this.updatedAt,
   });
@@ -424,6 +443,9 @@ final class HabitLog with ValueEquality {
 
   /// When it happened (relapse/urge time of day).
   final DateTime? at;
+
+  /// User-defined dimensions (`habitFields`): key → `String | num | bool`.
+  final Map<String, Object> extra;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -437,6 +459,7 @@ final class HabitLog with ValueEquality {
     Object? note = _unset,
     List<String>? triggers,
     Object? at = _unset,
+    Map<String, Object>? extra,
     DateTime? updatedAt,
   }) => HabitLog(
     id: id,
@@ -447,6 +470,7 @@ final class HabitLog with ValueEquality {
     note: identical(note, _unset) ? this.note : note as String?,
     triggers: triggers ?? this.triggers,
     at: identical(at, _unset) ? this.at : at as DateTime?,
+    extra: extra ?? this.extra,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -461,6 +485,7 @@ final class HabitLog with ValueEquality {
     note,
     triggers,
     at,
+    extra,
     createdAt,
     updatedAt,
   ];

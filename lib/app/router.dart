@@ -40,6 +40,10 @@ import '../presentation/features/prayers/pages/prayer_report_page.dart';
 import '../presentation/features/prayers/pages/prayers_page.dart';
 import '../presentation/features/profile/pages/achievements_page.dart';
 import '../presentation/features/profile/pages/profile_page.dart';
+import '../presentation/features/people/pages/people_manage_page.dart';
+import '../presentation/features/people/pages/people_page.dart';
+import '../presentation/features/people/pages/person_detail_page.dart';
+import '../presentation/features/people/pages/person_form_page.dart';
 import '../presentation/features/reminders/pages/reminder_form_page.dart';
 import '../presentation/features/reminders/pages/reminders_page.dart';
 import '../presentation/features/reports/pages/reports_page.dart';
@@ -267,6 +271,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/reminders',
         const RemindersPage(),
         (id) => ReminderFormPage(id: id),
+      ),
+      // Orang (docs/people.md): list, new, manage, detail, edit. The notes
+      // are online-only and live on the detail screen.
+      GoRoute(path: '/people', builder: (_, _) => const PeoplePage()),
+      GoRoute(path: '/people/new', builder: (_, _) => const PersonFormPage()),
+      GoRoute(
+        path: '/people/manage',
+        builder: (_, _) => const PeopleManagePage(),
+      ),
+      GoRoute(
+        path: '/people/:id',
+        builder: (_, s) => PersonDetailPage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/people/:id/edit',
+        builder: (_, s) => PersonFormPage(id: s.pathParameters['id']),
       ),
       GoRoute(path: '/calendar', builder: (_, _) => const CalendarPage()),
       GoRoute(
