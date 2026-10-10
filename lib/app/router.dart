@@ -40,6 +40,11 @@ import '../presentation/features/prayers/pages/prayer_report_page.dart';
 import '../presentation/features/prayers/pages/prayers_page.dart';
 import '../presentation/features/profile/pages/achievements_page.dart';
 import '../presentation/features/profile/pages/profile_page.dart';
+import '../presentation/features/dreams/dream_detail_page.dart';
+import '../presentation/features/dreams/dream_form_page.dart';
+import '../presentation/features/dreams/dream_manage_page.dart';
+import '../presentation/features/dreams/dream_review_page.dart';
+import '../presentation/features/dreams/dreams_page.dart';
 import '../presentation/features/people/pages/people_manage_page.dart';
 import '../presentation/features/people/pages/people_page.dart';
 import '../presentation/features/people/pages/person_detail_page.dart';
@@ -287,6 +292,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/people/:id/edit',
         builder: (_, s) => PersonFormPage(id: s.pathParameters['id']),
+      ),
+      // Mimpi (docs/dreams.md): the board / table / timeline list. Local first.
+      GoRoute(path: '/dreams', builder: (_, _) => const DreamsPage()),
+      GoRoute(path: '/dreams/new', builder: (_, _) => const DreamFormPage()),
+      GoRoute(
+        path: '/dreams/manage',
+        builder: (_, _) => const DreamManagePage(),
+      ),
+      GoRoute(
+        path: '/dreams/review',
+        builder: (_, _) => const DreamReviewPage(),
+      ),
+      GoRoute(
+        path: '/dreams/:id',
+        builder: (_, s) => DreamDetailPage(id: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/dreams/:id/edit',
+        builder: (_, s) => DreamFormPage(id: s.pathParameters['id']),
       ),
       GoRoute(path: '/calendar', builder: (_, _) => const CalendarPage()),
       GoRoute(

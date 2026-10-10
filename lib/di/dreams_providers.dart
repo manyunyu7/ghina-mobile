@@ -193,3 +193,49 @@ final recordDreamManualValueOnlineProvider =
         ref.watch(dreamOnlineRepositoryProvider),
       ),
     );
+
+/// Metrics of every dream by dream id (the local "last update" of a dream).
+final watchDreamMetricsProvider =
+    StreamProvider.autoDispose<Map<String, List<DreamMetric>>>(
+      (ref) => WatchDreamMetrics(
+        ref.watch(dreamRepositoryProvider),
+        ref.watch(dreamMetricRepositoryProvider),
+      )(),
+    );
+
+// ================================================================ screens (phase C2)
+
+/// Steps of every dream by dream id (list cost and checklist progress).
+final watchDreamStepsProvider =
+    StreamProvider.autoDispose<Map<String, List<DreamStep>>>(
+      (ref) => WatchDreamSteps(
+        ref.watch(dreamRepositoryProvider),
+        ref.watch(dreamStepRepositoryProvider),
+      )(),
+    );
+
+/// `(ids)` — the category order of the manage screen.
+final reorderDreamCategoriesProvider = Provider<ReorderDreamCategories>(
+  (ref) => ReorderDreamCategories(
+    ref.watch(dreamCategoryRepositoryProvider),
+    ref.watch(unitOfWorkProvider),
+    ref.watch(clockProvider),
+  ),
+);
+
+/// `(ids)` — the custom-column order of the manage screen.
+final reorderDreamFieldsProvider = Provider<ReorderDreamFields>(
+  (ref) => ReorderDreamFields(
+    ref.watch(dreamFieldRepositoryProvider),
+    ref.watch(unitOfWorkProvider),
+    ref.watch(clockProvider),
+  ),
+);
+
+/// `(id)` → the server detail with computed metric values. Online only: a
+/// failure (offline, unauthorized) is the error state of the detail screen.
+final dreamOnlineDetailProvider = FutureProvider.autoDispose
+    .family<DreamDetail, String>(
+      (ref, id) async =>
+          (await ref.watch(getDreamDetailProvider)(id)).valueOrThrow,
+    );

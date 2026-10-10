@@ -10,6 +10,7 @@ import '../../../../domain/entities/entities.dart';
 import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../dreams/dream_calendar.dart';
 import '../../people/people_format.dart';
 import '../calendar_format.dart';
 
@@ -121,6 +122,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       ref.watch(watchPeopleEventsInRangeProvider(range)).value ??
           const <EventOccurrence>[],
     );
+    // Targets of open dreams, same idea (🎯).
+    final dreams = ref.watch(dreamTargetMarkersProvider(range));
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         GhinaSpace.page,
@@ -162,13 +165,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             today: today,
             byDay: byDay,
             overlay: overlay,
+            dreams: dreams,
             onSelect: _select,
           ),
           const SizedBox(height: 24),
           SectionHeader(
             title: dayTitle(_selected, today),
             subtitle: switch ((byDay[dateKey(_selected)]?.length ?? 0) +
-                (overlay[dateKey(_selected)]?.length ?? 0)) {
+                (overlay[dateKey(_selected)]?.length ?? 0) +
+                (dreams[dateKey(_selected)]?.length ?? 0)) {
               0 => 'Kosong',
               final n => '$n acara',
             },
@@ -176,9 +181,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           ..._dayEvents(
             byDay[dateKey(_selected)] ?? const [],
             overlay[dateKey(_selected)] ?? const [],
+            dreams[dateKey(_selected)] ?? const [],
           ),
         ] else
-          ..._agenda(events, byDay, overlay, today),
+          ..._agenda(events, byDay, overlay, dreams, today),
       ],
     );
   }
@@ -186,8 +192,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   List<Widget> _dayEvents(
     List<CalendarEvent> events,
     List<EventOccurrence> people,
+    List<DreamTargetMarker> dreams,
   ) {
-    if (events.isEmpty && people.isEmpty) {
+    if (events.isEmpty && people.isEmpty && dreams.isEmpty) {
       return [
         EmptyState(
           compact: true,
@@ -219,6 +226,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             onTap: () => context.push('/people/${o.personId}'),
           ),
         ),
+      for (final m in dreams)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: DreamTargetTile(
+            marker: m,
+            onTap: () => context.push('/dreams/${m.dreamId}'),
+          ),
+        ),
     ];
   }
 
@@ -227,6 +242,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     List<CalendarEvent> events,
     Map<String, List<CalendarEvent>> byDay,
     Map<String, List<EventOccurrence>> overlay,
+    Map<String, List<DreamTargetMarker>> dreams,
     DateTime today,
   ) {
     final out = <Widget>[];
@@ -234,7 +250,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       final day = addDays(today, i);
       final list = byDay[dateKey(day)] ?? const <CalendarEvent>[];
       final people = overlay[dateKey(day)] ?? const <EventOccurrence>[];
-      if (list.isEmpty && people.isEmpty) continue;
+      final targets = dreams[dateKey(day)] ?? const <DreamTargetMarker>[];
+      if (list.isEmpty && people.isEmpty && targets.isEmpty) continue;
       out
         ..add(
           Padding(
@@ -257,6 +274,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               child: PersonOccurrenceTile(
                 occurrence: o,
                 onTap: () => context.push('/people/${o.personId}'),
+              ),
+            ),
+          for (final m in targets)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: DreamTargetTile(
+                marker: m,
+                onTap: () => context.push('/dreams/${m.dreamId}'),
               ),
             ),
         ]);
@@ -336,6 +361,7 @@ class MonthGrid extends StatelessWidget {
     required this.today,
     required this.byDay,
     this.overlay = const {},
+    this.dreams = const {},
     required this.onSelect,
   });
 
@@ -346,6 +372,9 @@ class MonthGrid extends StatelessWidget {
 
   /// Birthdays / important dates of People by day key (read-only dots).
   final Map<String, List<EventOccurrence>> overlay;
+
+  /// Open dreams' target days by day key (read-only dots).
+  final Map<String, List<DreamTargetMarker>> dreams;
   final ValueChanged<DateTime> onSelect;
 
   @override
@@ -390,6 +419,9 @@ class MonthGrid extends StatelessWidget {
                       people:
                           overlay[dateKey(days[w * 7 + d])] ??
                           const <EventOccurrence>[],
+                      dreams:
+                          dreams[dateKey(days[w * 7 + d])] ??
+                          const <DreamTargetMarker>[],
                       onTap: () => onSelect(days[w * 7 + d]),
                     ),
                   ),
@@ -409,6 +441,7 @@ class _DayCell extends StatelessWidget {
     required this.isSelected,
     required this.events,
     this.people = const [],
+    this.dreams = const [],
     required this.onTap,
   });
 
@@ -418,6 +451,7 @@ class _DayCell extends StatelessWidget {
   final bool isSelected;
   final List<CalendarEvent> events;
   final List<EventOccurrence> people;
+  final List<DreamTargetMarker> dreams;
   final VoidCallback onTap;
 
   @override
@@ -433,7 +467,8 @@ class _DayCell extends StatelessWidget {
     return Semantics(
       button: true,
       selected: isSelected,
-      label: '${Fmt.dateFull(day)}, ${events.length + people.length} acara',
+      label:
+          '${Fmt.dateFull(day)}, ${events.length + people.length + dreams.length} acara',
       child: InkWell(
         key: ValueKey('cal-day-${dateKey(day)}'),
         onTap: onTap,
@@ -496,6 +531,27 @@ class _DayCell extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: GhinaColors.pink.base.withValues(
+                            alpha: inMonth ? 1 : 0.4,
+                          ),
+                        ),
+                      ),
+                    // Targets of open dreams: purple dots after the rest.
+                    for (
+                      var i = 0;
+                      i < dreams.length &&
+                          events.length + people.length + i < 3;
+                      i++
+                    )
+                      Container(
+                        key: i == 0
+                            ? ValueKey('cal-dream-${dateKey(day)}')
+                            : null,
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: GhinaColors.purple.base.withValues(
                             alpha: inMonth ? 1 : 0.4,
                           ),
                         ),

@@ -213,7 +213,7 @@ void main() {
             'Investasi',
             'Kategori',
           ],
-          ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan', 'Orang'],
+          ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan', 'Orang', 'Mimpi'],
           ['Tugas', 'Catatan', 'Konten', 'Pengingat', 'Kalender', 'Killa'],
           [
             'Belajar',
@@ -240,6 +240,7 @@ void main() {
         'Kesehatan',
         'Makanan',
         'Orang',
+        'Mimpi',
       ]);
       expect(labels('xyzzy'), isEmpty);
       // Word prefixes first ("sa" → saldo, saham, salat) …

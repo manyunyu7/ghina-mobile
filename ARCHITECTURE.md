@@ -120,6 +120,7 @@ part, never converted to local time),
 `people` / `personCategories` / `personFields` / `personDates`, `../docs/people.md`; the markdown
 **notes are online-only**, fetched with `GET /api/mobile/people/{id}` and never stored; birthdays
 and important dates notify at 09:00 through the existing scheduler and show read-only on `/calendar`),
+`/dreams`, `/dreams/new`, `/dreams/manage`, `/dreams/review`, `/dreams/:id`, `/dreams/:id/edit` ("Mimpi", synced `dreams` and children, `../docs/dreams.md`; the list, detail and form work offline, the computed metric values are online-only; see "Dreams screens (phase C2)" below)
 `/habits/:id/insights` ("Analisis", server-computed, online-only), `/habits/fields?habit=` ("Dimensi"),
 `/killa`, `/killa/files?path=`, `/killa/file?path=`, `/killa/commits`, `/killa/reminders`,
 `/killa/usage` (Killa, `../docs/killa.md` — **online-only**, not in sync: `KillaApi` in
@@ -226,3 +227,31 @@ defensively), `data/repositories/dreams_repositories.dart` (offline-first, throu
   REST); it does **not** auto-complete steps: that happens on the server and arrives with the pull.
 - A manual reading written offline is queued (`RecordDreamManualValue`); a reading older than the
   stored one is refused, because the row carries only the newest value.
+
+## Dreams screens (phase C2)
+
+Screens for the Mimpi data layer of schema v9, all under `presentation/features/dreams/`. Local
+first: the list, the detail's stored values, the form, the review and the manage screen write through
+the use cases. Only the computed values (metric readings, on-track, projected dates, the server
+summary) come from `DreamOnlineRepository`, and they are shown only when the network answered.
+
+- Pure logic, no Flutter, unit tested: `dream_list_logic.dart` (one `DreamRow` per dream with the local
+  cost, checklist progress, staleness and review tag; filters, search, sorts, board columns, timeline
+  groups, summary counts, the review queue), `dream_format.dart` (text helpers), and the metric /
+  target helpers of the detail and form.
+- The list (`dreams_page.dart`) has three views: board (`dream_views.dart`, eager columns so every
+  status stays reachable), table (sortable) and timeline. The rows come from `dreamRowsProvider`
+  (`dream_list_rows.dart`), which joins dreams, steps and metrics streams. Status changes use the card
+  menu or long press. The filter sheet and status sheet are in `dream_sheets.dart`.
+- Staleness is computed locally from the newest of the dream's, steps', metrics' and manual readings'
+  timestamps (`dreamStaleDays` in the rules). The review tag `perlu-ditinjau` is the user's own
+  convention (the web has no such tag); the review queue is open dreams that are stale or tagged.
+- Use cases added in this phase (`domain/usecases/dreams_extra_usecases.dart`): `ReorderDreamCategories`,
+  `ReorderDreamFields` (same shape as People's reorder), and `WatchDreamSteps` / `WatchDreamMetrics`
+  (every dream's children as one live map, for the list). Providers in `di/dreams_providers.dart`.
+- "Masih berlaku" in the review is an update with unchanged values, which stamps `updatedAt` like the
+  web's `touchDream`, plus the removal of the review tag.
+- The calendar shows read-only 🎯 markers for open dreams with a target date (`dream_calendar.dart`);
+  no `CalendarEvent` rows are created.
+- Tests: `test/presentation/features/dreams/` (widget tests share `dreams_test_rig.dart`), and
+  `test/domain/dreams_extra_usecases_test.dart`. Test data is invented.

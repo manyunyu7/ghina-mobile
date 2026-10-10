@@ -196,6 +196,15 @@ const kAppMenu = <AppMenuItem>[
       'people',
     ],
   ),
+  AppMenuItem(
+    label: 'Mimpi',
+    icon: Icons.auto_awesome_rounded,
+    color: GhinaColors.purple,
+    path: '/dreams',
+    group: AppMenuGroup.life,
+    longPressPath: '/dreams/new',
+    synonyms: ['impian', 'cita-cita', 'bucket list', 'target', 'dream', 'goals'],
+  ),
   // ---- PRODUKTIF
   AppMenuItem(
     label: 'Tugas',
