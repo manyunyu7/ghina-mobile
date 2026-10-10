@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:ghina/core/dates.dart';
+import 'package:ghina/core/failure.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/repositories/repositories.dart';
 
@@ -521,6 +522,7 @@ class FakeContentPillarRepository implements ContentPillarRepository {
 
 class FakeHabitRepository implements HabitRepository {
   final s = _Store<Habit>((h) => h.id);
+  final refreshed = <String>[];
 
   List<Habit> _all() => s.items.values.toList()
     ..sort((a, b) {
@@ -540,6 +542,8 @@ class FakeHabitRepository implements HabitRepository {
   Future<void> save(Habit habit) async => s.put(habit);
   @override
   Future<void> delete(String id) async => s.remove(id);
+  @override
+  Future<void> refreshPending(String id) async => refreshed.add(id);
 }
 
 class FakeHabitLogRepository implements HabitLogRepository {
@@ -579,6 +583,124 @@ class FakeHabitLogRepository implements HabitLogRepository {
   Future<void> save(HabitLog log) async => s.put(log);
   @override
   Future<void> delete(String id) async => s.remove(id);
+}
+
+class FakeHabitFieldRepository implements HabitFieldRepository {
+  final s = _Store<HabitFieldDef>((d) => d.id);
+
+  List<HabitFieldDef> _all() =>
+      s.items.values.toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  @override
+  Stream<List<HabitFieldDef>> watchAll() => s.watch(_all);
+  @override
+  Future<List<HabitFieldDef>> getAll() async => _all();
+  @override
+  Future<HabitFieldDef?> getById(String id) async => s.items[id];
+  @override
+  Future<void> save(HabitFieldDef def) async => s.put(def);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+class FakeHabitEventRepository implements HabitEventRepository {
+  final s = _Store<HabitEvent>((e) => e.id);
+
+  List<HabitEvent> _q(String? habitId) =>
+      s.items.values
+          .where((e) => habitId == null || e.habitId == habitId)
+          .toList()
+        ..sort((a, b) {
+          final c = b.date.compareTo(a.date);
+          return c != 0 ? c : b.createdAt.compareTo(a.createdAt);
+        });
+
+  @override
+  Stream<List<HabitEvent>> watch({String? habitId}) =>
+      s.watch(() => _q(habitId));
+  @override
+  Future<List<HabitEvent>> getAll({String? habitId}) async => _q(habitId);
+  @override
+  Future<HabitEvent?> getById(String id) async => s.items[id];
+  @override
+  Future<void> save(HabitEvent event) async => s.put(event);
+  @override
+  Future<void> delete(String id) async => s.remove(id);
+}
+
+/// Online-only habit notes and analysis. Counts every read; `failWith` makes
+/// every call throw (offline = `NetworkFailure`).
+class FakeHabitOnline implements HabitOnlineRepository {
+  final notes = <String, String>{};
+  final updatedAt = <String, DateTime>{};
+  final analyses = <String, HabitAnalysis>{};
+  int noteGets = 0;
+  int analysisGets = 0;
+  Failure? failWith;
+  var _ticks = 0;
+
+  DateTime _stamp(String id) =>
+      updatedAt[id] = DateTime.utc(2026, 10, 10, 9, 0, _ticks++);
+
+  @override
+  Future<HabitNotes> fetchNotes(String habitId) async {
+    noteGets++;
+    if (failWith != null) throw failWith!;
+    return HabitNotes(
+      notes: notes[habitId] ?? '',
+      updatedAt: updatedAt[habitId] ?? _stamp(habitId),
+    );
+  }
+
+  @override
+  Future<HabitNotesWrite> replaceNotes(
+    String habitId,
+    String text, {
+    DateTime? expectedUpdatedAt,
+  }) async {
+    if (failWith != null) throw failWith!;
+    final current = updatedAt[habitId];
+    if (expectedUpdatedAt != null &&
+        current != null &&
+        expectedUpdatedAt != current) {
+      throw const ConflictFailure(
+        'Catatan ini sudah diubah di tempat lain. Muat ulang dulu, lalu coba lagi.',
+      );
+    }
+    notes[habitId] = text;
+    return HabitNotesWrite(
+      updatedAt: _stamp(habitId),
+      notesLength: text.length,
+    );
+  }
+
+  @override
+  Future<HabitNotesWrite> appendNotes(
+    String habitId,
+    String text, {
+    String? heading,
+  }) async {
+    if (failWith != null) throw failWith!;
+    final cur = notes[habitId] ?? '';
+    notes[habitId] =
+        '$cur${cur.isEmpty ? '' : '\n\n'}${heading == null ? '' : '## $heading\n'}$text';
+    return HabitNotesWrite(
+      updatedAt: _stamp(habitId),
+      notesLength: notes[habitId]!.length,
+    );
+  }
+
+  @override
+  Future<HabitAnalysis> fetchAnalysis(
+    String habitId, {
+    int days = 90,
+    required String today,
+  }) async {
+    analysisGets++;
+    if (failWith != null) throw failWith!;
+    return analyses[habitId] ?? HabitAnalysis(habitId: habitId);
+  }
 }
 
 class FakeAssetRepository implements AssetRepository {

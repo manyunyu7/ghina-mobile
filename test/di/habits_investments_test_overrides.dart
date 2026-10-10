@@ -10,6 +10,9 @@ import '../domain/fakes.dart';
 List<Override> habitsInvestmentsFakeOverrides({
   FakeHabitRepository? habits,
   FakeHabitLogRepository? habitLogs,
+  FakeHabitFieldRepository? habitFields,
+  FakeHabitEventRepository? habitEvents,
+  FakeHabitOnline? habitOnline,
   FakeAssetRepository? assets,
   FakeAssetTradeRepository? trades,
   FakePriceRepository? prices,
@@ -18,6 +21,15 @@ List<Override> habitsInvestmentsFakeOverrides({
   habitRepositoryProvider.overrideWithValue(habits ?? FakeHabitRepository()),
   habitLogRepositoryProvider.overrideWithValue(
     habitLogs ?? FakeHabitLogRepository(),
+  ),
+  habitFieldRepositoryProvider.overrideWithValue(
+    habitFields ?? FakeHabitFieldRepository(),
+  ),
+  habitEventRepositoryProvider.overrideWithValue(
+    habitEvents ?? FakeHabitEventRepository(),
+  ),
+  habitOnlineRepositoryProvider.overrideWithValue(
+    habitOnline ?? FakeHabitOnline(),
   ),
   assetRepositoryProvider.overrideWithValue(assets ?? FakeAssetRepository()),
   assetTradeRepositoryProvider.overrideWithValue(

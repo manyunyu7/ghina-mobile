@@ -23,6 +23,7 @@ import '../data/repositories/agenda_repositories.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/content_repositories.dart';
 import '../data/repositories/finance_repositories.dart';
+import '../data/repositories/habit_online_repository_impl.dart';
 import '../data/repositories/habit_repositories.dart';
 import '../data/repositories/investment_repositories.dart';
 import '../data/repositories/life_repositories.dart';
@@ -275,6 +276,12 @@ final habitEventRepositoryProvider = Provider<HabitEventRepository>(
 
 /// The online-only People notes (`/api/mobile/people/{id}[/notes]`); tests
 /// override it with a fake.
+/// The online-only habit notes and server analysis
+/// (`/api/mobile/habits/{id}[/notes|/insights]`); tests override it with a fake.
+final habitOnlineRepositoryProvider = Provider<HabitOnlineRepository>(
+  (ref) => ApiHabitOnlineRepository(ref.watch(apiClientProvider)),
+);
+
 final peopleNotesRepositoryProvider = Provider<PeopleNotesRepository>(
   (ref) => ApiPeopleNotesRepository(ref.watch(apiClientProvider)),
 );

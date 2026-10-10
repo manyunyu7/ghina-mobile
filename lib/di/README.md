@@ -517,9 +517,41 @@ Local notifications (09:00 on the day, plus `remindDaysBefore`) are merged into
 `watchRemindersUseCaseProvider` (shared cap of 60, keys `person:birthday:<id>:<yyyymmdd>` /
 `person:date:<id>:<yyyymmdd>[:b<n>]`, route `/people/<id>`).
 
-Habit enrichment (phase A: data layer only, no screens yet): `Habit.tools` (`HabitTool`),
-`HabitLog.extra`, `HabitFieldDef`, `HabitEvent` with `habitFieldRepositoryProvider` /
-`habitEventRepositoryProvider` (in `core_providers.dart`); `FoodLog.caloriesMax`, `tags`, `mealLabel`
-(`FoodInput` null = keep on update). Tests that override repositories with fakes and watch the
-calendar or the reminders also need `...peopleFakeOverrides()` (`test/di/people_test_overrides.dart`).
+### Habit enrichment API (phase B screens)
 
+Providers in `di/habit_enrichment_providers.dart` (exported by `di/di.dart`); rules in
+`domain/usecases/habit_enrichment_rules.dart` (port of `src/lib/habit-extras.ts`), use cases in
+`habit_enrichment_usecases.dart`. Entities: `Habit.tools` (`HabitTool`), `HabitLog.extra`,
+`HabitFieldDef`, `HabitEvent`; online-only `HabitNotes` / `HabitAnalysis` in `habit_online.dart`.
+
+| Provider | Value |
+|---|---|
+| `watchHabitFieldsProvider` | `List<HabitFieldDef>` (global + per habit, by `sortOrder`). Filter with `fieldsForHabit(defs, habitId)` / `fieldsForScope(defs, habitId, 'relapse'\|'urge'\|'done'\|event kind)` |
+| `watchHabitEventsProvider(habitId)` | `List<HabitEvent>` newest first |
+
+| Write | Notes |
+|---|---|
+| `setHabitToolsProvider(habitId, [HabitTool])` | whole list, ≤ 30, title ≤ 80, detail ≤ 500 (`validateHabitTools`) |
+| `saveHabitEventProvider(HabitEventInput(id?, habitId, date, kind, label, note, at, extra))`, `deleteHabitEventProvider(id)` | events never change streaks; `extra` is validated against the defs of the habit **and the event kind** |
+| `createHabitFieldProvider(HabitFieldInput(label, type, habitId?, options, min, max, appliesTo))`, `updateHabitFieldProvider(id, label:, appliesTo:, clearAppliesTo:)`, `reorderHabitFieldsProvider(ids)` | the `key` is a unique slug of the label and never changes; no retype |
+| `countHabitFieldUsageProvider(id)` → `(logs:, events:)`, `deleteHabitFieldProvider(id)` | delete strips the key from every log/event (local + server); show the count first |
+| `logRelapseProvider(habitId, RelapseInput(extra: {...}))`, `convertUrgeToRelapseProvider` | `extra` merged per key into the day's row; invalid → `ValidationFailure(field: 'extra')` and nothing is written |
+| `setHabitLogExtraProvider(habitId, day, type, {key: value\|null})` | sets dimensions on the day's **existing** row (urge row of the emergency screen; the check-in "tambah detail") |
+| `getHabitNotesProvider(id)` → `HabitNotes`, `replaceHabitNotesProvider(id, text, expectedUpdatedAt:)`, `appendHabitNotesProvider(id, text, heading:)` | online-only, never cached; `ConflictFailure` on 409; success re-stamps a queued edit of the habit (`HabitRepository.refreshPending`) and syncs |
+| `fetchHabitAnalysisProvider(habitId, days: 90)` → `HabitAnalysis` | `GET …/insights` with the local `today` and the device time zone; `NetworkFailure` offline; parsed leniently (`habitAnalysisFromWire`) |
+
+Rules worth knowing: a dimension without `appliesTo` shows for relapse, urge and events but **not** for
+`done`/`skip` (the one-tap check-in stays one tap; list `done` explicitly to get the "Tambah detail"
+tile). Scale values are numbers within `min..max` (default 1/10), select values one of the options,
+text ≤ 500, ≤ 30 keys per row. Tests that override habit repositories with fakes get the field/event/online
+fakes from `habitsInvestmentsFakeOverrides` (`test/di/habits_investments_test_overrides.dart`).
+
+### Food ranges, labels and tags
+
+`FoodLog.caloriesMax`, `tags`, `mealLabel` (`FoodInput`: null = keep on update; `clearCaloriesMax` /
+`clearMealLabel` remove; an empty `tags` list clears). Pure helpers in `domain/usecases/food_rules.dart`:
+`foodTotals` (min/max/mid, mid rounds half up like the server), `calorieNumbers(log)` (`700–900`),
+`summarizeFood` / `weeklyFoodSummary` (mirror of `GET /food/summary`, computed from local data),
+`parseCalorieRange`, `resolveMealText`, `recentMealLabels`, `foodTagCounts`, `filterFoodByTag`, `addFoodTag`.
+Tests that override repositories with fakes and watch the calendar or the reminders also need
+`...peopleFakeOverrides()` (`test/di/people_test_overrides.dart`).

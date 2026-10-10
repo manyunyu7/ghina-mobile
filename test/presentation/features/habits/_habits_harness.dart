@@ -144,6 +144,9 @@ class HabitsHarness {
   final InMemoryGameStore gameStore;
   final habits = FakeHabitRepository();
   final logs = FakeHabitLogRepository();
+  final fields = FakeHabitFieldRepository();
+  final events = FakeHabitEventRepository();
+  final online = FakeHabitOnline();
   final InMemoryHabitLockStore lockStore;
   final FakeAuthenticator auth;
   final scheduler = FakeScheduler();
@@ -161,7 +164,13 @@ class HabitsHarness {
   }
 
   List<Override> get overrides => [
-    ...habitsInvestmentsFakeOverrides(habits: habits, habitLogs: logs),
+    ...habitsInvestmentsFakeOverrides(
+      habits: habits,
+      habitLogs: logs,
+      habitFields: fields,
+      habitEvents: events,
+      habitOnline: online,
+    ),
     ...buildGameOverrides(store: gameStore),
     gameTickProvider.overrideWith((ref) => const Stream.empty()),
     clockProvider.overrideWithValue(clock),

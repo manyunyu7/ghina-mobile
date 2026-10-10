@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/dates.dart';
+import '../../../../core/failure.dart';
 import '../../../../core/result.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
@@ -10,6 +11,7 @@ import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../habit_format.dart';
+import 'habit_extra_fields.dart';
 
 /// "Aku kalah" — log a relapse without shaming: optional triggers, note and
 /// time, then the ended streak shown as an achievement. With [convertUrge]
@@ -60,6 +62,10 @@ class _RelapseSheetState extends ConsumerState<RelapseSheet> {
   late TimeOfDay _time;
   bool _saving = false;
   bool _addingCustom = false;
+
+  /// Values of the user's dimensions (`habitFields`) for this relapse.
+  final Map<String, Object> _extra = {};
+  Map<String, String> _extraErrors = const {};
 
   /// Set once logged: the clean streak the relapse ended.
   int? _previous;
@@ -128,15 +134,25 @@ class _RelapseSheetState extends ConsumerState<RelapseSheet> {
     if (picked != null && mounted) setState(() => _time = picked);
   }
 
+  List<HabitFieldDef> get _defs => fieldsForScope(
+    ref.read(watchHabitFieldsProvider).value ?? const [],
+    t.id,
+    'relapse',
+  );
+
   Future<void> _save() async {
     if (_custom.text.trim().isNotEmpty) _addCustom();
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _extraErrors = const {};
+    });
     final at = _at();
     final input = RelapseInput(
       day: at,
       at: at,
       triggers: _triggers.toList(),
       note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+      extra: _extra,
     );
     final r = widget.convertUrge
         ? await ref.read(convertUrgeToRelapseProvider)(t.id, input)
@@ -151,7 +167,12 @@ class _RelapseSheetState extends ConsumerState<RelapseSheet> {
           _previous = value.previousStreak;
         });
       case Err(:final failure):
-        setState(() => _saving = false);
+        setState(() {
+          _saving = false;
+          if (failure case ValidationFailure(field: 'extra')) {
+            _extraErrors = extraErrorsFor(failure.message, _defs);
+          }
+        });
         showFailureToast(context, failure);
     }
   }
@@ -161,6 +182,11 @@ class _RelapseSheetState extends ConsumerState<RelapseSheet> {
     final prev = _previous;
     if (prev != null) return _Done(previous: prev);
     final g = context.ghina;
+    final defs = fieldsForScope(
+      ref.watch(watchHabitFieldsProvider).value ?? const [],
+      t.id,
+      'relapse',
+    );
     final tags = [...habitTriggerPresets, ..._customTags];
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -262,6 +288,22 @@ class _RelapseSheetState extends ConsumerState<RelapseSheet> {
               icon: const Icon(Icons.check_rounded),
               onPressed: _addCustom,
             ),
+          ),
+        ],
+        if (defs.isNotEmpty) ...[
+          GhinaSpace.gapLg,
+          const FieldLabel('Detail lain (opsional)'),
+          ExtraFieldsForm(
+            defs: defs,
+            values: _extra,
+            errors: _extraErrors,
+            onChanged: (k, v) => setState(() {
+              if (v == null) {
+                _extra.remove(k);
+              } else {
+                _extra[k] = v;
+              }
+            }),
           ),
         ],
         GhinaSpace.gapLg,

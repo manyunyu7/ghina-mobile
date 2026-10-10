@@ -10,6 +10,7 @@ import '../../core/result.dart';
 import '../../core/streams.dart';
 import '../entities/entities.dart';
 import '../repositories/repositories.dart';
+import 'habit_enrichment_rules.dart';
 import 'habit_rules.dart';
 import 'task_usecases.dart' show TickSource;
 
@@ -58,6 +59,7 @@ final class RelapseInput {
     this.triggers = const [],
     this.note,
     this.count = 1,
+    this.extra = const {},
   });
 
   /// Day (default: today, or the day of [at]).
@@ -70,6 +72,10 @@ final class RelapseInput {
 
   /// How many times (≥ 1), added to the day's row.
   final int count;
+
+  /// Values of the user's dimensions (`habitFields`), key → `String | num |
+  /// bool`; merged per key into the day's row. A null value removes the key.
+  final Map<String, Object?> extra;
 }
 
 /// An inclusive day range (`YYYY-MM-DD`) for insights.
@@ -478,25 +484,52 @@ final class LogUrge {
 /// Returns the relapse row and the clean streak it ended ("Kamu sempat
 /// bersih 12 hari — itu nyata", server `cleanStreakBefore`).
 final class LogRelapse {
-  const LogRelapse(this._habits, this._logs, this._clock);
+  const LogRelapse(this._habits, this._logs, this._clock, [this._fields]);
   final HabitRepository _habits;
   final HabitLogRepository _logs;
   final Clock _clock;
 
+  /// Needed to validate [RelapseInput.extra]; without it a non-empty extra is
+  /// refused.
+  final HabitFieldRepository? _fields;
+
   Future<Result<({HabitLog log, int previousStreak})>> call(
     String habitId, [
     RelapseInput input = const RelapseInput(),
-  ]) => guard(() => relapse(_habits, _logs, _clock, habitId, input));
+  ]) => guard(
+    () => relapse(_habits, _logs, _clock, habitId, input, fields: _fields),
+  );
+
+  /// The validated `extra` of [input] (empty when it has none).
+  static Future<Map<String, Object>> checkExtra(
+    HabitFieldRepository? fields,
+    String habitId,
+    RelapseInput input,
+  ) async {
+    if (input.extra.isEmpty) return const {};
+    if (fields == null) {
+      throw const ValidationFailure(
+        'Dimensi belum bisa disimpan',
+        field: 'extra',
+      );
+    }
+    return validateExtra(
+      input.extra,
+      fieldsForScope(await fields.getAll(), habitId, 'relapse'),
+    );
+  }
 
   static Future<({HabitLog log, int previousStreak})> relapse(
     HabitRepository habits,
     HabitLogRepository logs,
     Clock clock,
     String habitId,
-    RelapseInput input,
-  ) async {
+    RelapseInput input, {
+    HabitFieldRepository? fields,
+  }) async {
     final h = await _requireHabit(habits, habitId);
     _requireKind(h, HabitKind.quit);
+    final extra = await checkExtra(fields, habitId, input);
     final now = clock.now();
     final when = input.at ?? now;
     final d = _logDay(input.day ?? when, now);
@@ -516,6 +549,7 @@ final class LogRelapse {
         triggers: mergeTriggers(base.triggers, tags),
         note: n ?? base.note,
         at: when,
+        extra: extra.isEmpty ? base.extra : mergeExtra(base.extra, extra),
       );
     }))!;
     return (log: log, previousStreak: before);
@@ -525,11 +559,18 @@ final class LogRelapse {
 /// Emergency screen "Aku kalah kali ini": the urge just logged turns into a
 /// relapse (urge −1, row removed at 0; relapse +1). All-or-nothing.
 final class ConvertUrgeToRelapse {
-  const ConvertUrgeToRelapse(this._habits, this._logs, this._uow, this._clock);
+  const ConvertUrgeToRelapse(
+    this._habits,
+    this._logs,
+    this._uow,
+    this._clock, [
+    this._fields,
+  ]);
   final HabitRepository _habits;
   final HabitLogRepository _logs;
   final UnitOfWork _uow;
   final Clock _clock;
+  final HabitFieldRepository? _fields;
 
   Future<Result<({HabitLog log, int previousStreak})>> call(
     String habitId, [
@@ -540,12 +581,21 @@ final class ConvertUrgeToRelapse {
       _requireKind(h, HabitKind.quit);
       final now = _clock.now();
       final d = _logDay(input.day ?? input.at ?? now, now);
+      // Before the urge changes: a bad extra must not leave half a convert.
+      await LogRelapse.checkExtra(_fields, habitId, input);
       await _upsertLog(_logs, h, d, HabitLogType.urge, now, (cur, _) {
         if (cur == null) return null;
         final left = cur.amount - 1;
         return left <= 0 ? null : cur.copyWith(value: left);
       });
-      return LogRelapse.relapse(_habits, _logs, _clock, habitId, input);
+      return LogRelapse.relapse(
+        _habits,
+        _logs,
+        _clock,
+        habitId,
+        input,
+        fields: _fields,
+      );
     }),
   );
 }

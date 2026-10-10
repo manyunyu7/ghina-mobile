@@ -14,6 +14,7 @@ import '../../../shared/rewards/rewards.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../lock/habit_lock_gate.dart';
 import '../widgets/box_breathing.dart';
+import '../widgets/habit_urge_extras.dart';
 import '../widgets/relapse_sheet.dart';
 
 /// "Lagi pengen…" — the emergency screen of a quit habit. Logs the urge right
@@ -213,13 +214,18 @@ class _UrgeViewState extends ConsumerState<_UrgeView>
                     },
                   ),
                   GhinaSpace.gapLg,
-                  if (done && today != null)
+                  if (done && today != null) ...[
+                    UrgeExtraCard(
+                      habitId: widget.id,
+                      ready: _logged == true && !_finishing,
+                    ),
+                    GhinaSpace.gapMd,
                     _EndChoice(
                       finishing: _finishing,
                       onResisted: _resisted,
                       onLost: () => _lost(today),
-                    )
-                  else ...[
+                    ),
+                  ] else ...[
                     ChunkyCard(
                       tinted: GhinaColors.blue,
                       child: Text(
@@ -288,6 +294,15 @@ class _UrgeViewState extends ConsumerState<_UrgeView>
                             }),
                           ),
                       ],
+                    ),
+                    if (habit != null && habit.tools.isNotEmpty) ...[
+                      GhinaSpace.gapLg,
+                      UrgeToolsList(tools: habit.tools),
+                    ],
+                    GhinaSpace.gapLg,
+                    UrgeExtraCard(
+                      habitId: widget.id,
+                      ready: _logged == true && !_finishing,
                     ),
                     GhinaSpace.gapXl,
                     Center(

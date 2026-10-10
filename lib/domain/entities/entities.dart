@@ -11,6 +11,7 @@ export 'enums.dart';
 export 'food_log.dart';
 export 'habit.dart';
 export 'habit_enrichment.dart';
+export 'habit_online.dart';
 export 'habit_views.dart';
 export 'health_entry.dart';
 export 'investment.dart';

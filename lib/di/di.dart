@@ -9,6 +9,7 @@ export 'core_providers.dart'
         apiBaseUrlProvider,
         tickSourceProvider;
 export 'game_overrides.dart' show gameOverrides, buildGameOverrides;
+export 'habit_enrichment_providers.dart';
 export 'habits_investments_providers.dart';
 export 'killa_providers.dart';
 export 'notification_overrides.dart' show reminderOverrides;

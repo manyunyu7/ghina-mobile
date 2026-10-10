@@ -1,12 +1,14 @@
 import 'package:go_router/go_router.dart';
 
 import 'habit_detail_page.dart';
+import 'habit_fields_page.dart';
 import 'habit_form_page.dart';
+import 'habit_insights_page.dart';
 import 'habit_urge_page.dart';
 import 'habits_page.dart';
 
 /// `/habits`, `/habits/new`, `/habits/:id`, `/habits/:id/edit`,
-/// `/habits/:id/urge` — each page sits behind "Kunci Kebiasaan".
+/// `/habits/:id/urge`, `/habits/:id/insights`, `/habits/fields?habit=` — each page sits behind "Kunci Kebiasaan".
 /// `/habits?pick=urge` (the "Lagi pengen…" launcher shortcut with several quit
 /// habits) opens the board with the quit-habit picker.
 final List<GoRoute> habitRoutes = [
@@ -17,8 +19,16 @@ final List<GoRoute> habitRoutes = [
   ),
   GoRoute(path: '/habits/new', builder: (_, _) => const HabitFormPage()),
   GoRoute(
+    path: '/habits/fields',
+    builder: (_, s) => HabitFieldsPage(habitId: s.uri.queryParameters['habit']),
+  ),
+  GoRoute(
     path: '/habits/:id',
     builder: (_, s) => HabitDetailPage(id: s.pathParameters['id']!),
+  ),
+  GoRoute(
+    path: '/habits/:id/insights',
+    builder: (_, s) => HabitInsightsPage(id: s.pathParameters['id']!),
   ),
   GoRoute(
     path: '/habits/:id/edit',

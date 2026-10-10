@@ -274,6 +274,22 @@ class DriftHabitFieldRepository implements HabitFieldRepository {
       isCreate: !exists,
     );
   });
+
+  @override
+  Future<void> delete(String id) => _s.write(() async {
+    final row = await (_db.select(
+      _db.habitFields,
+    )..where((f) => f.id.equals(id))).getSingleOrNull();
+    if (row == null) return;
+    await (_db.delete(_db.habitFields)..where((f) => f.id.equals(id))).go();
+    await _s.outbox.enqueueDelete(
+      entity: SyncEntity.habitFields,
+      entityId: id,
+      clientUpdatedAt: _s.clock.now(),
+    );
+    // Strip the key from every log / event (the server does the same).
+    await _s.cascades.habitFieldDeleted(row.key);
+  });
 }
 
 class DriftHabitEventRepository implements HabitEventRepository {

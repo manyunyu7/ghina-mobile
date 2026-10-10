@@ -116,6 +116,7 @@ final logRelapseProvider = Provider<LogRelapse>(
     ref.watch(habitRepositoryProvider),
     ref.watch(habitLogRepositoryProvider),
     ref.watch(clockProvider),
+    ref.watch(habitFieldRepositoryProvider),
   ),
 );
 
@@ -126,6 +127,7 @@ final convertUrgeToRelapseProvider = Provider<ConvertUrgeToRelapse>(
     ref.watch(habitLogRepositoryProvider),
     ref.watch(unitOfWorkProvider),
     ref.watch(clockProvider),
+    ref.watch(habitFieldRepositoryProvider),
   ),
 );
 

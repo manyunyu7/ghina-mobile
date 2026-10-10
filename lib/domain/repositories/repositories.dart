@@ -7,6 +7,7 @@ import '../../core/dates.dart';
 import '../entities/entities.dart';
 
 export 'killa_repository.dart';
+export 'habit_online_repository.dart';
 export 'people_notes_repository.dart';
 
 /// Runs several repository calls atomically (one local DB transaction).
@@ -240,6 +241,11 @@ abstract interface class HabitRepository {
 
   /// Deletes the habit and (cascade, like the server) its logs.
   Future<void> delete(String id);
+
+  /// Re-stamps a queued upsert of the habit with the current time, so a
+  /// server-side notes write (which moves the habit's `updatedAt`) can't make
+  /// it lose last-write-wins. No-op without a queued upsert.
+  Future<void> refreshPending(String id);
 }
 
 abstract interface class HabitLogRepository {
@@ -475,6 +481,10 @@ abstract interface class HabitFieldRepository {
   Future<List<HabitFieldDef>> getAll();
   Future<HabitFieldDef?> getById(String id);
   Future<void> save(HabitFieldDef def);
+
+  /// Deletes the def and strips its key from every log's and event's `extra`
+  /// (like the server; the touched rows re-sync).
+  Future<void> delete(String id);
 }
 
 /// Habit journal days, milestones and neutral events.

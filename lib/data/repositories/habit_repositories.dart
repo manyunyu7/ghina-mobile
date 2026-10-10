@@ -3,9 +3,11 @@ import 'package:drift/drift.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/repositories/repositories.dart';
 import '../datasources/local/app_database.dart';
+import '../models/api_dto.dart' show MutationOp;
 import '../models/entity_names.dart';
 import '../models/habits_investments_mappers.dart';
 import '../models/habits_investments_wire.dart';
+import '../sync/outbox.dart';
 import 'local_store.dart';
 
 class DriftHabitRepository implements HabitRepository {
@@ -63,6 +65,19 @@ class DriftHabitRepository implements HabitRepository {
       entity: SyncEntity.habits,
       entityId: id,
       clientUpdatedAt: _s.clock.now(),
+    );
+  });
+
+  @override
+  Future<void> refreshPending(String id) => _s.write(() async {
+    final e = await _s.outbox.pendingEntry(SyncEntity.habits, id);
+    if (e == null || e.op != MutationOp.upsert.name || e.data == null) return;
+    await _s.outbox.enqueueUpsert(
+      entity: SyncEntity.habits,
+      entityId: id,
+      data: Outbox.decode(e.data)!,
+      clientUpdatedAt: _s.clock.now(),
+      isCreate: false, // a pending create keeps its flag (collapsing rules)
     );
   });
 }

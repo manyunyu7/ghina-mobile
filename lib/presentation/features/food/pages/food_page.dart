@@ -6,13 +6,23 @@ import '../../../../core/dates.dart';
 import '../../../../core/formatters.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
+import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../widgets/food_photo.dart';
 
 /// Food diary: today's calories and meals, then every day's logs with photos.
-class FoodPage extends ConsumerWidget {
+class FoodPage extends ConsumerStatefulWidget {
   const FoodPage({super.key});
+
+  @override
+  ConsumerState<FoodPage> createState() => _FoodPageState();
+}
+
+String _kcalText(FoodTotals t) => '${formatCalorieSpan(t, Fmt.number)} kkal';
+
+class _FoodPageState extends ConsumerState<FoodPage> {
+  String? _tag;
 
   Future<void> _refresh(BuildContext context, WidgetRef ref) async {
     try {
@@ -25,7 +35,7 @@ class FoodPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final g = context.ghina;
     final async = ref.watch(watchFoodLogsProvider);
     final today = ref.watch(clockProvider).now();
@@ -93,7 +103,13 @@ class FoodPage extends ConsumerWidget {
     );
   }
 
-  Widget _list(BuildContext context, List<FoodLog> logs, DateTime now) {
+  Widget _list(BuildContext context, List<FoodLog> all, DateTime now) {
+    final counts = foodTagCounts(all);
+    // A tag that no longer exists (deleted logs) can't keep filtering.
+    final tag = counts.any((c) => c.tag.toLowerCase() == _tag?.toLowerCase())
+        ? _tag
+        : null;
+    final logs = filterFoodByTag(all, tag);
     // Group by local day (logs come newest first).
     final groups = <({DateTime day, List<FoodLog> items})>[];
     for (final l in logs) {
@@ -104,7 +120,8 @@ class FoodPage extends ConsumerWidget {
         groups.add((day: d, items: [l]));
       }
     }
-    final todayItems = logs.where((l) => isSameDay(l.date, now)).toList();
+    final todayItems = all.where((l) => isSameDay(l.date, now)).toList();
+    final weekly = weeklyFoodSummary(all, now);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         GhinaSpace.page,
@@ -114,6 +131,18 @@ class FoodPage extends ConsumerWidget {
       ),
       children: [
         _TodayCard(items: todayItems),
+        if (weekly.days.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _WeeklyCard(summary: weekly),
+        ],
+        if (counts.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _TagFilter(
+            counts: counts,
+            selected: tag,
+            onSelect: (t) => setState(() => _tag = t),
+          ),
+        ],
         for (final grp in groups) ...[
           const SizedBox(height: 24),
           SectionHeader(
@@ -122,9 +151,10 @@ class FoodPage extends ConsumerWidget {
                 isSameDay(grp.day, now) || isSameDay(grp.day, addDays(now, -1))
                 ? Fmt.dateFull(grp.day)
                 : null,
-            trailing: _kcalOf(grp.items) > 0
+            trailing: foodTotals(grp.items).hasCalories
                 ? ChunkyPill(
-                    label: '${Fmt.number(_kcalOf(grp.items))} kkal',
+                    key: ValueKey('day-total-${dateKey(grp.day)}'),
+                    label: _dayLabel(foodTotals(grp.items)),
                     icon: Icons.local_fire_department_rounded,
                     color: GhinaColors.orange,
                     soft: true,
@@ -142,8 +172,103 @@ class FoodPage extends ConsumerWidget {
     );
   }
 
-  static int _kcalOf(List<FoodLog> items) =>
-      items.fold(0, (s, l) => s + (l.calories ?? 0));
+  static String _dayLabel(FoodTotals t) =>
+      t.isRange ? '${_kcalText(t)} · ≈ ${Fmt.number(t.mid)}' : _kcalText(t);
+}
+
+/// Horizontally scrollable tag filter ("Semua" + one chip per tag).
+class _TagFilter extends StatelessWidget {
+  const _TagFilter({
+    required this.counts,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<FoodTagCount> counts;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          ChunkyChip(
+            key: const ValueKey('tag-filter-all'),
+            label: 'Semua',
+            selected: selected == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final c in counts) ...[
+            const SizedBox(width: 8),
+            ChunkyChip(
+              key: ValueKey('tag-filter-${c.tag}'),
+              label: '#${c.tag} (${c.count})',
+              selected: selected?.toLowerCase() == c.tag.toLowerCase(),
+              onTap: () => onSelect(c.tag),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact last-7-days summary (mirrors `GET /food/summary`).
+class _WeeklyCard extends StatelessWidget {
+  const _WeeklyCard({required this.summary});
+
+  final FoodSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    final avg = summary.avgPerDay!;
+    final span = avg.max > avg.min
+        ? '${Fmt.number(avg.min)}–${Fmt.number(avg.max)}'
+        : Fmt.number(avg.min);
+    String? topMeal;
+    for (final e in summary.byMeal.entries) {
+      if (e.key == '(none)') continue;
+      topMeal =
+          MealType.values
+              .where((m) => m.wire == e.key)
+              .map((m) => m.label)
+              .firstOrNull ??
+          e.key;
+      break;
+    }
+    final tags = summary.topTags.take(3).map((t) => '#${t.tag}').join(' ');
+    return ChunkyCard(
+      key: const ValueKey('food-weekly'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '7 HARI TERAKHIR',
+            style: GhinaType.overline.copyWith(color: g.textSecondary),
+          ),
+          const SizedBox(height: 4),
+          Text('Rata-rata $span kkal/hari', style: GhinaType.h3),
+          if (avg.max > avg.min)
+            Text(
+              'tengah ${Fmt.number(avg.mid)} kkal',
+              style: GhinaType.caption.copyWith(color: g.textMuted),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            [
+              '${summary.daysLogged} hari tercatat',
+              ?(topMeal == null ? null : 'terbanyak: $topMeal'),
+              if (tags.isNotEmpty) tags,
+            ].join(' · '),
+            style: GhinaType.bodyS.copyWith(color: g.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TodayCard extends StatelessWidget {
@@ -154,7 +279,7 @@ class _TodayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final kcal = FoodPage._kcalOf(items);
+    final totals = foodTotals(items);
     final logged = {for (final l in items) ?l.meal};
     return ChunkyCard(
       tinted: GhinaColors.orange,
@@ -183,12 +308,21 @@ class _TodayCard extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        kcal > 0
-                            ? '${Fmt.number(kcal)} kkal'
+                        totals.hasCalories
+                            ? _kcalText(totals)
                             : '${items.length} tercatat',
+                        key: const ValueKey('today-total'),
                         style: GhinaType.moneyL,
                       ),
                     ),
+                    if (totals.isRange)
+                      Text(
+                        'tengah ${Fmt.number(totals.mid)} kkal',
+                        key: const ValueKey('today-mid'),
+                        style: GhinaType.caption.copyWith(
+                          color: g.textSecondary,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -251,6 +385,14 @@ class _MealCheck extends StatelessWidget {
   }
 }
 
+String _rowKcal(FoodLog l) {
+  final hi = l.caloriesMax;
+  final lo = l.calories!;
+  return hi != null && hi > lo
+      ? '${Fmt.number(lo)}–${Fmt.number(hi)}'
+      : Fmt.number(lo);
+}
+
 class _FoodCard extends StatelessWidget {
   const _FoodCard({required this.log});
 
@@ -260,6 +402,7 @@ class _FoodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final pending = log.localPhotoPath != null && log.photoUrl == null;
+    final mealText = log.mealText;
     final meal = log.meal;
     return ChunkyCard(
       padding: const EdgeInsets.all(10),
@@ -311,10 +454,14 @@ class _FoodCard extends StatelessWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (meal != null)
+                    if (mealText != null)
                       ChunkyPill(
-                        label: '${meal.emoji} ${meal.label}',
-                        color: mealSwatch(meal),
+                        label: meal == null
+                            ? mealText
+                            : '${meal.emoji} ${meal.label}',
+                        color: meal == null
+                            ? GhinaColors.purple
+                            : mealSwatch(meal),
                         soft: true,
                         uppercase: false,
                       ),
@@ -324,13 +471,30 @@ class _FoodCard extends StatelessWidget {
                     ),
                     if (log.calories != null)
                       Text(
-                        '· ${Fmt.number(log.calories!)} kkal',
+                        '· ${_rowKcal(log)} kkal',
+                        key: ValueKey('kcal-${log.id}'),
                         style: GhinaType.caption
                             .w(900)
                             .copyWith(color: g.textPrimary),
                       ),
                   ],
                 ),
+                if (log.tags.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final t in log.tags)
+                        ChunkyPill(
+                          label: '#$t',
+                          color: GhinaColors.blue,
+                          soft: true,
+                          uppercase: false,
+                        ),
+                    ],
+                  ),
+                ],
                 if (log.note != null && log.note!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(

@@ -12,7 +12,11 @@ import '../../../shared/widgets/widgets.dart';
 import '../habit_format.dart';
 import '../lock/habit_lock_gate.dart';
 import '../widgets/habit_cards.dart';
+import '../widgets/habit_done_detail.dart';
+import '../widgets/habit_events_section.dart';
 import '../widgets/habit_insight_widgets.dart';
+import '../widgets/habit_notes_section.dart';
+import '../widgets/habit_tools_section.dart';
 
 /// One habit: streak ring + milestones, today's controls, heatmap
 /// (month/year), completion by range, streak history, insights, journal and
@@ -193,6 +197,7 @@ class _DetailViewState extends ConsumerState<_DetailView> {
           BuildHabitCard(today: t, linkToDetail: false)
         else
           QuitActions(today: t),
+        if (!h.archived) HabitDoneDetailTile(habit: h, logs: d.logs),
         GhinaSpace.gapXl,
         const SectionHeader(title: 'Target streak'),
         _Milestones(streak: t.streak),
@@ -258,6 +263,36 @@ class _DetailViewState extends ConsumerState<_DetailView> {
         GhinaSpace.gapXl,
         const SectionHeader(title: 'Insight'),
         _Insights(insights: ins, habit: h),
+        GhinaSpace.gapMd,
+        ChunkyTile(
+          key: const ValueKey('habit-analysis-link'),
+          leading: CategoryAvatar(
+            icon: Icons.insights_rounded,
+            color: GhinaColors.blue.base,
+            size: 40,
+          ),
+          title: 'Analisis lengkap',
+          subtitle:
+              'Pemicu, jam rawan, dan perbandingan dimensi (butuh internet)',
+          showChevron: true,
+          onTap: () => context.push('/habits/${h.id}/insights'),
+        ),
+        if (h.isQuit) ...[
+          GhinaSpace.gapXl,
+          HabitToolsSection(
+            habit: h,
+            onEdit: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    HabitLockGate(child: HabitToolsEditorPage(habitId: h.id)),
+              ),
+            ),
+          ),
+        ],
+        GhinaSpace.gapXl,
+        HabitEventsSection(habit: h),
+        GhinaSpace.gapXl,
+        HabitNotesSection(habit: h),
         GhinaSpace.gapXl,
         SectionHeader(
           title: 'Jurnal',
@@ -762,6 +797,10 @@ class _LogList extends ConsumerWidget {
       );
     }
     final shown = logs.take(40).toList();
+    final defs = fieldsForHabit(
+      ref.watch(watchHabitFieldsProvider).value ?? const [],
+      habit.id,
+    );
     return ChunkyCard(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
@@ -777,6 +816,8 @@ class _LogList extends ConsumerWidget {
                 if (l.at case final at?)
                   '${at.hour.toString().padLeft(2, '0')}.${at.minute.toString().padLeft(2, '0')}',
                 if (l.triggers.isNotEmpty) l.triggers.join(', '),
+                for (final e in extraEntries(l.extra, defs))
+                  '${e.def.label} ${formatExtraValue(e.def, e.value)}',
               ].join(' · '),
               leading: CategoryAvatar(
                 icon: switch (l.type) {

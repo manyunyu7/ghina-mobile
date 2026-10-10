@@ -146,6 +146,7 @@ final class FoodInput {
     required this.name,
     this.meal,
     this.mealLabel,
+    this.clearMealLabel = false,
     this.calories,
     this.caloriesMax,
     this.clearCaloriesMax = false,
@@ -161,6 +162,9 @@ final class FoodInput {
   /// null here keeps the stored label (an imported "makan malam" survives a
   /// form that only knows the canonical meals).
   final String? mealLabel;
+
+  /// On an update: drop the stored [mealLabel] (the user emptied the field).
+  final bool clearMealLabel;
   final num? calories;
 
   /// Upper bound of a calorie range (≥ [calories]). On an update null keeps
@@ -310,7 +314,9 @@ final class UpdateFoodLog {
       meal: input.meal,
       mealLabel: input.meal != null
           ? null
-          : (_mealLabel(input.mealLabel) ?? old.mealLabel),
+          : (input.clearMealLabel
+                ? null
+                : (_mealLabel(input.mealLabel) ?? old.mealLabel)),
       calories: calories,
       caloriesMax: input.clearCaloriesMax
           ? null

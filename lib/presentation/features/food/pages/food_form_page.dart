@@ -32,11 +32,14 @@ class FoodFormPage extends ConsumerStatefulWidget {
 class _FoodFormPageState extends ConsumerState<FoodFormPage> {
   final _name = TextEditingController();
   final _calories = TextEditingController();
+  final _caloriesMax = TextEditingController();
+  final _mealText = TextEditingController();
+  final _tagInput = TextEditingController();
+  List<String> _tags = const [];
   final _note = TextEditingController();
   final _dateText = TextEditingController();
 
   DateTime? _date;
-  MealType? _meal;
   FoodLog? _existing;
   String? _pickedPath;
   bool _removePhoto = false;
@@ -48,7 +51,15 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
 
   @override
   void dispose() {
-    for (final c in [_name, _calories, _note, _dateText]) {
+    for (final c in [
+      _name,
+      _calories,
+      _caloriesMax,
+      _mealText,
+      _tagInput,
+      _note,
+      _dateText,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -75,8 +86,10 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
     _existing = l;
     _name.text = l.name;
     _calories.text = l.calories?.toString() ?? '';
+    _caloriesMax.text = l.caloriesMax?.toString() ?? '';
     _note.text = l.note ?? '';
-    _meal = l.meal;
+    _mealText.text = l.mealText ?? '';
+    _tags = l.tags;
     _setDate(l.date);
   }
 
@@ -165,13 +178,7 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
   Map<String, String> _validate() {
     final e = <String, String>{};
     if (_name.text.trim().isEmpty) e['name'] = 'Isi nama makanannya dulu ya';
-    final c = _calories.text.trim();
-    if (c.isNotEmpty) {
-      final v = int.tryParse(c);
-      if (v == null || v < 0 || v > 20000) {
-        e['calories'] = 'Kalori sepertinya salah (0–20.000)';
-      }
-    }
+    e.addAll(parseCalorieRange(_calories.text, _caloriesMax.text).errors);
     return e;
   }
 
@@ -183,11 +190,18 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
       HapticFeedback.heavyImpact();
       return;
     }
+    final range = parseCalorieRange(_calories.text, _caloriesMax.text);
+    final meal = resolveMealText(_mealText.text);
     final input = FoodInput(
       date: _dateOrNow,
       name: _name.text,
-      meal: _meal,
-      calories: int.tryParse(_calories.text.trim()),
+      meal: meal.meal,
+      mealLabel: meal.label,
+      clearMealLabel: _isEdit && meal.label == null,
+      calories: range.min,
+      caloriesMax: range.max,
+      clearCaloriesMax: _isEdit && range.max == null,
+      tags: _tags,
       note: _note.text,
     );
     setState(() => _saving = true);
@@ -289,7 +303,7 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
       if (_date == null) {
         final now = ref.read(clockProvider).now();
         _setDate(now);
-        _meal = _guessMeal(now);
+        _mealText.text = _guessMeal(now).label;
       }
       body = _form();
     }
@@ -380,7 +394,7 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
                   height: 200,
                   fit: BoxFit.cover,
                   errorBuilder: (_, _, _) => MealEmojiTile(
-                    meal: _meal,
+                    meal: resolveMealText(_mealText.text).meal,
                     width: w,
                     height: 200,
                     radius: GhinaRadii.rXl,
@@ -423,6 +437,121 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
     );
   }
 
+  Widget _mealChips() {
+    final logs = ref.watch(watchFoodLogsProvider).value ?? const <FoodLog>[];
+    final current = _mealText.text.trim().toLowerCase();
+    final labels = [
+      for (final m in MealType.values) (text: m.label, emoji: m.emoji, m: m),
+      for (final l in recentMealLabels(logs)) (text: l, emoji: '', m: null),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final c in labels)
+          ChunkyChip(
+            key: ValueKey('meal-chip-${c.text}'),
+            label: c.emoji.isEmpty ? c.text : '${c.emoji} ${c.text}',
+            selected: current == c.text.toLowerCase(),
+            color: c.m == null ? GhinaColors.purple : mealSwatch(c.m!),
+            onTap: () => setState(() => _mealText.text = c.text),
+          ),
+      ],
+    );
+  }
+
+  void _addTag([String? raw]) {
+    final text = raw ?? _tagInput.text;
+    final next = addFoodTag(_tags, text);
+    if (identical(next, _tags)) {
+      if (text.trim().isNotEmpty) {
+        showErrorToast(
+          context,
+          _tags.length >= foodTagsMax
+              ? 'Maksimal $foodTagsMax tag'
+              : text.trim().length > foodTagMax
+              ? 'Tag maksimal $foodTagMax karakter'
+              : 'Tag itu sudah ada',
+        );
+      }
+      return;
+    }
+    setState(() {
+      _tags = next;
+      _tagInput.clear();
+    });
+  }
+
+  Widget _tagsEditor() {
+    final g = context.ghina;
+    final known = [
+      for (final c in foodTagCounts(
+        ref.watch(watchFoodLogsProvider).value ?? const <FoodLog>[],
+      ).take(8))
+        if (!_tags.any((t) => t.toLowerCase() == c.tag.toLowerCase())) c.tag,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Tag (opsional)', style: GhinaType.h3),
+        const SizedBox(height: 8),
+        ChunkyTextField(
+          key: const ValueKey('tag-input'),
+          hint: 'mis. pedas, porsi besar',
+          controller: _tagInput,
+          maxLength: foodTagMax,
+          prefixIcon: Icons.sell_rounded,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _addTag(),
+          suffix: IconButton(
+            key: const ValueKey('tag-add'),
+            tooltip: 'Tambah tag',
+            icon: const Icon(Icons.add_rounded),
+            onPressed: _addTag,
+          ),
+        ),
+        if (_tags.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in _tags)
+                ChunkyChip(
+                  key: ValueKey('tag-$t'),
+                  label: '#$t  ✕',
+                  selected: true,
+                  color: GhinaColors.blue,
+                  onTap: () => setState(() => _tags = [..._tags]..remove(t)),
+                ),
+            ],
+          ),
+        ],
+        if (known.isNotEmpty && _tags.length < foodTagsMax) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Tag yang pernah dipakai',
+            style: GhinaType.caption.copyWith(color: g.textMuted),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final t in known)
+                ChunkyChip(
+                  key: ValueKey('tag-suggest-$t'),
+                  label: '#$t',
+                  selected: false,
+                  onTap: () => _addTag(t),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _form() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -447,19 +576,15 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
         const SizedBox(height: 12),
         Text('Waktu makan', style: GhinaType.h3),
         const SizedBox(height: 8),
-        ChunkyChoiceChips<MealType>(
-          options: [
-            for (final m in MealType.values)
-              ChunkyChoice(
-                value: m,
-                label: '${m.emoji} ${m.label}',
-                color: mealSwatch(m),
-              ),
-          ],
-          selected: {?_meal},
-          allowEmpty: true,
-          onChanged: (s) => setState(() => _meal = s.isEmpty ? null : s.first),
+        ChunkyTextField(
+          key: const ValueKey('meal-label'),
+          hint: 'mis. Sarapan, atau tulis sendiri',
+          controller: _mealText,
+          maxLength: foodMealLabelMax,
+          onChanged: (_) => setState(() {}),
         ),
+        const SizedBox(height: 4),
+        _mealChips(),
         const SizedBox(height: 18),
         ChunkyTextField(
           key: const ValueKey('calories'),
@@ -484,6 +609,18 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           textInputAction: TextInputAction.next,
         ),
+        const SizedBox(height: 12),
+        ChunkyTextField(
+          key: const ValueKey('calories-max'),
+          label: 'Sampai (opsional, untuk rentang)',
+          hint: 'mis. 600',
+          controller: _caloriesMax,
+          prefixIcon: Icons.swap_horiz_rounded,
+          errorText: _errors['caloriesMax'],
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          textInputAction: TextInputAction.next,
+        ),
         const SizedBox(height: 16),
         ChunkyTextField(
           label: 'Tanggal',
@@ -492,6 +629,8 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
           prefixIcon: Icons.event_rounded,
           onTap: _pickDate,
         ),
+        const SizedBox(height: 16),
+        _tagsEditor(),
         const SizedBox(height: 16),
         ChunkyTextField(
           key: const ValueKey('note'),

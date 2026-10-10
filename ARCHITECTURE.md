@@ -120,6 +120,7 @@ part, never converted to local time),
 `people` / `personCategories` / `personFields` / `personDates`, `../docs/people.md`; the markdown
 **notes are online-only**, fetched with `GET /api/mobile/people/{id}` and never stored; birthdays
 and important dates notify at 09:00 through the existing scheduler and show read-only on `/calendar`),
+`/habits/:id/insights` ("Analisis", server-computed, online-only), `/habits/fields?habit=` ("Dimensi"),
 `/killa`, `/killa/files?path=`, `/killa/file?path=`, `/killa/commits`, `/killa/reminders`,
 `/killa/usage` (Killa, `../docs/killa.md` — **online-only**, not in sync: `KillaApi` in
 `data/datasources/remote/`, errors are `KillaException`s; a 403 locks the screens and hides the
@@ -177,3 +178,30 @@ screens in `presentation/features/people/`.
 - Notes writes (`ReplacePersonNotes` / `AppendPersonNotes`) re-stamp a queued edit of the same
   person so the server's moved `updatedAt` can't make it lose last-write-wins.
 
+
+## Habit & food screens (phase B)
+
+Screens for the enrichment of schema v8 — no schema change. Offline-first through the synced repositories:
+coping **tools** (editor on the habit screen + tappable suggestions grouped by kind on the urge screen,
+next to the preset ideas), the **events** timeline (journal / milestone / event, never touches streaks),
+user-defined **dimensions** (`habitFields`, manager at `/habits/fields`) and the `extra` values they
+produce on relapses (sheet), urges (optional card on the emergency screen, merged into the urge row that
+is logged on open) and events. **Online-only**, never stored: the habit **notes** (`HabitNotesSection`, a
+`private` habit keeps them collapsed behind "Tampilkan catatan" and fetches only on tap, like sensitive
+people; notes, tools and events never enter the masked digests/lists) and the server **analysis**
+(`HabitOnlineRepository`, `/insights?days=&today=&tz=`; offline = a distinct message, not an error).
+
+- A notes write moves the server habit's `updatedAt`, so `ReplaceHabitNotes` / `AppendHabitNotes` call
+  `HabitRepository.refreshPending` (re-stamps a queued edit, e.g. tools) and sync.
+- `extra` is validated locally exactly as the server does (`habit_enrichment_rules.dart`): only defs that
+  apply to the habit **and** the log type / event kind; a dimension without `appliesTo` does not show on the
+  one-tap check-in (list `done` to get a "Tambah detail" tile after it). A rejected row would be dropped by
+  sync, so a bad value is refused before saving.
+- `HabitFieldRepository.delete` strips the key from every log/event in the same transaction (the server does
+  the same); the UI warns with the number of records first.
+- Food: calories are a range (`700–900 kkal`, en dash, "kkal" like the rest of the app), daily totals show
+  min–max with a midpoint, `meal` is a free label (canonical meals resolve to `MealType`), tags are chips
+  (≤ 10 × 30) with a filter, and a weekly summary is computed locally with the same rounding as
+  `GET /food/summary` (`food_rules.dart`).
+- New routes sit behind `HabitLockGate` like every habit route; the analysis and notes are never shown on
+  home, the board, reminders or search.
