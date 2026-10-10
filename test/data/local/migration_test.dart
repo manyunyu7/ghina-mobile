@@ -25,6 +25,7 @@ import 'generated_migrations/schema_v3.dart' as v3;
 import 'generated_migrations/schema_v4.dart' as v4;
 import 'generated_migrations/schema_v6.dart' as v6;
 import 'generated_migrations/schema_v7.dart' as v7;
+import 'generated_migrations/schema_v8.dart' as v8;
 
 void main() {
   late SchemaVerifier verifier;
@@ -139,6 +140,144 @@ void main() {
     final schema = await verifier.schemaAt(8);
     final db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, 8);
+    await db.close();
+  });
+
+  for (final from in [1, 2, 3, 4, 5, 6, 7, 8]) {
+    test('upgrade v$from → v9 yields exactly the v9 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 9);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v9 schema', () async {
+    final schema = await verifier.schemaAt(9);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 9);
+    await db.close();
+  });
+
+  test('v8 data survives v8 → v9 on a real file; dream tables are created, '
+      'a full pull is scheduled and wipe clears them', () async {
+    final dir = await Directory.systemTemp.createTemp('ghina_migration_v9');
+    final file = File('${dir.path}/ghina.sqlite');
+    addTearDown(() => dir.delete(recursive: true));
+
+    // 1. A v8 database: a pending outbox entry and a cursor that says
+    //    "everything up to now is pulled".
+    final old = v8.DatabaseAtV8(NativeDatabase(file));
+    for (final sql in [
+      "INSERT INTO people (id, name, category, vibe, data_status, sensitive, tags, fields, has_notes, notes_length, created_at, updated_at) "
+          "VALUES ('p1', 'Siti Sample', 'family', 'unknown', 'sparse', 0, '[]', '{}', 0, 0, 1, 1)",
+      "INSERT INTO outbox (mutation_id, entity, op, entity_id, data, is_create, in_flight, client_updated_at) "
+          "VALUES ('m1', 'people', 'upsert', 'p1', '{\"name\":\"Siti Sample\"}', 0, 0, 2000)",
+      "INSERT INTO sync_meta (id, cursor, epoch, user_id, full_pull_required) "
+          "VALUES (1, 1790000000000, 'epoch-1', 'u1', 0)",
+    ]) {
+      await old.customStatement(sql);
+    }
+    await old.close();
+
+    // 2. Open with the current app → onUpgrade(8, 9).
+    final db = AppDatabase(NativeDatabase(file));
+    expect((await db.select(db.people).getSingle()).id, 'p1');
+    expect((await db.select(db.outbox).getSingle()).entityId, 'p1');
+
+    // The v8 app skipped the dreams: the migration forces a full re-pull like
+    // v7 and v8 did, and keeps the cursor.
+    final meta = await db.getMeta();
+    expect(meta.fullPullRequired, isTrue);
+    expect(meta.cursor, 1790000000000);
+
+    // The five new tables exist, are empty, writable and part of the wipe.
+    for (final t in <TableInfo<Table, dynamic>>[
+      db.dreams,
+      db.dreamSteps,
+      db.dreamMetrics,
+      db.dreamCategories,
+      db.dreamFields,
+    ]) {
+      expect(await db.select(t).get(), isEmpty);
+      expect(db.syncedTables, contains(t));
+    }
+    final now = DateTime(2026, 10, 10, 9);
+    await db
+        .into(db.dreams)
+        .insert(
+          DreamsCompanion.insert(
+            id: 'd1',
+            title: 'Mimpi contoh',
+            fields: const Value('{"sumber_contoh":"daftar-1"}'),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.dreamSteps)
+        .insert(
+          DreamStepsCompanion.insert(
+            id: 's1',
+            dreamId: 'd1',
+            title: 'Langkah contoh',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.dreamMetrics)
+        .insert(
+          DreamMetricsCompanion.insert(
+            id: 'm1',
+            dreamId: 'd1',
+            label: 'Tabungan contoh',
+            source: 'manual',
+            targetValue: 12000000,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.dreamCategories)
+        .insert(
+          DreamCategoriesCompanion.insert(
+            id: 'dc1',
+            key: 'travel',
+            label: 'Jalan-jalan',
+            emoji: '✈️',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    await db
+        .into(db.dreamFields)
+        .insert(
+          DreamFieldsCompanion.insert(
+            id: 'df1',
+            key: 'sumber_contoh',
+            label: 'Sumber contoh',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final d = await db.select(db.dreams).getSingle();
+    expect(d.category, 'other');
+    expect(d.status, 'idea');
+    expect(d.targetPrecision, 'day');
+    expect(d.tags, '[]');
+    expect(d.links, '{}');
+    expect(d.fields, '{"sumber_contoh":"daftar-1"}');
+    expect((await db.select(db.dreamSteps).getSingle()).done, isFalse);
+    expect((await db.select(db.dreamMetrics).getSingle()).manualValue, isNull);
+    expect((await db.select(db.dreamCategories).getSingle()).key, 'travel');
+
+    await db.wipe();
+    expect(await db.select(db.dreams).get(), isEmpty);
+    expect(await db.select(db.dreamSteps).get(), isEmpty);
+    expect(await db.select(db.dreamMetrics).get(), isEmpty);
+    expect(await db.select(db.dreamCategories).get(), isEmpty);
+    expect(await db.select(db.dreamFields).get(), isEmpty);
     await db.close();
   });
 

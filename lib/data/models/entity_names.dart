@@ -29,6 +29,11 @@ abstract final class SyncEntity {
   static const personDates = 'personDates';
   static const habitFields = 'habitFields';
   static const habitEvents = 'habitEvents';
+  static const dreamCategories = 'dreamCategories';
+  static const dreamFields = 'dreamFields';
+  static const dreams = 'dreams';
+  static const dreamMetrics = 'dreamMetrics';
+  static const dreamSteps = 'dreamSteps';
 
   /// Apply order for pulls (referenced entities first).
   static const all = [
@@ -63,6 +68,13 @@ abstract final class SyncEntity {
     personDates,
     habitFields,
     habitEvents,
+    // Dreams: categories and field defs before the dreams that use them, the
+    // dreams before their metrics and steps (docs/dreams.md → Sync).
+    dreamCategories,
+    dreamFields,
+    dreams,
+    dreamMetrics,
+    dreamSteps,
   ];
 
   /// Notes module (`docs/notes.md`): a pull carrying [noteLabels] comes from a
@@ -97,4 +109,13 @@ abstract final class SyncEntity {
   /// Habit enrichment (`docs/habits-food-enrichment.md`): a pull carrying
   /// [habitFields] comes from an enrichment-aware server.
   static const enrichmentModule = [habitFields, habitEvents];
+
+  /// Dreams ("Mimpi", `docs/dreams.md`).
+  static const dreamsModule = [
+    dreamCategories,
+    dreamFields,
+    dreams,
+    dreamMetrics,
+    dreamSteps,
+  ];
 }

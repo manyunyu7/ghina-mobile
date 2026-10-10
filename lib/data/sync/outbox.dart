@@ -311,6 +311,15 @@ class Outbox {
             SyncEntity.personFields => 4.2,
             SyncEntity.people => 4.3,
             SyncEntity.personDates => 4.4,
+            // Dreams (docs/dreams.md → Sync): categories and field defs, then
+            // the dreams (after `notes`, rank 5: a dream may link a note), then
+            // their metrics and steps. Parents before children is handled by
+            // [dreamParentOrder] below.
+            SyncEntity.dreamCategories => 5.1,
+            SyncEntity.dreamFields => 5.2,
+            SyncEntity.dreams => 5.5,
+            SyncEntity.dreamMetrics => 5.6,
+            SyncEntity.dreamSteps => 5.7,
             SyncEntity.contentItems => 6,
             SyncEntity.contentPosts => 7,
             // After the items: a rename renames the pillar on the server's
@@ -320,10 +329,13 @@ class Outbox {
           };
         }
 
+        final depth = dreamParentDepths(rows);
         final indexed = rows.indexed.toList()
           ..sort((a, b) {
             final c = rank(a.$2).compareTo(rank(b.$2));
-            return c != 0 ? c : a.$1.compareTo(b.$1);
+            if (c != 0) return c;
+            final d = (depth[a.$2.seq] ?? 0).compareTo(depth[b.$2.seq] ?? 0);
+            return d != 0 ? d : a.$1.compareTo(b.$1);
           });
         return [for (final e in indexed) e.$2.copyWith(inFlight: true)];
       });
@@ -352,4 +364,38 @@ class Outbox {
       (_db.update(_db.outbox)..where((o) => o.seq.equals(seq))).write(
         OutboxCompanion(data: Value(jsonEncode(data))),
       );
+}
+
+/// Depth of each queued dream upsert in its parent chain, counted only through
+/// dreams of the same batch (keyed by the entry's `seq`). A child sorts after
+/// its parent, so the server (which rejects a `parentId` it doesn't know yet)
+/// receives parents first even when the child was queued first.
+Map<int, int> dreamParentDepths(List<OutboxRow> rows) {
+  final inBatch = <String>{};
+  final parentOf = <String, String>{};
+  for (final r in rows) {
+    if (r.entity != SyncEntity.dreams || r.op != MutationOp.upsert.name) {
+      continue;
+    }
+    inBatch.add(r.entityId);
+    final parent = Outbox.decode(r.data)?['parentId'];
+    if (parent is String && parent.isNotEmpty) parentOf[r.entityId] = parent;
+  }
+  final out = <int, int>{};
+  for (final r in rows) {
+    if (r.entity != SyncEntity.dreams || r.op != MutationOp.upsert.name) {
+      continue;
+    }
+    var depth = 0;
+    final seen = <String>{r.entityId};
+    var cur = parentOf[r.entityId];
+    // Only ancestors that are queued in this batch count; the server already
+    // has the others.
+    while (cur != null && inBatch.contains(cur) && seen.add(cur)) {
+      depth++;
+      cur = parentOf[cur];
+    }
+    out[r.seq] = depth;
+  }
+  return out;
 }

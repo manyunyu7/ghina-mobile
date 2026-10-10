@@ -39,6 +39,11 @@ part 'app_database.g.dart';
     PersonDates,
     HabitFields,
     HabitEvents,
+    Dreams,
+    DreamSteps,
+    DreamMetrics,
+    DreamCategories,
+    DreamFields,
     CachedPrices,
     PortfolioSnapshots,
     CapturedNotifications,
@@ -79,13 +84,15 @@ class AppDatabase extends _$AppDatabase {
   /// `person_dates`) and habit enrichment (`habit_fields`, `habit_events`,
   /// `habits.tools/hasNotes/notesLength`, `habit_logs.extra`,
   /// `food.caloriesMax/tags`, `sync_meta.enrichment_seen`).
+  /// v9: dreams ("Mimpi", `docs/dreams.md`): `dreams`, `dream_steps`,
+  /// `dream_metrics`, `dream_categories`, `dream_fields` (all synced).
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -198,6 +205,20 @@ class AppDatabase extends _$AppDatabase {
         await m.createIndex(idxHabitEventHabit);
         await customStatement('UPDATE sync_meta SET full_pull_required = 1');
       }
+      if (from < 9 && to >= 9) {
+        // Additive only: five synced dream tables. The v8 app pulled past the
+        // dreams without storing them: re-download everything once (pending
+        // outbox rows still win), exactly like v7 and v8.
+        await m.createTable(dreams);
+        await m.createTable(dreamSteps);
+        await m.createTable(dreamMetrics);
+        await m.createTable(dreamCategories);
+        await m.createTable(dreamFields);
+        await m.createIndex(idxDreamCategory);
+        await m.createIndex(idxDreamStepDream);
+        await m.createIndex(idxDreamMetricDream);
+        await customStatement('UPDATE sync_meta SET full_pull_required = 1');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = OFF');
@@ -240,6 +261,11 @@ class AppDatabase extends _$AppDatabase {
     personDates,
     habitFields,
     habitEvents,
+    dreams,
+    dreamSteps,
+    dreamMetrics,
+    dreamCategories,
+    dreamFields,
   ];
 
   /// Device-only tables derived from the user's data (wiped with it).

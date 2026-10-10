@@ -19811,6 +19811,4156 @@ class HabitEventsCompanion extends UpdateCompanion<HabitEventRow> {
   }
 }
 
+class $DreamsTable extends Dreams with TableInfo<$DreamsTable, DreamRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DreamsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _emojiMeta = const VerificationMeta('emoji');
+  @override
+  late final GeneratedColumn<String> emoji = GeneratedColumn<String>(
+    'emoji',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('other'),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('idea'),
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _horizonMeta = const VerificationMeta(
+    'horizon',
+  );
+  @override
+  late final GeneratedColumn<String> horizon = GeneratedColumn<String>(
+    'horizon',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetDateMeta = const VerificationMeta(
+    'targetDate',
+  );
+  @override
+  late final GeneratedColumn<String> targetDate = GeneratedColumn<String>(
+    'target_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetPrecisionMeta = const VerificationMeta(
+    'targetPrecision',
+  );
+  @override
+  late final GeneratedColumn<String> targetPrecision = GeneratedColumn<String>(
+    'target_precision',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('day'),
+  );
+  static const VerificationMeta _conditionMeta = const VerificationMeta(
+    'condition',
+  );
+  @override
+  late final GeneratedColumn<String> condition = GeneratedColumn<String>(
+    'condition',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _whyMeta = const VerificationMeta('why');
+  @override
+  late final GeneratedColumn<String> why = GeneratedColumn<String>(
+    'why',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _costEstimateMeta = const VerificationMeta(
+    'costEstimate',
+  );
+  @override
+  late final GeneratedColumn<double> costEstimate = GeneratedColumn<double>(
+    'cost_estimate',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _costNoteMeta = const VerificationMeta(
+    'costNote',
+  );
+  @override
+  late final GeneratedColumn<String> costNote = GeneratedColumn<String>(
+    'cost_note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _progressManualMeta = const VerificationMeta(
+    'progressManual',
+  );
+  @override
+  late final GeneratedColumn<int> progressManual = GeneratedColumn<int>(
+    'progress_manual',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startedAtMeta = const VerificationMeta(
+    'startedAt',
+  );
+  @override
+  late final GeneratedColumn<String> startedAt = GeneratedColumn<String>(
+    'started_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
+  @override
+  late final GeneratedColumn<String> completedAt = GeneratedColumn<String>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteIdMeta = const VerificationMeta('noteId');
+  @override
+  late final GeneratedColumn<String> noteId = GeneratedColumn<String>(
+    'note_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _fieldsMeta = const VerificationMeta('fields');
+  @override
+  late final GeneratedColumn<String> fields = GeneratedColumn<String>(
+    'fields',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _linksMeta = const VerificationMeta('links');
+  @override
+  late final GeneratedColumn<String> links = GeneratedColumn<String>(
+    'links',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    emoji,
+    category,
+    status,
+    priority,
+    horizon,
+    targetDate,
+    targetPrecision,
+    condition,
+    why,
+    summary,
+    costEstimate,
+    costNote,
+    progressManual,
+    startedAt,
+    completedAt,
+    noteId,
+    parentId,
+    tags,
+    fields,
+    links,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dreams';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DreamRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('emoji')) {
+      context.handle(
+        _emojiMeta,
+        emoji.isAcceptableOrUnknown(data['emoji']!, _emojiMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('horizon')) {
+      context.handle(
+        _horizonMeta,
+        horizon.isAcceptableOrUnknown(data['horizon']!, _horizonMeta),
+      );
+    }
+    if (data.containsKey('target_date')) {
+      context.handle(
+        _targetDateMeta,
+        targetDate.isAcceptableOrUnknown(data['target_date']!, _targetDateMeta),
+      );
+    }
+    if (data.containsKey('target_precision')) {
+      context.handle(
+        _targetPrecisionMeta,
+        targetPrecision.isAcceptableOrUnknown(
+          data['target_precision']!,
+          _targetPrecisionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('condition')) {
+      context.handle(
+        _conditionMeta,
+        condition.isAcceptableOrUnknown(data['condition']!, _conditionMeta),
+      );
+    }
+    if (data.containsKey('why')) {
+      context.handle(
+        _whyMeta,
+        why.isAcceptableOrUnknown(data['why']!, _whyMeta),
+      );
+    }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    }
+    if (data.containsKey('cost_estimate')) {
+      context.handle(
+        _costEstimateMeta,
+        costEstimate.isAcceptableOrUnknown(
+          data['cost_estimate']!,
+          _costEstimateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cost_note')) {
+      context.handle(
+        _costNoteMeta,
+        costNote.isAcceptableOrUnknown(data['cost_note']!, _costNoteMeta),
+      );
+    }
+    if (data.containsKey('progress_manual')) {
+      context.handle(
+        _progressManualMeta,
+        progressManual.isAcceptableOrUnknown(
+          data['progress_manual']!,
+          _progressManualMeta,
+        ),
+      );
+    }
+    if (data.containsKey('started_at')) {
+      context.handle(
+        _startedAtMeta,
+        startedAt.isAcceptableOrUnknown(data['started_at']!, _startedAtMeta),
+      );
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('note_id')) {
+      context.handle(
+        _noteIdMeta,
+        noteId.isAcceptableOrUnknown(data['note_id']!, _noteIdMeta),
+      );
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
+    if (data.containsKey('fields')) {
+      context.handle(
+        _fieldsMeta,
+        fields.isAcceptableOrUnknown(data['fields']!, _fieldsMeta),
+      );
+    }
+    if (data.containsKey('links')) {
+      context.handle(
+        _linksMeta,
+        links.isAcceptableOrUnknown(data['links']!, _linksMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DreamRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DreamRow(
+      createdAt: $DreamsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $DreamsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      emoji: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emoji'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      ),
+      horizon: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}horizon'],
+      ),
+      targetDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_date'],
+      ),
+      targetPrecision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_precision'],
+      )!,
+      condition: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}condition'],
+      ),
+      why: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}why'],
+      ),
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      ),
+      costEstimate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cost_estimate'],
+      ),
+      costNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cost_note'],
+      ),
+      progressManual: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}progress_manual'],
+      ),
+      startedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}started_at'],
+      ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}completed_at'],
+      ),
+      noteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note_id'],
+      ),
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
+      fields: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fields'],
+      )!,
+      links: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}links'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $DreamsTable createAlias(String alias) {
+    return $DreamsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+}
+
+class DreamRow extends DataClass implements Insertable<DreamRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String title;
+  final String? emoji;
+
+  /// A `dream_categories.key` (default `other`).
+  final String category;
+
+  /// `idea | planned | active | waiting | done | paused | dropped | watching`
+  final String status;
+
+  /// 1 (highest) … 5, nullable.
+  final int? priority;
+
+  /// `someday | this_year | next_year | multi_year | ongoing`, nullable.
+  final String? horizon;
+
+  /// `YYYY-MM-DD`, always the last day of the `targetPrecision` period.
+  final String? targetDate;
+
+  /// `day | month | quarter | year`
+  final String targetPrecision;
+  final String? condition;
+  final String? why;
+  final String? summary;
+
+  /// Rupiah estimate, nullable.
+  final double? costEstimate;
+  final String? costNote;
+
+  /// 0–100, nullable (overrides the computed progress).
+  final int? progressManual;
+
+  /// `YYYY-MM-DD`, nullable.
+  final String? startedAt;
+
+  /// `YYYY-MM-DD`, nullable.
+  final String? completedAt;
+
+  /// A note of the user, nullable (the note's delete nulls it).
+  final String? noteId;
+
+  /// A parent dream of the user, nullable.
+  final String? parentId;
+
+  /// JSON array of strings.
+  final String tags;
+
+  /// JSON object: custom-field key → string|number|bool.
+  final String fields;
+
+  /// JSON object `{"taskIds": [...], "habitIds": [...]}` (soft links).
+  final String links;
+  final int sortOrder;
+  const DreamRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.title,
+    this.emoji,
+    required this.category,
+    required this.status,
+    this.priority,
+    this.horizon,
+    this.targetDate,
+    required this.targetPrecision,
+    this.condition,
+    this.why,
+    this.summary,
+    this.costEstimate,
+    this.costNote,
+    this.progressManual,
+    this.startedAt,
+    this.completedAt,
+    this.noteId,
+    this.parentId,
+    required this.tags,
+    required this.fields,
+    required this.links,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $DreamsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $DreamsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || emoji != null) {
+      map['emoji'] = Variable<String>(emoji);
+    }
+    map['category'] = Variable<String>(category);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || priority != null) {
+      map['priority'] = Variable<int>(priority);
+    }
+    if (!nullToAbsent || horizon != null) {
+      map['horizon'] = Variable<String>(horizon);
+    }
+    if (!nullToAbsent || targetDate != null) {
+      map['target_date'] = Variable<String>(targetDate);
+    }
+    map['target_precision'] = Variable<String>(targetPrecision);
+    if (!nullToAbsent || condition != null) {
+      map['condition'] = Variable<String>(condition);
+    }
+    if (!nullToAbsent || why != null) {
+      map['why'] = Variable<String>(why);
+    }
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
+    if (!nullToAbsent || costEstimate != null) {
+      map['cost_estimate'] = Variable<double>(costEstimate);
+    }
+    if (!nullToAbsent || costNote != null) {
+      map['cost_note'] = Variable<String>(costNote);
+    }
+    if (!nullToAbsent || progressManual != null) {
+      map['progress_manual'] = Variable<int>(progressManual);
+    }
+    if (!nullToAbsent || startedAt != null) {
+      map['started_at'] = Variable<String>(startedAt);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<String>(completedAt);
+    }
+    if (!nullToAbsent || noteId != null) {
+      map['note_id'] = Variable<String>(noteId);
+    }
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['fields'] = Variable<String>(fields);
+    map['links'] = Variable<String>(links);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  DreamsCompanion toCompanion(bool nullToAbsent) {
+    return DreamsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      title: Value(title),
+      emoji: emoji == null && nullToAbsent
+          ? const Value.absent()
+          : Value(emoji),
+      category: Value(category),
+      status: Value(status),
+      priority: priority == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priority),
+      horizon: horizon == null && nullToAbsent
+          ? const Value.absent()
+          : Value(horizon),
+      targetDate: targetDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetDate),
+      targetPrecision: Value(targetPrecision),
+      condition: condition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(condition),
+      why: why == null && nullToAbsent ? const Value.absent() : Value(why),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
+      costEstimate: costEstimate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(costEstimate),
+      costNote: costNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(costNote),
+      progressManual: progressManual == null && nullToAbsent
+          ? const Value.absent()
+          : Value(progressManual),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      noteId: noteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(noteId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      tags: Value(tags),
+      fields: Value(fields),
+      links: Value(links),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory DreamRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DreamRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      title: serializer.fromJson<String>(json['title']),
+      emoji: serializer.fromJson<String?>(json['emoji']),
+      category: serializer.fromJson<String>(json['category']),
+      status: serializer.fromJson<String>(json['status']),
+      priority: serializer.fromJson<int?>(json['priority']),
+      horizon: serializer.fromJson<String?>(json['horizon']),
+      targetDate: serializer.fromJson<String?>(json['targetDate']),
+      targetPrecision: serializer.fromJson<String>(json['targetPrecision']),
+      condition: serializer.fromJson<String?>(json['condition']),
+      why: serializer.fromJson<String?>(json['why']),
+      summary: serializer.fromJson<String?>(json['summary']),
+      costEstimate: serializer.fromJson<double?>(json['costEstimate']),
+      costNote: serializer.fromJson<String?>(json['costNote']),
+      progressManual: serializer.fromJson<int?>(json['progressManual']),
+      startedAt: serializer.fromJson<String?>(json['startedAt']),
+      completedAt: serializer.fromJson<String?>(json['completedAt']),
+      noteId: serializer.fromJson<String?>(json['noteId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
+      tags: serializer.fromJson<String>(json['tags']),
+      fields: serializer.fromJson<String>(json['fields']),
+      links: serializer.fromJson<String>(json['links']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'title': serializer.toJson<String>(title),
+      'emoji': serializer.toJson<String?>(emoji),
+      'category': serializer.toJson<String>(category),
+      'status': serializer.toJson<String>(status),
+      'priority': serializer.toJson<int?>(priority),
+      'horizon': serializer.toJson<String?>(horizon),
+      'targetDate': serializer.toJson<String?>(targetDate),
+      'targetPrecision': serializer.toJson<String>(targetPrecision),
+      'condition': serializer.toJson<String?>(condition),
+      'why': serializer.toJson<String?>(why),
+      'summary': serializer.toJson<String?>(summary),
+      'costEstimate': serializer.toJson<double?>(costEstimate),
+      'costNote': serializer.toJson<String?>(costNote),
+      'progressManual': serializer.toJson<int?>(progressManual),
+      'startedAt': serializer.toJson<String?>(startedAt),
+      'completedAt': serializer.toJson<String?>(completedAt),
+      'noteId': serializer.toJson<String?>(noteId),
+      'parentId': serializer.toJson<String?>(parentId),
+      'tags': serializer.toJson<String>(tags),
+      'fields': serializer.toJson<String>(fields),
+      'links': serializer.toJson<String>(links),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  DreamRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? title,
+    Value<String?> emoji = const Value.absent(),
+    String? category,
+    String? status,
+    Value<int?> priority = const Value.absent(),
+    Value<String?> horizon = const Value.absent(),
+    Value<String?> targetDate = const Value.absent(),
+    String? targetPrecision,
+    Value<String?> condition = const Value.absent(),
+    Value<String?> why = const Value.absent(),
+    Value<String?> summary = const Value.absent(),
+    Value<double?> costEstimate = const Value.absent(),
+    Value<String?> costNote = const Value.absent(),
+    Value<int?> progressManual = const Value.absent(),
+    Value<String?> startedAt = const Value.absent(),
+    Value<String?> completedAt = const Value.absent(),
+    Value<String?> noteId = const Value.absent(),
+    Value<String?> parentId = const Value.absent(),
+    String? tags,
+    String? fields,
+    String? links,
+    int? sortOrder,
+  }) => DreamRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    title: title ?? this.title,
+    emoji: emoji.present ? emoji.value : this.emoji,
+    category: category ?? this.category,
+    status: status ?? this.status,
+    priority: priority.present ? priority.value : this.priority,
+    horizon: horizon.present ? horizon.value : this.horizon,
+    targetDate: targetDate.present ? targetDate.value : this.targetDate,
+    targetPrecision: targetPrecision ?? this.targetPrecision,
+    condition: condition.present ? condition.value : this.condition,
+    why: why.present ? why.value : this.why,
+    summary: summary.present ? summary.value : this.summary,
+    costEstimate: costEstimate.present ? costEstimate.value : this.costEstimate,
+    costNote: costNote.present ? costNote.value : this.costNote,
+    progressManual: progressManual.present
+        ? progressManual.value
+        : this.progressManual,
+    startedAt: startedAt.present ? startedAt.value : this.startedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    noteId: noteId.present ? noteId.value : this.noteId,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    tags: tags ?? this.tags,
+    fields: fields ?? this.fields,
+    links: links ?? this.links,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  DreamRow copyWithCompanion(DreamsCompanion data) {
+    return DreamRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      title: data.title.present ? data.title.value : this.title,
+      emoji: data.emoji.present ? data.emoji.value : this.emoji,
+      category: data.category.present ? data.category.value : this.category,
+      status: data.status.present ? data.status.value : this.status,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      horizon: data.horizon.present ? data.horizon.value : this.horizon,
+      targetDate: data.targetDate.present
+          ? data.targetDate.value
+          : this.targetDate,
+      targetPrecision: data.targetPrecision.present
+          ? data.targetPrecision.value
+          : this.targetPrecision,
+      condition: data.condition.present ? data.condition.value : this.condition,
+      why: data.why.present ? data.why.value : this.why,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      costEstimate: data.costEstimate.present
+          ? data.costEstimate.value
+          : this.costEstimate,
+      costNote: data.costNote.present ? data.costNote.value : this.costNote,
+      progressManual: data.progressManual.present
+          ? data.progressManual.value
+          : this.progressManual,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+      noteId: data.noteId.present ? data.noteId.value : this.noteId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      fields: data.fields.present ? data.fields.value : this.fields,
+      links: data.links.present ? data.links.value : this.links,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('emoji: $emoji, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('priority: $priority, ')
+          ..write('horizon: $horizon, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('targetPrecision: $targetPrecision, ')
+          ..write('condition: $condition, ')
+          ..write('why: $why, ')
+          ..write('summary: $summary, ')
+          ..write('costEstimate: $costEstimate, ')
+          ..write('costNote: $costNote, ')
+          ..write('progressManual: $progressManual, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('noteId: $noteId, ')
+          ..write('parentId: $parentId, ')
+          ..write('tags: $tags, ')
+          ..write('fields: $fields, ')
+          ..write('links: $links, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    createdAt,
+    updatedAt,
+    id,
+    title,
+    emoji,
+    category,
+    status,
+    priority,
+    horizon,
+    targetDate,
+    targetPrecision,
+    condition,
+    why,
+    summary,
+    costEstimate,
+    costNote,
+    progressManual,
+    startedAt,
+    completedAt,
+    noteId,
+    parentId,
+    tags,
+    fields,
+    links,
+    sortOrder,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DreamRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.title == this.title &&
+          other.emoji == this.emoji &&
+          other.category == this.category &&
+          other.status == this.status &&
+          other.priority == this.priority &&
+          other.horizon == this.horizon &&
+          other.targetDate == this.targetDate &&
+          other.targetPrecision == this.targetPrecision &&
+          other.condition == this.condition &&
+          other.why == this.why &&
+          other.summary == this.summary &&
+          other.costEstimate == this.costEstimate &&
+          other.costNote == this.costNote &&
+          other.progressManual == this.progressManual &&
+          other.startedAt == this.startedAt &&
+          other.completedAt == this.completedAt &&
+          other.noteId == this.noteId &&
+          other.parentId == this.parentId &&
+          other.tags == this.tags &&
+          other.fields == this.fields &&
+          other.links == this.links &&
+          other.sortOrder == this.sortOrder);
+}
+
+class DreamsCompanion extends UpdateCompanion<DreamRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> title;
+  final Value<String?> emoji;
+  final Value<String> category;
+  final Value<String> status;
+  final Value<int?> priority;
+  final Value<String?> horizon;
+  final Value<String?> targetDate;
+  final Value<String> targetPrecision;
+  final Value<String?> condition;
+  final Value<String?> why;
+  final Value<String?> summary;
+  final Value<double?> costEstimate;
+  final Value<String?> costNote;
+  final Value<int?> progressManual;
+  final Value<String?> startedAt;
+  final Value<String?> completedAt;
+  final Value<String?> noteId;
+  final Value<String?> parentId;
+  final Value<String> tags;
+  final Value<String> fields;
+  final Value<String> links;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const DreamsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.title = const Value.absent(),
+    this.emoji = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.horizon = const Value.absent(),
+    this.targetDate = const Value.absent(),
+    this.targetPrecision = const Value.absent(),
+    this.condition = const Value.absent(),
+    this.why = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.costEstimate = const Value.absent(),
+    this.costNote = const Value.absent(),
+    this.progressManual = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.fields = const Value.absent(),
+    this.links = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DreamsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String title,
+    this.emoji = const Value.absent(),
+    this.category = const Value.absent(),
+    this.status = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.horizon = const Value.absent(),
+    this.targetDate = const Value.absent(),
+    this.targetPrecision = const Value.absent(),
+    this.condition = const Value.absent(),
+    this.why = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.costEstimate = const Value.absent(),
+    this.costNote = const Value.absent(),
+    this.progressManual = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.noteId = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.fields = const Value.absent(),
+    this.links = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       title = Value(title);
+  static Insertable<DreamRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? title,
+    Expression<String>? emoji,
+    Expression<String>? category,
+    Expression<String>? status,
+    Expression<int>? priority,
+    Expression<String>? horizon,
+    Expression<String>? targetDate,
+    Expression<String>? targetPrecision,
+    Expression<String>? condition,
+    Expression<String>? why,
+    Expression<String>? summary,
+    Expression<double>? costEstimate,
+    Expression<String>? costNote,
+    Expression<int>? progressManual,
+    Expression<String>? startedAt,
+    Expression<String>? completedAt,
+    Expression<String>? noteId,
+    Expression<String>? parentId,
+    Expression<String>? tags,
+    Expression<String>? fields,
+    Expression<String>? links,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (title != null) 'title': title,
+      if (emoji != null) 'emoji': emoji,
+      if (category != null) 'category': category,
+      if (status != null) 'status': status,
+      if (priority != null) 'priority': priority,
+      if (horizon != null) 'horizon': horizon,
+      if (targetDate != null) 'target_date': targetDate,
+      if (targetPrecision != null) 'target_precision': targetPrecision,
+      if (condition != null) 'condition': condition,
+      if (why != null) 'why': why,
+      if (summary != null) 'summary': summary,
+      if (costEstimate != null) 'cost_estimate': costEstimate,
+      if (costNote != null) 'cost_note': costNote,
+      if (progressManual != null) 'progress_manual': progressManual,
+      if (startedAt != null) 'started_at': startedAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (noteId != null) 'note_id': noteId,
+      if (parentId != null) 'parent_id': parentId,
+      if (tags != null) 'tags': tags,
+      if (fields != null) 'fields': fields,
+      if (links != null) 'links': links,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DreamsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? title,
+    Value<String?>? emoji,
+    Value<String>? category,
+    Value<String>? status,
+    Value<int?>? priority,
+    Value<String?>? horizon,
+    Value<String?>? targetDate,
+    Value<String>? targetPrecision,
+    Value<String?>? condition,
+    Value<String?>? why,
+    Value<String?>? summary,
+    Value<double?>? costEstimate,
+    Value<String?>? costNote,
+    Value<int?>? progressManual,
+    Value<String?>? startedAt,
+    Value<String?>? completedAt,
+    Value<String?>? noteId,
+    Value<String?>? parentId,
+    Value<String>? tags,
+    Value<String>? fields,
+    Value<String>? links,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return DreamsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      title: title ?? this.title,
+      emoji: emoji ?? this.emoji,
+      category: category ?? this.category,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      horizon: horizon ?? this.horizon,
+      targetDate: targetDate ?? this.targetDate,
+      targetPrecision: targetPrecision ?? this.targetPrecision,
+      condition: condition ?? this.condition,
+      why: why ?? this.why,
+      summary: summary ?? this.summary,
+      costEstimate: costEstimate ?? this.costEstimate,
+      costNote: costNote ?? this.costNote,
+      progressManual: progressManual ?? this.progressManual,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      noteId: noteId ?? this.noteId,
+      parentId: parentId ?? this.parentId,
+      tags: tags ?? this.tags,
+      fields: fields ?? this.fields,
+      links: links ?? this.links,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $DreamsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $DreamsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (emoji.present) {
+      map['emoji'] = Variable<String>(emoji.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
+    if (horizon.present) {
+      map['horizon'] = Variable<String>(horizon.value);
+    }
+    if (targetDate.present) {
+      map['target_date'] = Variable<String>(targetDate.value);
+    }
+    if (targetPrecision.present) {
+      map['target_precision'] = Variable<String>(targetPrecision.value);
+    }
+    if (condition.present) {
+      map['condition'] = Variable<String>(condition.value);
+    }
+    if (why.present) {
+      map['why'] = Variable<String>(why.value);
+    }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (costEstimate.present) {
+      map['cost_estimate'] = Variable<double>(costEstimate.value);
+    }
+    if (costNote.present) {
+      map['cost_note'] = Variable<String>(costNote.value);
+    }
+    if (progressManual.present) {
+      map['progress_manual'] = Variable<int>(progressManual.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<String>(startedAt.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<String>(completedAt.value);
+    }
+    if (noteId.present) {
+      map['note_id'] = Variable<String>(noteId.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (fields.present) {
+      map['fields'] = Variable<String>(fields.value);
+    }
+    if (links.present) {
+      map['links'] = Variable<String>(links.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('title: $title, ')
+          ..write('emoji: $emoji, ')
+          ..write('category: $category, ')
+          ..write('status: $status, ')
+          ..write('priority: $priority, ')
+          ..write('horizon: $horizon, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('targetPrecision: $targetPrecision, ')
+          ..write('condition: $condition, ')
+          ..write('why: $why, ')
+          ..write('summary: $summary, ')
+          ..write('costEstimate: $costEstimate, ')
+          ..write('costNote: $costNote, ')
+          ..write('progressManual: $progressManual, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('noteId: $noteId, ')
+          ..write('parentId: $parentId, ')
+          ..write('tags: $tags, ')
+          ..write('fields: $fields, ')
+          ..write('links: $links, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DreamStepsTable extends DreamSteps
+    with TableInfo<$DreamStepsTable, DreamStepRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DreamStepsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamStepsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamStepsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dreamIdMeta = const VerificationMeta(
+    'dreamId',
+  );
+  @override
+  late final GeneratedColumn<String> dreamId = GeneratedColumn<String>(
+    'dream_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+    'done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> doneAt =
+      GeneratedColumn<int>(
+        'done_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($DreamStepsTable.$converterdoneAtn);
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<String> dueDate = GeneratedColumn<String>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _costMeta = const VerificationMeta('cost');
+  @override
+  late final GeneratedColumn<double> cost = GeneratedColumn<double>(
+    'cost',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rewardMeta = const VerificationMeta('reward');
+  @override
+  late final GeneratedColumn<String> reward = GeneratedColumn<String>(
+    'reward',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _metricRefMeta = const VerificationMeta(
+    'metricRef',
+  );
+  @override
+  late final GeneratedColumn<String> metricRef = GeneratedColumn<String>(
+    'metric_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _atValueMeta = const VerificationMeta(
+    'atValue',
+  );
+  @override
+  late final GeneratedColumn<double> atValue = GeneratedColumn<double>(
+    'at_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    dreamId,
+    title,
+    notes,
+    done,
+    doneAt,
+    dueDate,
+    cost,
+    reward,
+    metricRef,
+    atValue,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dream_steps';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DreamStepRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('dream_id')) {
+      context.handle(
+        _dreamIdMeta,
+        dreamId.isAcceptableOrUnknown(data['dream_id']!, _dreamIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dreamIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+        _doneMeta,
+        done.isAcceptableOrUnknown(data['done']!, _doneMeta),
+      );
+    }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
+    if (data.containsKey('cost')) {
+      context.handle(
+        _costMeta,
+        cost.isAcceptableOrUnknown(data['cost']!, _costMeta),
+      );
+    }
+    if (data.containsKey('reward')) {
+      context.handle(
+        _rewardMeta,
+        reward.isAcceptableOrUnknown(data['reward']!, _rewardMeta),
+      );
+    }
+    if (data.containsKey('metric_ref')) {
+      context.handle(
+        _metricRefMeta,
+        metricRef.isAcceptableOrUnknown(data['metric_ref']!, _metricRefMeta),
+      );
+    }
+    if (data.containsKey('at_value')) {
+      context.handle(
+        _atValueMeta,
+        atValue.isAcceptableOrUnknown(data['at_value']!, _atValueMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DreamStepRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DreamStepRow(
+      createdAt: $DreamStepsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $DreamStepsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      dreamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dream_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      done: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done'],
+      )!,
+      doneAt: $DreamStepsTable.$converterdoneAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}done_at'],
+        ),
+      ),
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}due_date'],
+      ),
+      cost: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cost'],
+      ),
+      reward: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reward'],
+      ),
+      metricRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metric_ref'],
+      ),
+      atValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}at_value'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $DreamStepsTable createAlias(String alias) {
+    return $DreamStepsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterdoneAt = epochMs;
+  static TypeConverter<DateTime?, int?> $converterdoneAtn =
+      NullAwareTypeConverter.wrap($converterdoneAt);
+}
+
+class DreamStepRow extends DataClass implements Insertable<DreamStepRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String dreamId;
+  final String title;
+  final String? notes;
+  final bool done;
+
+  /// Stamped when done (epoch ms), nullable.
+  final DateTime? doneAt;
+
+  /// `YYYY-MM-DD`, nullable.
+  final String? dueDate;
+
+  /// Rupiah, nullable.
+  final double? cost;
+
+  /// "Hadiah" unlocked when the step is done, nullable.
+  final String? reward;
+
+  /// A `dream_metrics.id` of the same dream, nullable. Stored as pushed.
+  final String? metricRef;
+
+  /// Threshold of [metricRef] (both or neither is set), nullable.
+  final double? atValue;
+  final int sortOrder;
+  const DreamStepRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.dreamId,
+    required this.title,
+    this.notes,
+    required this.done,
+    this.doneAt,
+    this.dueDate,
+    this.cost,
+    this.reward,
+    this.metricRef,
+    this.atValue,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $DreamStepsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $DreamStepsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['dream_id'] = Variable<String>(dreamId);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['done'] = Variable<bool>(done);
+    if (!nullToAbsent || doneAt != null) {
+      map['done_at'] = Variable<int>(
+        $DreamStepsTable.$converterdoneAtn.toSql(doneAt),
+      );
+    }
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<String>(dueDate);
+    }
+    if (!nullToAbsent || cost != null) {
+      map['cost'] = Variable<double>(cost);
+    }
+    if (!nullToAbsent || reward != null) {
+      map['reward'] = Variable<String>(reward);
+    }
+    if (!nullToAbsent || metricRef != null) {
+      map['metric_ref'] = Variable<String>(metricRef);
+    }
+    if (!nullToAbsent || atValue != null) {
+      map['at_value'] = Variable<double>(atValue);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  DreamStepsCompanion toCompanion(bool nullToAbsent) {
+    return DreamStepsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      dreamId: Value(dreamId),
+      title: Value(title),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      done: Value(done),
+      doneAt: doneAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneAt),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      cost: cost == null && nullToAbsent ? const Value.absent() : Value(cost),
+      reward: reward == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reward),
+      metricRef: metricRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metricRef),
+      atValue: atValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(atValue),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory DreamStepRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DreamStepRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      dreamId: serializer.fromJson<String>(json['dreamId']),
+      title: serializer.fromJson<String>(json['title']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      done: serializer.fromJson<bool>(json['done']),
+      doneAt: serializer.fromJson<DateTime?>(json['doneAt']),
+      dueDate: serializer.fromJson<String?>(json['dueDate']),
+      cost: serializer.fromJson<double?>(json['cost']),
+      reward: serializer.fromJson<String?>(json['reward']),
+      metricRef: serializer.fromJson<String?>(json['metricRef']),
+      atValue: serializer.fromJson<double?>(json['atValue']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'dreamId': serializer.toJson<String>(dreamId),
+      'title': serializer.toJson<String>(title),
+      'notes': serializer.toJson<String?>(notes),
+      'done': serializer.toJson<bool>(done),
+      'doneAt': serializer.toJson<DateTime?>(doneAt),
+      'dueDate': serializer.toJson<String?>(dueDate),
+      'cost': serializer.toJson<double?>(cost),
+      'reward': serializer.toJson<String?>(reward),
+      'metricRef': serializer.toJson<String?>(metricRef),
+      'atValue': serializer.toJson<double?>(atValue),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  DreamStepRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? dreamId,
+    String? title,
+    Value<String?> notes = const Value.absent(),
+    bool? done,
+    Value<DateTime?> doneAt = const Value.absent(),
+    Value<String?> dueDate = const Value.absent(),
+    Value<double?> cost = const Value.absent(),
+    Value<String?> reward = const Value.absent(),
+    Value<String?> metricRef = const Value.absent(),
+    Value<double?> atValue = const Value.absent(),
+    int? sortOrder,
+  }) => DreamStepRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    dreamId: dreamId ?? this.dreamId,
+    title: title ?? this.title,
+    notes: notes.present ? notes.value : this.notes,
+    done: done ?? this.done,
+    doneAt: doneAt.present ? doneAt.value : this.doneAt,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    cost: cost.present ? cost.value : this.cost,
+    reward: reward.present ? reward.value : this.reward,
+    metricRef: metricRef.present ? metricRef.value : this.metricRef,
+    atValue: atValue.present ? atValue.value : this.atValue,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  DreamStepRow copyWithCompanion(DreamStepsCompanion data) {
+    return DreamStepRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      dreamId: data.dreamId.present ? data.dreamId.value : this.dreamId,
+      title: data.title.present ? data.title.value : this.title,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      done: data.done.present ? data.done.value : this.done,
+      doneAt: data.doneAt.present ? data.doneAt.value : this.doneAt,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      cost: data.cost.present ? data.cost.value : this.cost,
+      reward: data.reward.present ? data.reward.value : this.reward,
+      metricRef: data.metricRef.present ? data.metricRef.value : this.metricRef,
+      atValue: data.atValue.present ? data.atValue.value : this.atValue,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamStepRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('dreamId: $dreamId, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('cost: $cost, ')
+          ..write('reward: $reward, ')
+          ..write('metricRef: $metricRef, ')
+          ..write('atValue: $atValue, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    dreamId,
+    title,
+    notes,
+    done,
+    doneAt,
+    dueDate,
+    cost,
+    reward,
+    metricRef,
+    atValue,
+    sortOrder,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DreamStepRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.dreamId == this.dreamId &&
+          other.title == this.title &&
+          other.notes == this.notes &&
+          other.done == this.done &&
+          other.doneAt == this.doneAt &&
+          other.dueDate == this.dueDate &&
+          other.cost == this.cost &&
+          other.reward == this.reward &&
+          other.metricRef == this.metricRef &&
+          other.atValue == this.atValue &&
+          other.sortOrder == this.sortOrder);
+}
+
+class DreamStepsCompanion extends UpdateCompanion<DreamStepRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> dreamId;
+  final Value<String> title;
+  final Value<String?> notes;
+  final Value<bool> done;
+  final Value<DateTime?> doneAt;
+  final Value<String?> dueDate;
+  final Value<double?> cost;
+  final Value<String?> reward;
+  final Value<String?> metricRef;
+  final Value<double?> atValue;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const DreamStepsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.dreamId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.cost = const Value.absent(),
+    this.reward = const Value.absent(),
+    this.metricRef = const Value.absent(),
+    this.atValue = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DreamStepsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String dreamId,
+    required String title,
+    this.notes = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.cost = const Value.absent(),
+    this.reward = const Value.absent(),
+    this.metricRef = const Value.absent(),
+    this.atValue = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       dreamId = Value(dreamId),
+       title = Value(title);
+  static Insertable<DreamStepRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? dreamId,
+    Expression<String>? title,
+    Expression<String>? notes,
+    Expression<bool>? done,
+    Expression<int>? doneAt,
+    Expression<String>? dueDate,
+    Expression<double>? cost,
+    Expression<String>? reward,
+    Expression<String>? metricRef,
+    Expression<double>? atValue,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (dreamId != null) 'dream_id': dreamId,
+      if (title != null) 'title': title,
+      if (notes != null) 'notes': notes,
+      if (done != null) 'done': done,
+      if (doneAt != null) 'done_at': doneAt,
+      if (dueDate != null) 'due_date': dueDate,
+      if (cost != null) 'cost': cost,
+      if (reward != null) 'reward': reward,
+      if (metricRef != null) 'metric_ref': metricRef,
+      if (atValue != null) 'at_value': atValue,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DreamStepsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? dreamId,
+    Value<String>? title,
+    Value<String?>? notes,
+    Value<bool>? done,
+    Value<DateTime?>? doneAt,
+    Value<String?>? dueDate,
+    Value<double?>? cost,
+    Value<String?>? reward,
+    Value<String?>? metricRef,
+    Value<double?>? atValue,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return DreamStepsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      dreamId: dreamId ?? this.dreamId,
+      title: title ?? this.title,
+      notes: notes ?? this.notes,
+      done: done ?? this.done,
+      doneAt: doneAt ?? this.doneAt,
+      dueDate: dueDate ?? this.dueDate,
+      cost: cost ?? this.cost,
+      reward: reward ?? this.reward,
+      metricRef: metricRef ?? this.metricRef,
+      atValue: atValue ?? this.atValue,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $DreamStepsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $DreamStepsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (dreamId.present) {
+      map['dream_id'] = Variable<String>(dreamId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    if (doneAt.present) {
+      map['done_at'] = Variable<int>(
+        $DreamStepsTable.$converterdoneAtn.toSql(doneAt.value),
+      );
+    }
+    if (dueDate.present) {
+      map['due_date'] = Variable<String>(dueDate.value);
+    }
+    if (cost.present) {
+      map['cost'] = Variable<double>(cost.value);
+    }
+    if (reward.present) {
+      map['reward'] = Variable<String>(reward.value);
+    }
+    if (metricRef.present) {
+      map['metric_ref'] = Variable<String>(metricRef.value);
+    }
+    if (atValue.present) {
+      map['at_value'] = Variable<double>(atValue.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamStepsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('dreamId: $dreamId, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('cost: $cost, ')
+          ..write('reward: $reward, ')
+          ..write('metricRef: $metricRef, ')
+          ..write('atValue: $atValue, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DreamMetricsTable extends DreamMetrics
+    with TableInfo<$DreamMetricsTable, DreamMetricRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DreamMetricsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamMetricsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamMetricsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dreamIdMeta = const VerificationMeta(
+    'dreamId',
+  );
+  @override
+  late final GeneratedColumn<String> dreamId = GeneratedColumn<String>(
+    'dream_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceRefMeta = const VerificationMeta(
+    'sourceRef',
+  );
+  @override
+  late final GeneratedColumn<String> sourceRef = GeneratedColumn<String>(
+    'source_ref',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _directionMeta = const VerificationMeta(
+    'direction',
+  );
+  @override
+  late final GeneratedColumn<String> direction = GeneratedColumn<String>(
+    'direction',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startValueMeta = const VerificationMeta(
+    'startValue',
+  );
+  @override
+  late final GeneratedColumn<double> startValue = GeneratedColumn<double>(
+    'start_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<String> startDate = GeneratedColumn<String>(
+    'start_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetValueMeta = const VerificationMeta(
+    'targetValue',
+  );
+  @override
+  late final GeneratedColumn<double> targetValue = GeneratedColumn<double>(
+    'target_value',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetDateMeta = const VerificationMeta(
+    'targetDate',
+  );
+  @override
+  late final GeneratedColumn<String> targetDate = GeneratedColumn<String>(
+    'target_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _manualValueMeta = const VerificationMeta(
+    'manualValue',
+  );
+  @override
+  late final GeneratedColumn<double> manualValue = GeneratedColumn<double>(
+    'manual_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> manualAt =
+      GeneratedColumn<int>(
+        'manual_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($DreamMetricsTable.$convertermanualAtn);
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    dreamId,
+    label,
+    source,
+    sourceRef,
+    direction,
+    unit,
+    startValue,
+    startDate,
+    targetValue,
+    targetDate,
+    manualValue,
+    manualAt,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dream_metrics';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DreamMetricRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('dream_id')) {
+      context.handle(
+        _dreamIdMeta,
+        dreamId.isAcceptableOrUnknown(data['dream_id']!, _dreamIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dreamIdMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceMeta);
+    }
+    if (data.containsKey('source_ref')) {
+      context.handle(
+        _sourceRefMeta,
+        sourceRef.isAcceptableOrUnknown(data['source_ref']!, _sourceRefMeta),
+      );
+    }
+    if (data.containsKey('direction')) {
+      context.handle(
+        _directionMeta,
+        direction.isAcceptableOrUnknown(data['direction']!, _directionMeta),
+      );
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('start_value')) {
+      context.handle(
+        _startValueMeta,
+        startValue.isAcceptableOrUnknown(data['start_value']!, _startValueMeta),
+      );
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    }
+    if (data.containsKey('target_value')) {
+      context.handle(
+        _targetValueMeta,
+        targetValue.isAcceptableOrUnknown(
+          data['target_value']!,
+          _targetValueMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetValueMeta);
+    }
+    if (data.containsKey('target_date')) {
+      context.handle(
+        _targetDateMeta,
+        targetDate.isAcceptableOrUnknown(data['target_date']!, _targetDateMeta),
+      );
+    }
+    if (data.containsKey('manual_value')) {
+      context.handle(
+        _manualValueMeta,
+        manualValue.isAcceptableOrUnknown(
+          data['manual_value']!,
+          _manualValueMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DreamMetricRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DreamMetricRow(
+      createdAt: $DreamMetricsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $DreamMetricsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      dreamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}dream_id'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+      sourceRef: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_ref'],
+      ),
+      direction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction'],
+      ),
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      startValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}start_value'],
+      ),
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_date'],
+      ),
+      targetValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_value'],
+      )!,
+      targetDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_date'],
+      ),
+      manualValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}manual_value'],
+      ),
+      manualAt: $DreamMetricsTable.$convertermanualAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}manual_at'],
+        ),
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $DreamMetricsTable createAlias(String alias) {
+    return $DreamMetricsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+  static TypeConverter<DateTime, int> $convertermanualAt = epochMs;
+  static TypeConverter<DateTime?, int?> $convertermanualAtn =
+      NullAwareTypeConverter.wrap($convertermanualAt);
+}
+
+class DreamMetricRow extends DataClass implements Insertable<DreamMetricRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String dreamId;
+  final String label;
+
+  /// `weight | pulse | systolic | diastolic | habit_clean_days |
+  /// habit_current_streak | habit_longest_streak | wallet_balance |
+  /// net_worth | spend_category | manual`
+  final String source;
+
+  /// JSON object (`habitId` / `walletId` / `categoryId`+`period`), nullable.
+  final String? sourceRef;
+
+  /// `down | up`, nullable (the server derives it when omitted).
+  final String? direction;
+  final String? unit;
+  final double? startValue;
+
+  /// `YYYY-MM-DD`, nullable.
+  final String? startDate;
+  final double targetValue;
+
+  /// `YYYY-MM-DD`, nullable.
+  final String? targetDate;
+  final double? manualValue;
+
+  /// Epoch ms of [manualValue], nullable.
+  final DateTime? manualAt;
+  final int sortOrder;
+  const DreamMetricRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.dreamId,
+    required this.label,
+    required this.source,
+    this.sourceRef,
+    this.direction,
+    this.unit,
+    this.startValue,
+    this.startDate,
+    required this.targetValue,
+    this.targetDate,
+    this.manualValue,
+    this.manualAt,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $DreamMetricsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $DreamMetricsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['dream_id'] = Variable<String>(dreamId);
+    map['label'] = Variable<String>(label);
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || sourceRef != null) {
+      map['source_ref'] = Variable<String>(sourceRef);
+    }
+    if (!nullToAbsent || direction != null) {
+      map['direction'] = Variable<String>(direction);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    if (!nullToAbsent || startValue != null) {
+      map['start_value'] = Variable<double>(startValue);
+    }
+    if (!nullToAbsent || startDate != null) {
+      map['start_date'] = Variable<String>(startDate);
+    }
+    map['target_value'] = Variable<double>(targetValue);
+    if (!nullToAbsent || targetDate != null) {
+      map['target_date'] = Variable<String>(targetDate);
+    }
+    if (!nullToAbsent || manualValue != null) {
+      map['manual_value'] = Variable<double>(manualValue);
+    }
+    if (!nullToAbsent || manualAt != null) {
+      map['manual_at'] = Variable<int>(
+        $DreamMetricsTable.$convertermanualAtn.toSql(manualAt),
+      );
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  DreamMetricsCompanion toCompanion(bool nullToAbsent) {
+    return DreamMetricsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      dreamId: Value(dreamId),
+      label: Value(label),
+      source: Value(source),
+      sourceRef: sourceRef == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceRef),
+      direction: direction == null && nullToAbsent
+          ? const Value.absent()
+          : Value(direction),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      startValue: startValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startValue),
+      startDate: startDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startDate),
+      targetValue: Value(targetValue),
+      targetDate: targetDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetDate),
+      manualValue: manualValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(manualValue),
+      manualAt: manualAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(manualAt),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory DreamMetricRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DreamMetricRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      dreamId: serializer.fromJson<String>(json['dreamId']),
+      label: serializer.fromJson<String>(json['label']),
+      source: serializer.fromJson<String>(json['source']),
+      sourceRef: serializer.fromJson<String?>(json['sourceRef']),
+      direction: serializer.fromJson<String?>(json['direction']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      startValue: serializer.fromJson<double?>(json['startValue']),
+      startDate: serializer.fromJson<String?>(json['startDate']),
+      targetValue: serializer.fromJson<double>(json['targetValue']),
+      targetDate: serializer.fromJson<String?>(json['targetDate']),
+      manualValue: serializer.fromJson<double?>(json['manualValue']),
+      manualAt: serializer.fromJson<DateTime?>(json['manualAt']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'dreamId': serializer.toJson<String>(dreamId),
+      'label': serializer.toJson<String>(label),
+      'source': serializer.toJson<String>(source),
+      'sourceRef': serializer.toJson<String?>(sourceRef),
+      'direction': serializer.toJson<String?>(direction),
+      'unit': serializer.toJson<String?>(unit),
+      'startValue': serializer.toJson<double?>(startValue),
+      'startDate': serializer.toJson<String?>(startDate),
+      'targetValue': serializer.toJson<double>(targetValue),
+      'targetDate': serializer.toJson<String?>(targetDate),
+      'manualValue': serializer.toJson<double?>(manualValue),
+      'manualAt': serializer.toJson<DateTime?>(manualAt),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  DreamMetricRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? dreamId,
+    String? label,
+    String? source,
+    Value<String?> sourceRef = const Value.absent(),
+    Value<String?> direction = const Value.absent(),
+    Value<String?> unit = const Value.absent(),
+    Value<double?> startValue = const Value.absent(),
+    Value<String?> startDate = const Value.absent(),
+    double? targetValue,
+    Value<String?> targetDate = const Value.absent(),
+    Value<double?> manualValue = const Value.absent(),
+    Value<DateTime?> manualAt = const Value.absent(),
+    int? sortOrder,
+  }) => DreamMetricRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    dreamId: dreamId ?? this.dreamId,
+    label: label ?? this.label,
+    source: source ?? this.source,
+    sourceRef: sourceRef.present ? sourceRef.value : this.sourceRef,
+    direction: direction.present ? direction.value : this.direction,
+    unit: unit.present ? unit.value : this.unit,
+    startValue: startValue.present ? startValue.value : this.startValue,
+    startDate: startDate.present ? startDate.value : this.startDate,
+    targetValue: targetValue ?? this.targetValue,
+    targetDate: targetDate.present ? targetDate.value : this.targetDate,
+    manualValue: manualValue.present ? manualValue.value : this.manualValue,
+    manualAt: manualAt.present ? manualAt.value : this.manualAt,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  DreamMetricRow copyWithCompanion(DreamMetricsCompanion data) {
+    return DreamMetricRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      dreamId: data.dreamId.present ? data.dreamId.value : this.dreamId,
+      label: data.label.present ? data.label.value : this.label,
+      source: data.source.present ? data.source.value : this.source,
+      sourceRef: data.sourceRef.present ? data.sourceRef.value : this.sourceRef,
+      direction: data.direction.present ? data.direction.value : this.direction,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      startValue: data.startValue.present
+          ? data.startValue.value
+          : this.startValue,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      targetValue: data.targetValue.present
+          ? data.targetValue.value
+          : this.targetValue,
+      targetDate: data.targetDate.present
+          ? data.targetDate.value
+          : this.targetDate,
+      manualValue: data.manualValue.present
+          ? data.manualValue.value
+          : this.manualValue,
+      manualAt: data.manualAt.present ? data.manualAt.value : this.manualAt,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamMetricRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('dreamId: $dreamId, ')
+          ..write('label: $label, ')
+          ..write('source: $source, ')
+          ..write('sourceRef: $sourceRef, ')
+          ..write('direction: $direction, ')
+          ..write('unit: $unit, ')
+          ..write('startValue: $startValue, ')
+          ..write('startDate: $startDate, ')
+          ..write('targetValue: $targetValue, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('manualValue: $manualValue, ')
+          ..write('manualAt: $manualAt, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    dreamId,
+    label,
+    source,
+    sourceRef,
+    direction,
+    unit,
+    startValue,
+    startDate,
+    targetValue,
+    targetDate,
+    manualValue,
+    manualAt,
+    sortOrder,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DreamMetricRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.dreamId == this.dreamId &&
+          other.label == this.label &&
+          other.source == this.source &&
+          other.sourceRef == this.sourceRef &&
+          other.direction == this.direction &&
+          other.unit == this.unit &&
+          other.startValue == this.startValue &&
+          other.startDate == this.startDate &&
+          other.targetValue == this.targetValue &&
+          other.targetDate == this.targetDate &&
+          other.manualValue == this.manualValue &&
+          other.manualAt == this.manualAt &&
+          other.sortOrder == this.sortOrder);
+}
+
+class DreamMetricsCompanion extends UpdateCompanion<DreamMetricRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> dreamId;
+  final Value<String> label;
+  final Value<String> source;
+  final Value<String?> sourceRef;
+  final Value<String?> direction;
+  final Value<String?> unit;
+  final Value<double?> startValue;
+  final Value<String?> startDate;
+  final Value<double> targetValue;
+  final Value<String?> targetDate;
+  final Value<double?> manualValue;
+  final Value<DateTime?> manualAt;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const DreamMetricsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.dreamId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.source = const Value.absent(),
+    this.sourceRef = const Value.absent(),
+    this.direction = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.startValue = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.targetValue = const Value.absent(),
+    this.targetDate = const Value.absent(),
+    this.manualValue = const Value.absent(),
+    this.manualAt = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DreamMetricsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String dreamId,
+    required String label,
+    required String source,
+    this.sourceRef = const Value.absent(),
+    this.direction = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.startValue = const Value.absent(),
+    this.startDate = const Value.absent(),
+    required double targetValue,
+    this.targetDate = const Value.absent(),
+    this.manualValue = const Value.absent(),
+    this.manualAt = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       dreamId = Value(dreamId),
+       label = Value(label),
+       source = Value(source),
+       targetValue = Value(targetValue);
+  static Insertable<DreamMetricRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? dreamId,
+    Expression<String>? label,
+    Expression<String>? source,
+    Expression<String>? sourceRef,
+    Expression<String>? direction,
+    Expression<String>? unit,
+    Expression<double>? startValue,
+    Expression<String>? startDate,
+    Expression<double>? targetValue,
+    Expression<String>? targetDate,
+    Expression<double>? manualValue,
+    Expression<int>? manualAt,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (dreamId != null) 'dream_id': dreamId,
+      if (label != null) 'label': label,
+      if (source != null) 'source': source,
+      if (sourceRef != null) 'source_ref': sourceRef,
+      if (direction != null) 'direction': direction,
+      if (unit != null) 'unit': unit,
+      if (startValue != null) 'start_value': startValue,
+      if (startDate != null) 'start_date': startDate,
+      if (targetValue != null) 'target_value': targetValue,
+      if (targetDate != null) 'target_date': targetDate,
+      if (manualValue != null) 'manual_value': manualValue,
+      if (manualAt != null) 'manual_at': manualAt,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DreamMetricsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? dreamId,
+    Value<String>? label,
+    Value<String>? source,
+    Value<String?>? sourceRef,
+    Value<String?>? direction,
+    Value<String?>? unit,
+    Value<double?>? startValue,
+    Value<String?>? startDate,
+    Value<double>? targetValue,
+    Value<String?>? targetDate,
+    Value<double?>? manualValue,
+    Value<DateTime?>? manualAt,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return DreamMetricsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      dreamId: dreamId ?? this.dreamId,
+      label: label ?? this.label,
+      source: source ?? this.source,
+      sourceRef: sourceRef ?? this.sourceRef,
+      direction: direction ?? this.direction,
+      unit: unit ?? this.unit,
+      startValue: startValue ?? this.startValue,
+      startDate: startDate ?? this.startDate,
+      targetValue: targetValue ?? this.targetValue,
+      targetDate: targetDate ?? this.targetDate,
+      manualValue: manualValue ?? this.manualValue,
+      manualAt: manualAt ?? this.manualAt,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $DreamMetricsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $DreamMetricsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (dreamId.present) {
+      map['dream_id'] = Variable<String>(dreamId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (sourceRef.present) {
+      map['source_ref'] = Variable<String>(sourceRef.value);
+    }
+    if (direction.present) {
+      map['direction'] = Variable<String>(direction.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (startValue.present) {
+      map['start_value'] = Variable<double>(startValue.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<String>(startDate.value);
+    }
+    if (targetValue.present) {
+      map['target_value'] = Variable<double>(targetValue.value);
+    }
+    if (targetDate.present) {
+      map['target_date'] = Variable<String>(targetDate.value);
+    }
+    if (manualValue.present) {
+      map['manual_value'] = Variable<double>(manualValue.value);
+    }
+    if (manualAt.present) {
+      map['manual_at'] = Variable<int>(
+        $DreamMetricsTable.$convertermanualAtn.toSql(manualAt.value),
+      );
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamMetricsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('dreamId: $dreamId, ')
+          ..write('label: $label, ')
+          ..write('source: $source, ')
+          ..write('sourceRef: $sourceRef, ')
+          ..write('direction: $direction, ')
+          ..write('unit: $unit, ')
+          ..write('startValue: $startValue, ')
+          ..write('startDate: $startDate, ')
+          ..write('targetValue: $targetValue, ')
+          ..write('targetDate: $targetDate, ')
+          ..write('manualValue: $manualValue, ')
+          ..write('manualAt: $manualAt, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DreamCategoriesTable extends DreamCategories
+    with TableInfo<$DreamCategoriesTable, DreamCategoryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DreamCategoriesTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamCategoriesTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamCategoriesTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _emojiMeta = const VerificationMeta('emoji');
+  @override
+  late final GeneratedColumn<String> emoji = GeneratedColumn<String>(
+    'emoji',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    key,
+    label,
+    emoji,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dream_categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DreamCategoryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('emoji')) {
+      context.handle(
+        _emojiMeta,
+        emoji.isAcceptableOrUnknown(data['emoji']!, _emojiMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_emojiMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DreamCategoryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DreamCategoryRow(
+      createdAt: $DreamCategoriesTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $DreamCategoriesTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      emoji: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}emoji'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $DreamCategoriesTable createAlias(String alias) {
+    return $DreamCategoriesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+}
+
+class DreamCategoryRow extends DataClass
+    implements Insertable<DreamCategoryRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+
+  /// Immutable slug; unique per user (the server answers `duplicate`).
+  final String key;
+  final String label;
+  final String emoji;
+  final int sortOrder;
+  const DreamCategoryRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.key,
+    required this.label,
+    required this.emoji,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $DreamCategoriesTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $DreamCategoriesTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['key'] = Variable<String>(key);
+    map['label'] = Variable<String>(label);
+    map['emoji'] = Variable<String>(emoji);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  DreamCategoriesCompanion toCompanion(bool nullToAbsent) {
+    return DreamCategoriesCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      key: Value(key),
+      label: Value(label),
+      emoji: Value(emoji),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory DreamCategoryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DreamCategoryRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      key: serializer.fromJson<String>(json['key']),
+      label: serializer.fromJson<String>(json['label']),
+      emoji: serializer.fromJson<String>(json['emoji']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'key': serializer.toJson<String>(key),
+      'label': serializer.toJson<String>(label),
+      'emoji': serializer.toJson<String>(emoji),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  DreamCategoryRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? key,
+    String? label,
+    String? emoji,
+    int? sortOrder,
+  }) => DreamCategoryRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    key: key ?? this.key,
+    label: label ?? this.label,
+    emoji: emoji ?? this.emoji,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  DreamCategoryRow copyWithCompanion(DreamCategoriesCompanion data) {
+    return DreamCategoryRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      key: data.key.present ? data.key.value : this.key,
+      label: data.label.present ? data.label.value : this.label,
+      emoji: data.emoji.present ? data.emoji.value : this.emoji,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamCategoryRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('key: $key, ')
+          ..write('label: $label, ')
+          ..write('emoji: $emoji, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(createdAt, updatedAt, id, key, label, emoji, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DreamCategoryRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.key == this.key &&
+          other.label == this.label &&
+          other.emoji == this.emoji &&
+          other.sortOrder == this.sortOrder);
+}
+
+class DreamCategoriesCompanion extends UpdateCompanion<DreamCategoryRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> key;
+  final Value<String> label;
+  final Value<String> emoji;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const DreamCategoriesCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.key = const Value.absent(),
+    this.label = const Value.absent(),
+    this.emoji = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DreamCategoriesCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String key,
+    required String label,
+    required String emoji,
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       key = Value(key),
+       label = Value(label),
+       emoji = Value(emoji);
+  static Insertable<DreamCategoryRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? key,
+    Expression<String>? label,
+    Expression<String>? emoji,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (key != null) 'key': key,
+      if (label != null) 'label': label,
+      if (emoji != null) 'emoji': emoji,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DreamCategoriesCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? key,
+    Value<String>? label,
+    Value<String>? emoji,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return DreamCategoriesCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      key: key ?? this.key,
+      label: label ?? this.label,
+      emoji: emoji ?? this.emoji,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $DreamCategoriesTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $DreamCategoriesTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (emoji.present) {
+      map['emoji'] = Variable<String>(emoji.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamCategoriesCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('key: $key, ')
+          ..write('label: $label, ')
+          ..write('emoji: $emoji, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DreamFieldsTable extends DreamFields
+    with TableInfo<$DreamFieldsTable, DreamFieldRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DreamFieldsTable(this.attachedDatabase, [this._alias]);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamFieldsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($DreamFieldsTable.$converterupdatedAt);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('text'),
+  );
+  static const VerificationMeta _optionsMeta = const VerificationMeta(
+    'options',
+  );
+  @override
+  late final GeneratedColumn<String> options = GeneratedColumn<String>(
+    'options',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _appliesToMeta = const VerificationMeta(
+    'appliesTo',
+  );
+  @override
+  late final GeneratedColumn<String> appliesTo = GeneratedColumn<String>(
+    'applies_to',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _showInListMeta = const VerificationMeta(
+    'showInList',
+  );
+  @override
+  late final GeneratedColumn<bool> showInList = GeneratedColumn<bool>(
+    'show_in_list',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("show_in_list" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    createdAt,
+    updatedAt,
+    id,
+    key,
+    label,
+    type,
+    options,
+    appliesTo,
+    sortOrder,
+    showInList,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dream_fields';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DreamFieldRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    }
+    if (data.containsKey('options')) {
+      context.handle(
+        _optionsMeta,
+        options.isAcceptableOrUnknown(data['options']!, _optionsMeta),
+      );
+    }
+    if (data.containsKey('applies_to')) {
+      context.handle(
+        _appliesToMeta,
+        appliesTo.isAcceptableOrUnknown(data['applies_to']!, _appliesToMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('show_in_list')) {
+      context.handle(
+        _showInListMeta,
+        showInList.isAcceptableOrUnknown(
+          data['show_in_list']!,
+          _showInListMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DreamFieldRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DreamFieldRow(
+      createdAt: $DreamFieldsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $DreamFieldsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      options: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}options'],
+      ),
+      appliesTo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}applies_to'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      showInList: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}show_in_list'],
+      )!,
+    );
+  }
+
+  @override
+  $DreamFieldsTable createAlias(String alias) {
+    return $DreamFieldsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt = epochMs;
+  static TypeConverter<DateTime, int> $converterupdatedAt = epochMs;
+}
+
+class DreamFieldRow extends DataClass implements Insertable<DreamFieldRow> {
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String id;
+  final String key;
+  final String label;
+  final String type;
+
+  /// JSON array (select) or null.
+  final String? options;
+
+  /// JSON array of dream category keys, null = all.
+  final String? appliesTo;
+  final int sortOrder;
+  final bool showInList;
+  const DreamFieldRow({
+    required this.createdAt,
+    required this.updatedAt,
+    required this.id,
+    required this.key,
+    required this.label,
+    required this.type,
+    this.options,
+    this.appliesTo,
+    required this.sortOrder,
+    required this.showInList,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    {
+      map['created_at'] = Variable<int>(
+        $DreamFieldsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $DreamFieldsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    map['id'] = Variable<String>(id);
+    map['key'] = Variable<String>(key);
+    map['label'] = Variable<String>(label);
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || options != null) {
+      map['options'] = Variable<String>(options);
+    }
+    if (!nullToAbsent || appliesTo != null) {
+      map['applies_to'] = Variable<String>(appliesTo);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['show_in_list'] = Variable<bool>(showInList);
+    return map;
+  }
+
+  DreamFieldsCompanion toCompanion(bool nullToAbsent) {
+    return DreamFieldsCompanion(
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      id: Value(id),
+      key: Value(key),
+      label: Value(label),
+      type: Value(type),
+      options: options == null && nullToAbsent
+          ? const Value.absent()
+          : Value(options),
+      appliesTo: appliesTo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appliesTo),
+      sortOrder: Value(sortOrder),
+      showInList: Value(showInList),
+    );
+  }
+
+  factory DreamFieldRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DreamFieldRow(
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      id: serializer.fromJson<String>(json['id']),
+      key: serializer.fromJson<String>(json['key']),
+      label: serializer.fromJson<String>(json['label']),
+      type: serializer.fromJson<String>(json['type']),
+      options: serializer.fromJson<String?>(json['options']),
+      appliesTo: serializer.fromJson<String?>(json['appliesTo']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      showInList: serializer.fromJson<bool>(json['showInList']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'id': serializer.toJson<String>(id),
+      'key': serializer.toJson<String>(key),
+      'label': serializer.toJson<String>(label),
+      'type': serializer.toJson<String>(type),
+      'options': serializer.toJson<String?>(options),
+      'appliesTo': serializer.toJson<String?>(appliesTo),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'showInList': serializer.toJson<bool>(showInList),
+    };
+  }
+
+  DreamFieldRow copyWith({
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? id,
+    String? key,
+    String? label,
+    String? type,
+    Value<String?> options = const Value.absent(),
+    Value<String?> appliesTo = const Value.absent(),
+    int? sortOrder,
+    bool? showInList,
+  }) => DreamFieldRow(
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    id: id ?? this.id,
+    key: key ?? this.key,
+    label: label ?? this.label,
+    type: type ?? this.type,
+    options: options.present ? options.value : this.options,
+    appliesTo: appliesTo.present ? appliesTo.value : this.appliesTo,
+    sortOrder: sortOrder ?? this.sortOrder,
+    showInList: showInList ?? this.showInList,
+  );
+  DreamFieldRow copyWithCompanion(DreamFieldsCompanion data) {
+    return DreamFieldRow(
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      id: data.id.present ? data.id.value : this.id,
+      key: data.key.present ? data.key.value : this.key,
+      label: data.label.present ? data.label.value : this.label,
+      type: data.type.present ? data.type.value : this.type,
+      options: data.options.present ? data.options.value : this.options,
+      appliesTo: data.appliesTo.present ? data.appliesTo.value : this.appliesTo,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      showInList: data.showInList.present
+          ? data.showInList.value
+          : this.showInList,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamFieldRow(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('key: $key, ')
+          ..write('label: $label, ')
+          ..write('type: $type, ')
+          ..write('options: $options, ')
+          ..write('appliesTo: $appliesTo, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('showInList: $showInList')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    createdAt,
+    updatedAt,
+    id,
+    key,
+    label,
+    type,
+    options,
+    appliesTo,
+    sortOrder,
+    showInList,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DreamFieldRow &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.id == this.id &&
+          other.key == this.key &&
+          other.label == this.label &&
+          other.type == this.type &&
+          other.options == this.options &&
+          other.appliesTo == this.appliesTo &&
+          other.sortOrder == this.sortOrder &&
+          other.showInList == this.showInList);
+}
+
+class DreamFieldsCompanion extends UpdateCompanion<DreamFieldRow> {
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<String> id;
+  final Value<String> key;
+  final Value<String> label;
+  final Value<String> type;
+  final Value<String?> options;
+  final Value<String?> appliesTo;
+  final Value<int> sortOrder;
+  final Value<bool> showInList;
+  final Value<int> rowid;
+  const DreamFieldsCompanion({
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.id = const Value.absent(),
+    this.key = const Value.absent(),
+    this.label = const Value.absent(),
+    this.type = const Value.absent(),
+    this.options = const Value.absent(),
+    this.appliesTo = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.showInList = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DreamFieldsCompanion.insert({
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    required String id,
+    required String key,
+    required String label,
+    this.type = const Value.absent(),
+    this.options = const Value.absent(),
+    this.appliesTo = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.showInList = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt),
+       id = Value(id),
+       key = Value(key),
+       label = Value(label);
+  static Insertable<DreamFieldRow> custom({
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<String>? id,
+    Expression<String>? key,
+    Expression<String>? label,
+    Expression<String>? type,
+    Expression<String>? options,
+    Expression<String>? appliesTo,
+    Expression<int>? sortOrder,
+    Expression<bool>? showInList,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (id != null) 'id': id,
+      if (key != null) 'key': key,
+      if (label != null) 'label': label,
+      if (type != null) 'type': type,
+      if (options != null) 'options': options,
+      if (appliesTo != null) 'applies_to': appliesTo,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (showInList != null) 'show_in_list': showInList,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DreamFieldsCompanion copyWith({
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<String>? id,
+    Value<String>? key,
+    Value<String>? label,
+    Value<String>? type,
+    Value<String?>? options,
+    Value<String?>? appliesTo,
+    Value<int>? sortOrder,
+    Value<bool>? showInList,
+    Value<int>? rowid,
+  }) {
+    return DreamFieldsCompanion(
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      id: id ?? this.id,
+      key: key ?? this.key,
+      label: label ?? this.label,
+      type: type ?? this.type,
+      options: options ?? this.options,
+      appliesTo: appliesTo ?? this.appliesTo,
+      sortOrder: sortOrder ?? this.sortOrder,
+      showInList: showInList ?? this.showInList,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $DreamFieldsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $DreamFieldsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (options.present) {
+      map['options'] = Variable<String>(options.value);
+    }
+    if (appliesTo.present) {
+      map['applies_to'] = Variable<String>(appliesTo.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (showInList.present) {
+      map['show_in_list'] = Variable<bool>(showInList.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DreamFieldsCompanion(')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('id: $id, ')
+          ..write('key: $key, ')
+          ..write('label: $label, ')
+          ..write('type: $type, ')
+          ..write('options: $options, ')
+          ..write('appliesTo: $appliesTo, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('showInList: $showInList, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedPricesTable extends CachedPrices
     with TableInfo<$CachedPricesTable, CachedPriceRow> {
   @override
@@ -23906,6 +28056,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PersonDatesTable personDates = $PersonDatesTable(this);
   late final $HabitFieldsTable habitFields = $HabitFieldsTable(this);
   late final $HabitEventsTable habitEvents = $HabitEventsTable(this);
+  late final $DreamsTable dreams = $DreamsTable(this);
+  late final $DreamStepsTable dreamSteps = $DreamStepsTable(this);
+  late final $DreamMetricsTable dreamMetrics = $DreamMetricsTable(this);
+  late final $DreamCategoriesTable dreamCategories = $DreamCategoriesTable(
+    this,
+  );
+  late final $DreamFieldsTable dreamFields = $DreamFieldsTable(this);
   late final $CachedPricesTable cachedPrices = $CachedPricesTable(this);
   late final $PortfolioSnapshotsTable portfolioSnapshots =
       $PortfolioSnapshotsTable(this);
@@ -24011,6 +28168,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_habit_event_habit',
     'CREATE INDEX idx_habit_event_habit ON habit_events (habit_id, date)',
   );
+  late final Index idxDreamCategory = Index(
+    'idx_dream_category',
+    'CREATE INDEX idx_dream_category ON dreams (category)',
+  );
+  late final Index idxDreamStepDream = Index(
+    'idx_dream_step_dream',
+    'CREATE INDEX idx_dream_step_dream ON dream_steps (dream_id)',
+  );
+  late final Index idxDreamMetricDream = Index(
+    'idx_dream_metric_dream',
+    'CREATE INDEX idx_dream_metric_dream ON dream_metrics (dream_id)',
+  );
   late final Index idxNotifPosted = Index(
     'idx_notif_posted',
     'CREATE INDEX idx_notif_posted ON captured_notifications (posted_at)',
@@ -24061,6 +28230,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     personDates,
     habitFields,
     habitEvents,
+    dreams,
+    dreamSteps,
+    dreamMetrics,
+    dreamCategories,
+    dreamFields,
     cachedPrices,
     portfolioSnapshots,
     capturedNotifications,
@@ -24091,6 +28265,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxPersonCategory,
     idxPersonDatePerson,
     idxHabitEventHabit,
+    idxDreamCategory,
+    idxDreamStepDream,
+    idxDreamMetricDream,
     idxNotifPosted,
     idxNotifPackage,
     idxNotifProcessed,
@@ -33928,6 +38105,1976 @@ typedef $$HabitEventsTableProcessedTableManager =
       HabitEventRow,
       PrefetchHooks Function()
     >;
+typedef $$DreamsTableCreateCompanionBuilder =
+    DreamsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String title,
+      Value<String?> emoji,
+      Value<String> category,
+      Value<String> status,
+      Value<int?> priority,
+      Value<String?> horizon,
+      Value<String?> targetDate,
+      Value<String> targetPrecision,
+      Value<String?> condition,
+      Value<String?> why,
+      Value<String?> summary,
+      Value<double?> costEstimate,
+      Value<String?> costNote,
+      Value<int?> progressManual,
+      Value<String?> startedAt,
+      Value<String?> completedAt,
+      Value<String?> noteId,
+      Value<String?> parentId,
+      Value<String> tags,
+      Value<String> fields,
+      Value<String> links,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$DreamsTableUpdateCompanionBuilder =
+    DreamsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> title,
+      Value<String?> emoji,
+      Value<String> category,
+      Value<String> status,
+      Value<int?> priority,
+      Value<String?> horizon,
+      Value<String?> targetDate,
+      Value<String> targetPrecision,
+      Value<String?> condition,
+      Value<String?> why,
+      Value<String?> summary,
+      Value<double?> costEstimate,
+      Value<String?> costNote,
+      Value<int?> progressManual,
+      Value<String?> startedAt,
+      Value<String?> completedAt,
+      Value<String?> noteId,
+      Value<String?> parentId,
+      Value<String> tags,
+      Value<String> fields,
+      Value<String> links,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$DreamsTableFilterComposer
+    extends Composer<_$AppDatabase, $DreamsTable> {
+  $$DreamsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emoji => $composableBuilder(
+    column: $table.emoji,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get horizon => $composableBuilder(
+    column: $table.horizon,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetPrecision => $composableBuilder(
+    column: $table.targetPrecision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get condition => $composableBuilder(
+    column: $table.condition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get why => $composableBuilder(
+    column: $table.why,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get costEstimate => $composableBuilder(
+    column: $table.costEstimate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get costNote => $composableBuilder(
+    column: $table.costNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get progressManual => $composableBuilder(
+    column: $table.progressManual,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fields => $composableBuilder(
+    column: $table.fields,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get links => $composableBuilder(
+    column: $table.links,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DreamsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DreamsTable> {
+  $$DreamsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get emoji => $composableBuilder(
+    column: $table.emoji,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get horizon => $composableBuilder(
+    column: $table.horizon,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetPrecision => $composableBuilder(
+    column: $table.targetPrecision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get condition => $composableBuilder(
+    column: $table.condition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get why => $composableBuilder(
+    column: $table.why,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get costEstimate => $composableBuilder(
+    column: $table.costEstimate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get costNote => $composableBuilder(
+    column: $table.costNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get progressManual => $composableBuilder(
+    column: $table.progressManual,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get noteId => $composableBuilder(
+    column: $table.noteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fields => $composableBuilder(
+    column: $table.fields,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get links => $composableBuilder(
+    column: $table.links,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DreamsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DreamsTable> {
+  $$DreamsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get emoji =>
+      $composableBuilder(column: $table.emoji, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get horizon =>
+      $composableBuilder(column: $table.horizon, builder: (column) => column);
+
+  GeneratedColumn<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetPrecision => $composableBuilder(
+    column: $table.targetPrecision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get condition =>
+      $composableBuilder(column: $table.condition, builder: (column) => column);
+
+  GeneratedColumn<String> get why =>
+      $composableBuilder(column: $table.why, builder: (column) => column);
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<double> get costEstimate => $composableBuilder(
+    column: $table.costEstimate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get costNote =>
+      $composableBuilder(column: $table.costNote, builder: (column) => column);
+
+  GeneratedColumn<int> get progressManual => $composableBuilder(
+    column: $table.progressManual,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get noteId =>
+      $composableBuilder(column: $table.noteId, builder: (column) => column);
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<String> get fields =>
+      $composableBuilder(column: $table.fields, builder: (column) => column);
+
+  GeneratedColumn<String> get links =>
+      $composableBuilder(column: $table.links, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$DreamsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DreamsTable,
+          DreamRow,
+          $$DreamsTableFilterComposer,
+          $$DreamsTableOrderingComposer,
+          $$DreamsTableAnnotationComposer,
+          $$DreamsTableCreateCompanionBuilder,
+          $$DreamsTableUpdateCompanionBuilder,
+          (DreamRow, BaseReferences<_$AppDatabase, $DreamsTable, DreamRow>),
+          DreamRow,
+          PrefetchHooks Function()
+        > {
+  $$DreamsTableTableManager(_$AppDatabase db, $DreamsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DreamsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DreamsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DreamsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> emoji = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int?> priority = const Value.absent(),
+                Value<String?> horizon = const Value.absent(),
+                Value<String?> targetDate = const Value.absent(),
+                Value<String> targetPrecision = const Value.absent(),
+                Value<String?> condition = const Value.absent(),
+                Value<String?> why = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<double?> costEstimate = const Value.absent(),
+                Value<String?> costNote = const Value.absent(),
+                Value<int?> progressManual = const Value.absent(),
+                Value<String?> startedAt = const Value.absent(),
+                Value<String?> completedAt = const Value.absent(),
+                Value<String?> noteId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> fields = const Value.absent(),
+                Value<String> links = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                emoji: emoji,
+                category: category,
+                status: status,
+                priority: priority,
+                horizon: horizon,
+                targetDate: targetDate,
+                targetPrecision: targetPrecision,
+                condition: condition,
+                why: why,
+                summary: summary,
+                costEstimate: costEstimate,
+                costNote: costNote,
+                progressManual: progressManual,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                noteId: noteId,
+                parentId: parentId,
+                tags: tags,
+                fields: fields,
+                links: links,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String title,
+                Value<String?> emoji = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<int?> priority = const Value.absent(),
+                Value<String?> horizon = const Value.absent(),
+                Value<String?> targetDate = const Value.absent(),
+                Value<String> targetPrecision = const Value.absent(),
+                Value<String?> condition = const Value.absent(),
+                Value<String?> why = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<double?> costEstimate = const Value.absent(),
+                Value<String?> costNote = const Value.absent(),
+                Value<int?> progressManual = const Value.absent(),
+                Value<String?> startedAt = const Value.absent(),
+                Value<String?> completedAt = const Value.absent(),
+                Value<String?> noteId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<String> tags = const Value.absent(),
+                Value<String> fields = const Value.absent(),
+                Value<String> links = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                title: title,
+                emoji: emoji,
+                category: category,
+                status: status,
+                priority: priority,
+                horizon: horizon,
+                targetDate: targetDate,
+                targetPrecision: targetPrecision,
+                condition: condition,
+                why: why,
+                summary: summary,
+                costEstimate: costEstimate,
+                costNote: costNote,
+                progressManual: progressManual,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                noteId: noteId,
+                parentId: parentId,
+                tags: tags,
+                fields: fields,
+                links: links,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DreamsTable, DreamRow>(table),
+                  BaseReferences<_$AppDatabase, $DreamsTable, DreamRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DreamsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DreamsTable,
+      DreamRow,
+      $$DreamsTableFilterComposer,
+      $$DreamsTableOrderingComposer,
+      $$DreamsTableAnnotationComposer,
+      $$DreamsTableCreateCompanionBuilder,
+      $$DreamsTableUpdateCompanionBuilder,
+      (DreamRow, BaseReferences<_$AppDatabase, $DreamsTable, DreamRow>),
+      DreamRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DreamStepsTableCreateCompanionBuilder =
+    DreamStepsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String dreamId,
+      required String title,
+      Value<String?> notes,
+      Value<bool> done,
+      Value<DateTime?> doneAt,
+      Value<String?> dueDate,
+      Value<double?> cost,
+      Value<String?> reward,
+      Value<String?> metricRef,
+      Value<double?> atValue,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$DreamStepsTableUpdateCompanionBuilder =
+    DreamStepsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> dreamId,
+      Value<String> title,
+      Value<String?> notes,
+      Value<bool> done,
+      Value<DateTime?> doneAt,
+      Value<String?> dueDate,
+      Value<double?> cost,
+      Value<String?> reward,
+      Value<String?> metricRef,
+      Value<double?> atValue,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$DreamStepsTableFilterComposer
+    extends Composer<_$AppDatabase, $DreamStepsTable> {
+  $$DreamStepsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dreamId => $composableBuilder(
+    column: $table.dreamId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get doneAt =>
+      $composableBuilder(
+        column: $table.doneAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cost => $composableBuilder(
+    column: $table.cost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reward => $composableBuilder(
+    column: $table.reward,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metricRef => $composableBuilder(
+    column: $table.metricRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get atValue => $composableBuilder(
+    column: $table.atValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DreamStepsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DreamStepsTable> {
+  $$DreamStepsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dreamId => $composableBuilder(
+    column: $table.dreamId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cost => $composableBuilder(
+    column: $table.cost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reward => $composableBuilder(
+    column: $table.reward,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metricRef => $composableBuilder(
+    column: $table.metricRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get atValue => $composableBuilder(
+    column: $table.atValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DreamStepsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DreamStepsTable> {
+  $$DreamStepsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get dreamId =>
+      $composableBuilder(column: $table.dreamId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get doneAt =>
+      $composableBuilder(column: $table.doneAt, builder: (column) => column);
+
+  GeneratedColumn<String> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumn<double> get cost =>
+      $composableBuilder(column: $table.cost, builder: (column) => column);
+
+  GeneratedColumn<String> get reward =>
+      $composableBuilder(column: $table.reward, builder: (column) => column);
+
+  GeneratedColumn<String> get metricRef =>
+      $composableBuilder(column: $table.metricRef, builder: (column) => column);
+
+  GeneratedColumn<double> get atValue =>
+      $composableBuilder(column: $table.atValue, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$DreamStepsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DreamStepsTable,
+          DreamStepRow,
+          $$DreamStepsTableFilterComposer,
+          $$DreamStepsTableOrderingComposer,
+          $$DreamStepsTableAnnotationComposer,
+          $$DreamStepsTableCreateCompanionBuilder,
+          $$DreamStepsTableUpdateCompanionBuilder,
+          (
+            DreamStepRow,
+            BaseReferences<_$AppDatabase, $DreamStepsTable, DreamStepRow>,
+          ),
+          DreamStepRow,
+          PrefetchHooks Function()
+        > {
+  $$DreamStepsTableTableManager(_$AppDatabase db, $DreamStepsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DreamStepsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DreamStepsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DreamStepsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> dreamId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<String?> dueDate = const Value.absent(),
+                Value<double?> cost = const Value.absent(),
+                Value<String?> reward = const Value.absent(),
+                Value<String?> metricRef = const Value.absent(),
+                Value<double?> atValue = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamStepsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                dreamId: dreamId,
+                title: title,
+                notes: notes,
+                done: done,
+                doneAt: doneAt,
+                dueDate: dueDate,
+                cost: cost,
+                reward: reward,
+                metricRef: metricRef,
+                atValue: atValue,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String dreamId,
+                required String title,
+                Value<String?> notes = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<String?> dueDate = const Value.absent(),
+                Value<double?> cost = const Value.absent(),
+                Value<String?> reward = const Value.absent(),
+                Value<String?> metricRef = const Value.absent(),
+                Value<double?> atValue = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamStepsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                dreamId: dreamId,
+                title: title,
+                notes: notes,
+                done: done,
+                doneAt: doneAt,
+                dueDate: dueDate,
+                cost: cost,
+                reward: reward,
+                metricRef: metricRef,
+                atValue: atValue,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DreamStepsTable, DreamStepRow>(table),
+                  BaseReferences<_$AppDatabase, $DreamStepsTable, DreamStepRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DreamStepsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DreamStepsTable,
+      DreamStepRow,
+      $$DreamStepsTableFilterComposer,
+      $$DreamStepsTableOrderingComposer,
+      $$DreamStepsTableAnnotationComposer,
+      $$DreamStepsTableCreateCompanionBuilder,
+      $$DreamStepsTableUpdateCompanionBuilder,
+      (
+        DreamStepRow,
+        BaseReferences<_$AppDatabase, $DreamStepsTable, DreamStepRow>,
+      ),
+      DreamStepRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DreamMetricsTableCreateCompanionBuilder =
+    DreamMetricsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String dreamId,
+      required String label,
+      required String source,
+      Value<String?> sourceRef,
+      Value<String?> direction,
+      Value<String?> unit,
+      Value<double?> startValue,
+      Value<String?> startDate,
+      required double targetValue,
+      Value<String?> targetDate,
+      Value<double?> manualValue,
+      Value<DateTime?> manualAt,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$DreamMetricsTableUpdateCompanionBuilder =
+    DreamMetricsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> dreamId,
+      Value<String> label,
+      Value<String> source,
+      Value<String?> sourceRef,
+      Value<String?> direction,
+      Value<String?> unit,
+      Value<double?> startValue,
+      Value<String?> startDate,
+      Value<double> targetValue,
+      Value<String?> targetDate,
+      Value<double?> manualValue,
+      Value<DateTime?> manualAt,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$DreamMetricsTableFilterComposer
+    extends Composer<_$AppDatabase, $DreamMetricsTable> {
+  $$DreamMetricsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dreamId => $composableBuilder(
+    column: $table.dreamId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceRef => $composableBuilder(
+    column: $table.sourceRef,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get startValue => $composableBuilder(
+    column: $table.startValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get manualValue => $composableBuilder(
+    column: $table.manualValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get manualAt =>
+      $composableBuilder(
+        column: $table.manualAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DreamMetricsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DreamMetricsTable> {
+  $$DreamMetricsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dreamId => $composableBuilder(
+    column: $table.dreamId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceRef => $composableBuilder(
+    column: $table.sourceRef,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get startValue => $composableBuilder(
+    column: $table.startValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get manualValue => $composableBuilder(
+    column: $table.manualValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get manualAt => $composableBuilder(
+    column: $table.manualAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DreamMetricsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DreamMetricsTable> {
+  $$DreamMetricsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get dreamId =>
+      $composableBuilder(column: $table.dreamId, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceRef =>
+      $composableBuilder(column: $table.sourceRef, builder: (column) => column);
+
+  GeneratedColumn<String> get direction =>
+      $composableBuilder(column: $table.direction, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<double> get startValue => $composableBuilder(
+    column: $table.startValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<double> get targetValue => $composableBuilder(
+    column: $table.targetValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get targetDate => $composableBuilder(
+    column: $table.targetDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get manualValue => $composableBuilder(
+    column: $table.manualValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get manualAt =>
+      $composableBuilder(column: $table.manualAt, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$DreamMetricsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DreamMetricsTable,
+          DreamMetricRow,
+          $$DreamMetricsTableFilterComposer,
+          $$DreamMetricsTableOrderingComposer,
+          $$DreamMetricsTableAnnotationComposer,
+          $$DreamMetricsTableCreateCompanionBuilder,
+          $$DreamMetricsTableUpdateCompanionBuilder,
+          (
+            DreamMetricRow,
+            BaseReferences<_$AppDatabase, $DreamMetricsTable, DreamMetricRow>,
+          ),
+          DreamMetricRow,
+          PrefetchHooks Function()
+        > {
+  $$DreamMetricsTableTableManager(_$AppDatabase db, $DreamMetricsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DreamMetricsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DreamMetricsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DreamMetricsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> dreamId = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<String?> sourceRef = const Value.absent(),
+                Value<String?> direction = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double?> startValue = const Value.absent(),
+                Value<String?> startDate = const Value.absent(),
+                Value<double> targetValue = const Value.absent(),
+                Value<String?> targetDate = const Value.absent(),
+                Value<double?> manualValue = const Value.absent(),
+                Value<DateTime?> manualAt = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamMetricsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                dreamId: dreamId,
+                label: label,
+                source: source,
+                sourceRef: sourceRef,
+                direction: direction,
+                unit: unit,
+                startValue: startValue,
+                startDate: startDate,
+                targetValue: targetValue,
+                targetDate: targetDate,
+                manualValue: manualValue,
+                manualAt: manualAt,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String dreamId,
+                required String label,
+                required String source,
+                Value<String?> sourceRef = const Value.absent(),
+                Value<String?> direction = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double?> startValue = const Value.absent(),
+                Value<String?> startDate = const Value.absent(),
+                required double targetValue,
+                Value<String?> targetDate = const Value.absent(),
+                Value<double?> manualValue = const Value.absent(),
+                Value<DateTime?> manualAt = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamMetricsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                dreamId: dreamId,
+                label: label,
+                source: source,
+                sourceRef: sourceRef,
+                direction: direction,
+                unit: unit,
+                startValue: startValue,
+                startDate: startDate,
+                targetValue: targetValue,
+                targetDate: targetDate,
+                manualValue: manualValue,
+                manualAt: manualAt,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DreamMetricsTable, DreamMetricRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $DreamMetricsTable,
+                    DreamMetricRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DreamMetricsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DreamMetricsTable,
+      DreamMetricRow,
+      $$DreamMetricsTableFilterComposer,
+      $$DreamMetricsTableOrderingComposer,
+      $$DreamMetricsTableAnnotationComposer,
+      $$DreamMetricsTableCreateCompanionBuilder,
+      $$DreamMetricsTableUpdateCompanionBuilder,
+      (
+        DreamMetricRow,
+        BaseReferences<_$AppDatabase, $DreamMetricsTable, DreamMetricRow>,
+      ),
+      DreamMetricRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DreamCategoriesTableCreateCompanionBuilder =
+    DreamCategoriesCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String key,
+      required String label,
+      required String emoji,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$DreamCategoriesTableUpdateCompanionBuilder =
+    DreamCategoriesCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> key,
+      Value<String> label,
+      Value<String> emoji,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+class $$DreamCategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $DreamCategoriesTable> {
+  $$DreamCategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get emoji => $composableBuilder(
+    column: $table.emoji,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DreamCategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $DreamCategoriesTable> {
+  $$DreamCategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get emoji => $composableBuilder(
+    column: $table.emoji,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DreamCategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DreamCategoriesTable> {
+  $$DreamCategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get emoji =>
+      $composableBuilder(column: $table.emoji, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+}
+
+class $$DreamCategoriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DreamCategoriesTable,
+          DreamCategoryRow,
+          $$DreamCategoriesTableFilterComposer,
+          $$DreamCategoriesTableOrderingComposer,
+          $$DreamCategoriesTableAnnotationComposer,
+          $$DreamCategoriesTableCreateCompanionBuilder,
+          $$DreamCategoriesTableUpdateCompanionBuilder,
+          (
+            DreamCategoryRow,
+            BaseReferences<
+              _$AppDatabase,
+              $DreamCategoriesTable,
+              DreamCategoryRow
+            >,
+          ),
+          DreamCategoryRow,
+          PrefetchHooks Function()
+        > {
+  $$DreamCategoriesTableTableManager(
+    _$AppDatabase db,
+    $DreamCategoriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DreamCategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DreamCategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DreamCategoriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> key = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> emoji = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamCategoriesCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                key: key,
+                label: label,
+                emoji: emoji,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String key,
+                required String label,
+                required String emoji,
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamCategoriesCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                key: key,
+                label: label,
+                emoji: emoji,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DreamCategoriesTable, DreamCategoryRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $DreamCategoriesTable,
+                    DreamCategoryRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DreamCategoriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DreamCategoriesTable,
+      DreamCategoryRow,
+      $$DreamCategoriesTableFilterComposer,
+      $$DreamCategoriesTableOrderingComposer,
+      $$DreamCategoriesTableAnnotationComposer,
+      $$DreamCategoriesTableCreateCompanionBuilder,
+      $$DreamCategoriesTableUpdateCompanionBuilder,
+      (
+        DreamCategoryRow,
+        BaseReferences<_$AppDatabase, $DreamCategoriesTable, DreamCategoryRow>,
+      ),
+      DreamCategoryRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DreamFieldsTableCreateCompanionBuilder =
+    DreamFieldsCompanion Function({
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      required String id,
+      required String key,
+      required String label,
+      Value<String> type,
+      Value<String?> options,
+      Value<String?> appliesTo,
+      Value<int> sortOrder,
+      Value<bool> showInList,
+      Value<int> rowid,
+    });
+typedef $$DreamFieldsTableUpdateCompanionBuilder =
+    DreamFieldsCompanion Function({
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String> id,
+      Value<String> key,
+      Value<String> label,
+      Value<String> type,
+      Value<String?> options,
+      Value<String?> appliesTo,
+      Value<int> sortOrder,
+      Value<bool> showInList,
+      Value<int> rowid,
+    });
+
+class $$DreamFieldsTableFilterComposer
+    extends Composer<_$AppDatabase, $DreamFieldsTable> {
+  $$DreamFieldsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get options => $composableBuilder(
+    column: $table.options,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appliesTo => $composableBuilder(
+    column: $table.appliesTo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get showInList => $composableBuilder(
+    column: $table.showInList,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DreamFieldsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DreamFieldsTable> {
+  $$DreamFieldsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get options => $composableBuilder(
+    column: $table.options,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appliesTo => $composableBuilder(
+    column: $table.appliesTo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get showInList => $composableBuilder(
+    column: $table.showInList,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DreamFieldsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DreamFieldsTable> {
+  $$DreamFieldsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get options =>
+      $composableBuilder(column: $table.options, builder: (column) => column);
+
+  GeneratedColumn<String> get appliesTo =>
+      $composableBuilder(column: $table.appliesTo, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get showInList => $composableBuilder(
+    column: $table.showInList,
+    builder: (column) => column,
+  );
+}
+
+class $$DreamFieldsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DreamFieldsTable,
+          DreamFieldRow,
+          $$DreamFieldsTableFilterComposer,
+          $$DreamFieldsTableOrderingComposer,
+          $$DreamFieldsTableAnnotationComposer,
+          $$DreamFieldsTableCreateCompanionBuilder,
+          $$DreamFieldsTableUpdateCompanionBuilder,
+          (
+            DreamFieldRow,
+            BaseReferences<_$AppDatabase, $DreamFieldsTable, DreamFieldRow>,
+          ),
+          DreamFieldRow,
+          PrefetchHooks Function()
+        > {
+  $$DreamFieldsTableTableManager(_$AppDatabase db, $DreamFieldsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DreamFieldsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DreamFieldsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DreamFieldsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> key = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<String?> options = const Value.absent(),
+                Value<String?> appliesTo = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> showInList = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamFieldsCompanion(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                key: key,
+                label: label,
+                type: type,
+                options: options,
+                appliesTo: appliesTo,
+                sortOrder: sortOrder,
+                showInList: showInList,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                required String id,
+                required String key,
+                required String label,
+                Value<String> type = const Value.absent(),
+                Value<String?> options = const Value.absent(),
+                Value<String?> appliesTo = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> showInList = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DreamFieldsCompanion.insert(
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                id: id,
+                key: key,
+                label: label,
+                type: type,
+                options: options,
+                appliesTo: appliesTo,
+                sortOrder: sortOrder,
+                showInList: showInList,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$DreamFieldsTable, DreamFieldRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $DreamFieldsTable,
+                    DreamFieldRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DreamFieldsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DreamFieldsTable,
+      DreamFieldRow,
+      $$DreamFieldsTableFilterComposer,
+      $$DreamFieldsTableOrderingComposer,
+      $$DreamFieldsTableAnnotationComposer,
+      $$DreamFieldsTableCreateCompanionBuilder,
+      $$DreamFieldsTableUpdateCompanionBuilder,
+      (
+        DreamFieldRow,
+        BaseReferences<_$AppDatabase, $DreamFieldsTable, DreamFieldRow>,
+      ),
+      DreamFieldRow,
+      PrefetchHooks Function()
+    >;
 typedef $$CachedPricesTableCreateCompanionBuilder =
     CachedPricesCompanion Function({
       required String key,
@@ -36012,6 +42159,16 @@ class $AppDatabaseManager {
       $$HabitFieldsTableTableManager(_db, _db.habitFields);
   $$HabitEventsTableTableManager get habitEvents =>
       $$HabitEventsTableTableManager(_db, _db.habitEvents);
+  $$DreamsTableTableManager get dreams =>
+      $$DreamsTableTableManager(_db, _db.dreams);
+  $$DreamStepsTableTableManager get dreamSteps =>
+      $$DreamStepsTableTableManager(_db, _db.dreamSteps);
+  $$DreamMetricsTableTableManager get dreamMetrics =>
+      $$DreamMetricsTableTableManager(_db, _db.dreamMetrics);
+  $$DreamCategoriesTableTableManager get dreamCategories =>
+      $$DreamCategoriesTableTableManager(_db, _db.dreamCategories);
+  $$DreamFieldsTableTableManager get dreamFields =>
+      $$DreamFieldsTableTableManager(_db, _db.dreamFields);
   $$CachedPricesTableTableManager get cachedPrices =>
       $$CachedPricesTableTableManager(_db, _db.cachedPrices);
   $$PortfolioSnapshotsTableTableManager get portfolioSnapshots =>

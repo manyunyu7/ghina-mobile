@@ -23,6 +23,8 @@ export 'notes_usecases.dart';
 export 'notification_rules.dart';
 export 'notification_usecases.dart';
 export 'people_rules.dart';
+export 'dreams_rules.dart';
+export 'dreams_usecases.dart';
 export 'people_usecases.dart';
 export 'planned_usecases.dart';
 export 'prayer_quality.dart';

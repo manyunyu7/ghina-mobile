@@ -172,6 +172,83 @@ class LocalCascades {
     }
   }
 
+  // ---------------------------------------------------------------- dreams
+
+  /// Dream deleted → its steps and metrics are deleted (the server tombstones
+  /// them) and its child dreams lose `parentId` (they re-sync).
+  Future<void> dreamDeleted(String dreamId) async {
+    final steps = await (_db.select(
+      _db.dreamSteps,
+    )..where((s) => s.dreamId.equals(dreamId))).get();
+    for (final s in steps) {
+      await (_db.delete(_db.dreamSteps)..where((x) => x.id.equals(s.id))).go();
+      await _outbox.dropQueued(SyncEntity.dreamSteps, s.id);
+    }
+    final metrics = await (_db.select(
+      _db.dreamMetrics,
+    )..where((m) => m.dreamId.equals(dreamId))).get();
+    for (final m in metrics) {
+      await (_db.delete(
+        _db.dreamMetrics,
+      )..where((x) => x.id.equals(m.id))).go();
+      await _outbox.dropQueued(SyncEntity.dreamMetrics, m.id);
+    }
+    final children = await (_db.select(
+      _db.dreams,
+    )..where((d) => d.parentId.equals(dreamId))).get();
+    for (final c in children) {
+      await (_db.update(_db.dreams)..where((x) => x.id.equals(c.id))).write(
+        const DreamsCompanion(parentId: Value(null)),
+      );
+      await _outbox.patchQueued(SyncEntity.dreams, c.id, {'parentId': null});
+    }
+  }
+
+  /// Dream metric deleted → steps tied to it lose `metricRef` / `atValue` (the
+  /// server updates them too, so they re-sync).
+  Future<void> dreamMetricDeleted(String metricId) async {
+    final steps = await (_db.select(
+      _db.dreamSteps,
+    )..where((s) => s.metricRef.equals(metricId))).get();
+    for (final s in steps) {
+      await (_db.update(_db.dreamSteps)..where((x) => x.id.equals(s.id))).write(
+        const DreamStepsCompanion(metricRef: Value(null), atValue: Value(null)),
+      );
+      await _outbox.patchQueued(SyncEntity.dreamSteps, s.id, {
+        'metricRef': null,
+        'atValue': null,
+      });
+    }
+  }
+
+  /// Dream category [key] deleted → its dreams move to `other` (the server
+  /// updates them too, so they re-sync).
+  Future<void> dreamCategoryDeleted(String key) async {
+    final rows = await (_db.select(
+      _db.dreams,
+    )..where((d) => d.category.equals(key))).get();
+    for (final r in rows) {
+      await (_db.update(_db.dreams)..where((x) => x.id.equals(r.id))).write(
+        const DreamsCompanion(category: Value('other')),
+      );
+      await _outbox.patchQueued(SyncEntity.dreams, r.id, {'category': 'other'});
+    }
+  }
+
+  /// Dream field def [key] deleted → the key is removed from every dream's
+  /// `fields` (the server updates those rows too, so they re-sync).
+  Future<void> dreamFieldDeleted(String key) async {
+    for (final r in await _db.select(_db.dreams).get()) {
+      final fields = scalarMapFromJson(r.fields);
+      if (!fields.containsKey(key)) continue;
+      final next = {...fields}..remove(key);
+      await (_db.update(_db.dreams)..where((x) => x.id.equals(r.id))).write(
+        DreamsCompanion(fields: Value(jsonEncode(next))),
+      );
+      await _outbox.patchQueued(SyncEntity.dreams, r.id, {'fields': next});
+    }
+  }
+
   // ---------------------------------------------------------------- people
 
   /// Person deleted → its important dates are deleted (the server tombstones
@@ -229,7 +306,7 @@ class LocalCascades {
 
   // ---------------------------------------------------------------- notes & content
 
-  /// Note deleted → content items get `noteId = null`.
+  /// Note deleted → content items and dreams get `noteId = null`.
   Future<void> noteDeleted(String noteId) async {
     final rows = await (_db.select(
       _db.contentItems,
@@ -240,6 +317,15 @@ class LocalCascades {
       await _outbox.patchQueued(SyncEntity.contentItems, r.id, {
         'noteId': null,
       });
+    }
+    final dreams = await (_db.select(
+      _db.dreams,
+    )..where((d) => d.noteId.equals(noteId))).get();
+    for (final d in dreams) {
+      await (_db.update(_db.dreams)..where((x) => x.id.equals(d.id))).write(
+        const DreamsCompanion(noteId: Value(null)),
+      );
+      await _outbox.patchQueued(SyncEntity.dreams, d.id, {'noteId': null});
     }
   }
 

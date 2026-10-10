@@ -7,6 +7,7 @@ export 'budget.dart';
 export 'category.dart';
 export 'content.dart';
 export 'content_views.dart';
+export 'dreams.dart';
 export 'enums.dart';
 export 'food_log.dart';
 export 'habit.dart';

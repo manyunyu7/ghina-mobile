@@ -31,6 +31,8 @@ import '../data/repositories/local_store.dart';
 import '../data/repositories/notes_repositories.dart';
 import '../data/repositories/notification_log_repositories.dart';
 import '../data/repositories/people_notes_repository_impl.dart';
+import '../data/repositories/dreams_online_repository_impl.dart';
+import '../data/repositories/dreams_repositories.dart';
 import '../data/repositories/people_repositories.dart';
 import '../data/repositories/photo_store.dart';
 import '../data/repositories/task_repositories.dart';
@@ -284,4 +286,27 @@ final habitOnlineRepositoryProvider = Provider<HabitOnlineRepository>(
 
 final peopleNotesRepositoryProvider = Provider<PeopleNotesRepository>(
   (ref) => ApiPeopleNotesRepository(ref.watch(apiClientProvider)),
+);
+
+/// Dreams ("Mimpi", `docs/dreams.md`): synced tables through the outbox.
+final dreamRepositoryProvider = Provider<DreamRepository>(
+  (ref) => DriftDreamRepository(ref.watch(localStoreProvider)),
+);
+final dreamStepRepositoryProvider = Provider<DreamStepRepository>(
+  (ref) => DriftDreamStepRepository(ref.watch(localStoreProvider)),
+);
+final dreamMetricRepositoryProvider = Provider<DreamMetricRepository>(
+  (ref) => DriftDreamMetricRepository(ref.watch(localStoreProvider)),
+);
+final dreamCategoryRepositoryProvider = Provider<DreamCategoryRepository>(
+  (ref) => DriftDreamCategoryRepository(ref.watch(localStoreProvider)),
+);
+final dreamFieldRepositoryProvider = Provider<DreamFieldRepository>(
+  (ref) => DriftDreamFieldRepository(ref.watch(localStoreProvider)),
+);
+
+/// The online-only Dreams reads and manual readings (`/api/mobile/dreams`);
+/// tests override it with a fake.
+final dreamOnlineRepositoryProvider = Provider<DreamOnlineRepository>(
+  (ref) => ApiDreamOnlineRepository(ref.watch(apiClientProvider)),
 );

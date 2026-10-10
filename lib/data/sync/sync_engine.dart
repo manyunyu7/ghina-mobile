@@ -25,6 +25,7 @@ import '../models/wire.dart';
 import '../repositories/photo_store.dart';
 import 'agenda_sync.dart';
 import 'habits_investments_sync.dart';
+import 'dreams_sync.dart';
 import 'local_cascades.dart';
 import 'outbox.dart';
 import 'people_sync.dart';
@@ -55,6 +56,7 @@ class SyncEngine implements SyncService {
     _hi = HabitsInvestmentsSync(db, outbox, _cascades, _clock);
     _agenda = AgendaSync(db);
     _people = PeopleSync(db, outbox, _cascades);
+    _dreams = DreamsSync(db, outbox, _cascades);
   }
 
   final AppDatabase _db;
@@ -74,6 +76,9 @@ class SyncEngine implements SyncService {
 
   /// People + habit enrichment (categories/defs unique by key, cascades).
   late final PeopleSync _people;
+
+  /// Dreams ("Mimpi"): categories/fields by key, cascades on delete.
+  late final DreamsSync _dreams;
 
   /// Delay between a local write and the sync it triggers.
   final Duration debounce;
@@ -1120,7 +1125,9 @@ class SyncEngine implements SyncService {
               _db.contentPillars,
             )..where((p) => p.id.equals(t.id))).getSingleOrNull())?.name
           : null;
-      final tombKey = await _people.beforeTombstone(t.entity, t.id);
+      final tombKey =
+          await _people.beforeTombstone(t.entity, t.id) ??
+          await _dreams.beforeTombstone(t.entity, t.id);
       final n = await _deleteRow(t.entity, t.id);
       if (n == 0) continue;
       if (t.entity == SyncEntity.wallets) await _cascades.walletDeleted(t.id);
@@ -1147,6 +1154,7 @@ class SyncEngine implements SyncService {
       if (pillarName != null) await _cascades.pillarDeleted(pillarName);
       await _hi.onTombstone(t.entity, t.id);
       await _people.onTombstone(t.entity, t.id, tombKey);
+      await _dreams.onTombstone(t.entity, t.id, tombKey);
     }
 
     for (final entity in SyncEntity.all) {
@@ -1335,8 +1343,9 @@ class SyncEngine implements SyncService {
         // Habits/investments, reminders/calendar, people/habit enrichment,
         // else an unknown entity (newer server): ignore.
         if (!await _hi.upsertPulled(entity, j) &&
-            !await _agenda.upsertPulled(entity, j)) {
-          await _people.upsertPulled(entity, j);
+            !await _agenda.upsertPulled(entity, j) &&
+            !await _people.upsertPulled(entity, j)) {
+          await _dreams.upsertPulled(entity, j);
         }
     }
   }
@@ -1371,7 +1380,11 @@ class SyncEngine implements SyncService {
     SyncEntity.contentPillars => _db.contentPillars,
     SyncEntity.contentItems => _db.contentItems,
     SyncEntity.contentPosts => _db.contentPosts,
-    _ => _hi.table(entity) ?? _agenda.table(entity) ?? _people.table(entity),
+    _ =>
+      _hi.table(entity) ??
+          _agenda.table(entity) ??
+          _people.table(entity) ??
+          _dreams.table(entity),
   };
 
   /// Deletes one local row without queuing anything. Returns rows deleted.

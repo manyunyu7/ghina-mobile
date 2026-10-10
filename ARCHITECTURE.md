@@ -205,3 +205,24 @@ people; notes, tools and events never enter the masked digests/lists) and the se
   `GET /food/summary` (`food_rules.dart`).
 - New routes sit behind `HabitLockGate` like every habit route; the analysis and notes are never shown on
   home, the board, reminders or search.
+
+## Dreams / Mimpi (schema v9)
+
+Drift v9 adds `dreams`, `dream_steps`, `dream_metrics`, `dream_categories`, `dream_fields`
+(all synced, `../docs/dreams.md`). The v8 → v9 upgrade forces one full re-pull like v7 and v8.
+Layers: `domain/entities/dreams.dart` (entities + enums; dates are `YYYY-MM-DD` strings),
+`domain/usecases/dreams_rules.dart` (Dart port of `src/lib/dreams.ts`: flexible targets, limits,
+metric math, costs, staleness, lists), `dreams_usecases.dart`, `domain/repositories/dreams_*.dart`;
+`data/models/dreams_wire.dart` (sync rows) and `dreams_online_wire.dart` (computed values, parsed
+defensively), `data/repositories/dreams_repositories.dart` (offline-first, through the outbox) and
+`dreams_online_repository_impl.dart` (summary, detail, manual value: online only), `data/sync/dreams_sync.dart`
+(pull, tombstones, key clashes), cascades in `local_cascades.dart`, `di/dreams_providers.dart`.
+
+- Push order: the outbox ranks `dreamCategories` 5.1, `dreamFields` 5.2, `dreams` 5.5 (after `notes`
+  at 5), `dreamMetrics` 5.6, `dreamSteps` 5.7; inside a batch a child dream follows its parent
+  (`dreamParentDepths`). Ranks are fixed, so a re-saved entry keeps its place.
+- Computed values (progress, metric readings, on-track, projections, summary) never enter the
+  database. The app stamps `startedAt` / `completedAt` on its own writes (the server does the same on
+  REST); it does **not** auto-complete steps: that happens on the server and arrives with the pull.
+- A manual reading written offline is queued (`RecordDreamManualValue`); a reading older than the
+  stored one is refused, because the row carries only the newest value.

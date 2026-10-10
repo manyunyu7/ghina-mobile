@@ -690,6 +690,177 @@ class HabitEvents extends Table with Timestamps {
   Set<Column> get primaryKey => {id};
 }
 
+// --- schema v9: dreams / "Mimpi" (`docs/dreams.md`) ---
+
+/// Synced `dreams`. Computed values (progress, metric current values, on-track,
+/// stale/overdue) never travel and have no column.
+@DataClassName('DreamRow')
+@TableIndex(name: 'idx_dream_category', columns: {#category})
+class Dreams extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get emoji => text().nullable()();
+
+  /// A `dream_categories.key` (default `other`).
+  TextColumn get category => text().withDefault(const Constant('other'))();
+
+  /// `idea | planned | active | waiting | done | paused | dropped | watching`
+  TextColumn get status => text().withDefault(const Constant('idea'))();
+
+  /// 1 (highest) … 5, nullable.
+  IntColumn get priority => integer().nullable()();
+
+  /// `someday | this_year | next_year | multi_year | ongoing`, nullable.
+  TextColumn get horizon => text().nullable()();
+
+  /// `YYYY-MM-DD`, always the last day of the `targetPrecision` period.
+  TextColumn get targetDate => text().nullable()();
+
+  /// `day | month | quarter | year`
+  TextColumn get targetPrecision => text().withDefault(const Constant('day'))();
+  TextColumn get condition => text().nullable()();
+  TextColumn get why => text().nullable()();
+  TextColumn get summary => text().nullable()();
+
+  /// Rupiah estimate, nullable.
+  RealColumn get costEstimate => real().nullable()();
+  TextColumn get costNote => text().nullable()();
+
+  /// 0–100, nullable (overrides the computed progress).
+  IntColumn get progressManual => integer().nullable()();
+
+  /// `YYYY-MM-DD`, nullable.
+  TextColumn get startedAt => text().nullable()();
+
+  /// `YYYY-MM-DD`, nullable.
+  TextColumn get completedAt => text().nullable()();
+
+  /// A note of the user, nullable (the note's delete nulls it).
+  TextColumn get noteId => text().nullable()();
+
+  /// A parent dream of the user, nullable.
+  TextColumn get parentId => text().nullable()();
+
+  /// JSON array of strings.
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
+
+  /// JSON object: custom-field key → string|number|bool.
+  TextColumn get fields => text().withDefault(const Constant('{}'))();
+
+  /// JSON object `{"taskIds": [...], "habitIds": [...]}` (soft links).
+  TextColumn get links => text().withDefault(const Constant('{}'))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `dreamSteps` (child of a dream, deleted with it).
+@DataClassName('DreamStepRow')
+@TableIndex(name: 'idx_dream_step_dream', columns: {#dreamId})
+class DreamSteps extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get dreamId => text()();
+  TextColumn get title => text()();
+  TextColumn get notes => text().nullable()();
+  BoolColumn get done => boolean().withDefault(const Constant(false))();
+
+  /// Stamped when done (epoch ms), nullable.
+  IntColumn get doneAt => integer().map(epochMs).nullable()();
+
+  /// `YYYY-MM-DD`, nullable.
+  TextColumn get dueDate => text().nullable()();
+
+  /// Rupiah, nullable.
+  RealColumn get cost => real().nullable()();
+
+  /// "Hadiah" unlocked when the step is done, nullable.
+  TextColumn get reward => text().nullable()();
+
+  /// A `dream_metrics.id` of the same dream, nullable. Stored as pushed.
+  TextColumn get metricRef => text().nullable()();
+
+  /// Threshold of [metricRef] (both or neither is set), nullable.
+  RealColumn get atValue => real().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `dreamMetrics` (child of a dream, deleted with it). Computed current
+/// values are never stored here.
+@DataClassName('DreamMetricRow')
+@TableIndex(name: 'idx_dream_metric_dream', columns: {#dreamId})
+class DreamMetrics extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get dreamId => text()();
+  TextColumn get label => text()();
+
+  /// `weight | pulse | systolic | diastolic | habit_clean_days |
+  /// habit_current_streak | habit_longest_streak | wallet_balance |
+  /// net_worth | spend_category | manual`
+  TextColumn get source => text()();
+
+  /// JSON object (`habitId` / `walletId` / `categoryId`+`period`), nullable.
+  TextColumn get sourceRef => text().nullable()();
+
+  /// `down | up`, nullable (the server derives it when omitted).
+  TextColumn get direction => text().nullable()();
+  TextColumn get unit => text().nullable()();
+  RealColumn get startValue => real().nullable()();
+
+  /// `YYYY-MM-DD`, nullable.
+  TextColumn get startDate => text().nullable()();
+  RealColumn get targetValue => real()();
+
+  /// `YYYY-MM-DD`, nullable.
+  TextColumn get targetDate => text().nullable()();
+  RealColumn get manualValue => real().nullable()();
+
+  /// Epoch ms of [manualValue], nullable.
+  IntColumn get manualAt => integer().map(epochMs).nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `dreamCategories`. The 12 built-ins are seeded by the server.
+@DataClassName('DreamCategoryRow')
+class DreamCategories extends Table with Timestamps {
+  TextColumn get id => text()();
+
+  /// Immutable slug; unique per user (the server answers `duplicate`).
+  TextColumn get key => text()();
+  TextColumn get label => text()();
+  TextColumn get emoji => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Synced `dreamFields` (custom-column definitions).
+@DataClassName('DreamFieldRow')
+class DreamFields extends Table with Timestamps {
+  TextColumn get id => text()();
+  TextColumn get key => text()();
+  TextColumn get label => text()();
+  TextColumn get type => text().withDefault(const Constant('text'))();
+
+  /// JSON array (select) or null.
+  TextColumn get options => text().nullable()();
+
+  /// JSON array of dream category keys, null = all.
+  TextColumn get appliesTo => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  BoolColumn get showInList => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Device-only cache of `GET /api/mobile/prices` (not synced, not user data).
 @DataClassName('CachedPriceRow')
 class CachedPrices extends Table {

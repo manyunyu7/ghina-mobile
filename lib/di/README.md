@@ -555,3 +555,16 @@ fakes from `habitsInvestmentsFakeOverrides` (`test/di/habits_investments_test_ov
 `parseCalorieRange`, `resolveMealText`, `recentMealLabels`, `foodTagCounts`, `filterFoodByTag`, `addFoodTag`.
 Tests that override repositories with fakes and watch the calendar or the reminders also need
 `...peopleFakeOverrides()` (`test/di/people_test_overrides.dart`).
+
+## Dreams / Mimpi (schema v9)
+
+`di/dreams_providers.dart`: reads `watchDreamsProvider`, `watchDreamCategoriesProvider`,
+`watchDreamFieldsProvider`, `watchDreamLocalDetailProvider(id)` (dream + local steps and metrics, no
+computed values); writes `createDreamProvider`, `updateDreamProvider`, `setDreamStatusProvider`,
+`moveDreamCategoryProvider`, `deleteDreamProvider`, `saveDreamStepProvider`, `toggleDreamStepProvider`,
+`deleteDreamStepProvider`, `reorderDreamStepsProvider`, `saveDreamMetricProvider`,
+`recordDreamManualValueProvider`, `deleteDreamMetricProvider`, category and field CRUD providers; online
+(never stored, fail offline): `getDreamSummaryProvider`, `getDreamDetailProvider`,
+`recordDreamManualValueOnlineProvider`. Repository bindings live in `core_providers.dart`
+(`dreamRepositoryProvider` … `dreamOnlineRepositoryProvider`). Tests override them with
+`test/di/dreams_test_overrides.dart` (`dreamsFakeOverrides`).

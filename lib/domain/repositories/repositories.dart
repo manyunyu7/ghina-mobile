@@ -9,6 +9,8 @@ import '../entities/entities.dart';
 export 'killa_repository.dart';
 export 'habit_online_repository.dart';
 export 'people_notes_repository.dart';
+export 'dreams_repositories.dart';
+export 'dreams_online_repository.dart';
 
 /// Runs several repository calls atomically (one local DB transaction).
 abstract interface class UnitOfWork {

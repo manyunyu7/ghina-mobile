@@ -646,6 +646,80 @@ class FakeServer implements SyncApi {
           );
           if (!known) return 'Unknown dimension "$k"';
         }
+      case SyncEntity.dreamCategories:
+        if (!ppl.keyRe.hasMatch(d['key'] as String? ?? '')) {
+          return 'Invalid key';
+        }
+        final prev = rows[SyncEntity.dreamCategories]![_currentId];
+        if (prev != null && prev['key'] != d['key']) return 'Key is immutable';
+      case SyncEntity.dreamFields:
+        if (!ppl.keyRe.hasMatch(d['key'] as String? ?? '')) {
+          return 'Invalid key';
+        }
+        final prev = rows[SyncEntity.dreamFields]![_currentId];
+        if (prev != null && prev['key'] != d['key']) return 'Key is immutable';
+      case SyncEntity.dreams:
+        final title = (d['title'] as String? ?? '').trim();
+        if (title.isEmpty || title.length > 160) return 'Invalid title';
+        final cat = d['category'] as String? ?? 'other';
+        if (!rows[SyncEntity.dreamCategories]!.values.any(
+          (c) => c['key'] == cat,
+        )) {
+          return 'Unknown category "$cat"';
+        }
+        final pid = d['parentId'] as String?;
+        if (pid != null) {
+          if (!_owned(SyncEntity.dreams, pid) || pid == _currentId) {
+            return 'Parent not found';
+          }
+        }
+        final nid = d['noteId'] as String?;
+        if (nid != null && !_owned(SyncEntity.notes, nid)) {
+          return 'Note not found';
+        }
+        final dfields = d['fields'];
+        if (dfields is! Map) return 'Invalid fields';
+        for (final k in dfields.keys) {
+          final def = rows[SyncEntity.dreamFields]!.values
+              .where((f) => f['key'] == k)
+              .firstOrNull;
+          if (def == null) return 'Unknown field "$k"';
+          final v = dfields[k];
+          final ok = switch (def['type']) {
+            'number' => v is num,
+            'boolean' => v is bool,
+            _ => v is String,
+          };
+          if (!ok) return '${def['label']} does not fit its type';
+        }
+      case SyncEntity.dreamSteps:
+        if (!_owned(SyncEntity.dreams, d['dreamId'] as String?)) {
+          return 'Not found';
+        }
+        final stitle = (d['title'] as String? ?? '').trim();
+        if (stitle.isEmpty || stitle.length > 200) return 'Invalid title';
+      case SyncEntity.dreamMetrics:
+        if (!_owned(SyncEntity.dreams, d['dreamId'] as String?)) {
+          return 'Not found';
+        }
+        final mlabel = (d['label'] as String? ?? '').trim();
+        if (mlabel.isEmpty || mlabel.length > 80) return 'Invalid label';
+        if (!const [
+          'weight',
+          'systolic',
+          'diastolic',
+          'pulse',
+          'habit_clean_days',
+          'habit_current_streak',
+          'habit_longest_streak',
+          'wallet_balance',
+          'net_worth',
+          'spend_category',
+          'manual',
+        ].contains(d['source'])) {
+          return 'Unknown source';
+        }
+        if (d['targetValue'] is! num) return 'Invalid targetValue';
       case SyncEntity.people:
         final name = (d['name'] as String? ?? '').trim();
         if (name.isEmpty || name.length > 120) return 'Invalid name';
@@ -844,6 +918,8 @@ class FakeServer implements SyncApi {
       ),
       SyncEntity.personCategories ||
       SyncEntity.personFields ||
+      SyncEntity.dreamCategories ||
+      SyncEntity.dreamFields ||
       SyncEntity.habitFields => clash((r) => r['key'] == d['key']),
       SyncEntity.assets => clash(
         (r) =>
@@ -928,6 +1004,50 @@ class FakeServer implements SyncApi {
         _tomb(SyncEntity.personDates, dId);
       }
     }
+    if (e == SyncEntity.dreams) {
+      for (final ent in [SyncEntity.dreamSteps, SyncEntity.dreamMetrics]) {
+        for (final x
+            in rows[ent]!.values
+                .where((x) => x['dreamId'] == id)
+                .map((x) => x['id'] as String)
+                .toList()) {
+          rows[ent]!.remove(x);
+          _tomb(ent, x);
+        }
+      }
+      for (final c in rows[SyncEntity.dreams]!.values) {
+        if (c['parentId'] == id) {
+          c['parentId'] = null;
+          c['updatedAt'] = iso(tick());
+        }
+      }
+    }
+    if (e == SyncEntity.dreamMetrics) {
+      for (final st in rows[SyncEntity.dreamSteps]!.values) {
+        if (st['metricRef'] == id) {
+          st['metricRef'] = null;
+          st['atValue'] = null;
+          st['updatedAt'] = iso(tick());
+        }
+      }
+    }
+    if (e == SyncEntity.dreamCategories) {
+      for (final d in rows[SyncEntity.dreams]!.values) {
+        if (d['category'] == row['key']) {
+          d['category'] = 'other';
+          d['updatedAt'] = iso(tick());
+        }
+      }
+    }
+    if (e == SyncEntity.dreamFields) {
+      for (final d in rows[SyncEntity.dreams]!.values) {
+        final f = d['fields'] as Map;
+        if (f.containsKey(row['key'])) {
+          d['fields'] = {...f}..remove(row['key']);
+          d['updatedAt'] = iso(tick());
+        }
+      }
+    }
     if (e == SyncEntity.personCategories) {
       for (final p in rows[SyncEntity.people]!.values) {
         if (p['category'] == row['key']) {
@@ -996,7 +1116,10 @@ class FakeServer implements SyncApi {
       delete(SyncEntity.transactions, row['cashTransactionId'] as String);
     }
     if (e == SyncEntity.tasks) _nullRef(SyncEntity.notes, 'linkedTaskId', id);
-    if (e == SyncEntity.notes) _nullRef(SyncEntity.contentItems, 'noteId', id);
+    if (e == SyncEntity.notes) {
+      _nullRef(SyncEntity.contentItems, 'noteId', id);
+      _nullRef(SyncEntity.dreams, 'noteId', id);
+    }
     if (e == SyncEntity.noteLabels) {
       for (final n in rows[SyncEntity.notes]!.values) {
         final l = n['labels'] as List? ?? const [];
