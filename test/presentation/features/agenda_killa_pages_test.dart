@@ -12,12 +12,14 @@ import 'package:ghina/di/core_providers.dart';
 import 'package:ghina/di/killa_providers.dart';
 import 'package:ghina/domain/entities/entities.dart';
 import 'package:ghina/domain/repositories/repositories.dart';
-import 'package:ghina/domain/services/killa_media_picker.dart';
+import 'package:ghina/data/platform/fakes.dart';
+import 'package:ghina/domain/services/services.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/calendar/pages/calendar_page.dart';
 import 'package:ghina/presentation/features/killa/pages/killa_chat_page.dart';
 import 'package:ghina/presentation/features/reminders/pages/reminders_page.dart';
 import 'package:ghina/presentation/state/killa_access_provider.dart';
+import 'package:ghina/presentation/state/platform/platform_providers.dart';
 import 'package:ghina/presentation/state/session_controller.dart';
 
 final _now = DateTime(2026, 10, 1, 12);
@@ -85,6 +87,7 @@ class _Killa implements KillaRepository {
   final messages = <KillaMessage>[];
   String? storedModel;
   final modelPosts = <String>[];
+  final sentTexts = <String>[];
 
   @override
   Future<KillaModelSetting> model() async {
@@ -112,6 +115,7 @@ class _Killa implements KillaRepository {
     required String text,
     List<KillaOutgoingMedia> media = const [],
   }) async {
+    sentTexts.add(text);
     final u = KillaMessage(
       id: 'u${messages.length}',
       role: KillaRole.user,
@@ -340,6 +344,150 @@ void main() {
     expect(find.text('Model: Default'), findsOneWidget);
     expect(find.text('Model tersimpan (berlaku juga di WA)'), findsOneWidget);
     await t.pumpWidget(const SizedBox());
+  });
+
+  group('killa dictation', () {
+    late _Killa killa;
+    late FakeSpeechTranscriber speech;
+
+    Future<void> pumpChat(
+      WidgetTester t, {
+      SpeechAvailability? available,
+      MicPermissionStatus mic = MicPermissionStatus.granted,
+    }) async {
+      killa = _Killa();
+      speech = FakeSpeechTranscriber();
+      if (available != null) speech.available = available;
+      await _pump(t, const KillaChatPage(), [
+        killaRepositoryProvider.overrideWithValue(killa),
+        killaMediaPickerProvider.overrideWithValue(const _NoPicker()),
+        speechTranscriberProvider.overrideWithValue(speech),
+        microphonePermissionProvider.overrideWithValue(
+          FakeMicrophonePermission(mic),
+        ),
+      ]);
+    }
+
+    Future<void> settle(WidgetTester t) async {
+      for (var i = 0; i < 6; i++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    String input(WidgetTester t) => t
+        .widget<TextField>(find.byKey(const ValueKey('killa-input')))
+        .controller!
+        .text;
+
+    testWidgets('speech lands in the composer (id-ID), editable, then sent', (
+      t,
+    ) async {
+      await pumpChat(t);
+      await t.tap(find.byKey(const ValueKey('killa-dictate')));
+      await settle(t);
+      expect(speech.calls, ['start:id-ID']);
+      expect(find.byKey(const ValueKey('dictation-bar')), findsOneWidget);
+
+      speech.partial('ingatkan aku');
+      await t.pump();
+      expect(find.byKey(const ValueKey('dictation-partial')), findsOneWidget);
+      expect(input(t), '');
+      speech.finalResult('ingatkan aku besok jam tujuh');
+      await t.pump();
+      expect(input(t), 'ingatkan aku besok jam tujuh');
+
+      // Android ends the session after silence; dictation keeps listening
+      // and the next words are appended.
+      speech.endSession();
+      await t.pump(const Duration(milliseconds: 400));
+      speech.finalResult('beli susu');
+      await t.pump();
+      expect(input(t), 'ingatkan aku besok jam tujuh beli susu');
+
+      await t.tap(find.byKey(const ValueKey('dictation-stop')));
+      await settle(t);
+      expect(find.byKey(const ValueKey('dictation-bar')), findsNothing);
+
+      // Fix a word by hand before sending.
+      await t.enterText(
+        find.byKey(const ValueKey('killa-input')),
+        'ingatkan aku besok jam 7 beli susu',
+      );
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('killa-send')));
+      await settle(t);
+      expect(killa.sentTexts, ['ingatkan aku besok jam 7 beli susu']);
+      expect(input(t), '');
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('sending while dictating keeps the last words', (t) async {
+      await pumpChat(t);
+      await t.enterText(find.byKey(const ValueKey('killa-input')), 'Halo');
+      await t.tap(find.byKey(const ValueKey('killa-dictate')));
+      await settle(t);
+      speech.partial('apa kabar');
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('killa-send')));
+      await settle(t);
+      expect(killa.sentTexts, ['Halo apa kabar']);
+      expect(find.byKey(const ValueKey('dictation-bar')), findsNothing);
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('Batal stops listening; words already in stay editable', (
+      t,
+    ) async {
+      await pumpChat(t);
+      await t.tap(find.byKey(const ValueKey('killa-dictate')));
+      await settle(t);
+      speech.finalResult('catat ide ini');
+      await t.pump();
+      speech.partial('eh salah');
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('dictation-cancel')));
+      await settle(t);
+      expect(speech.calls.last, 'cancel');
+      expect(input(t), 'catat ide ini');
+      expect(killa.sentTexts, isEmpty);
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('no Indonesian model → explained, recognizer not started', (
+      t,
+    ) async {
+      await pumpChat(
+        t,
+        available: const SpeechAvailability(
+          recognizerAvailable: true,
+          offline: OfflineSpeechSupport.downloadable,
+        ),
+      );
+      await t.tap(find.byKey(const ValueKey('killa-dictate')));
+      await settle(t);
+      expect(find.text('Dikte belum bisa dipakai'), findsOneWidget);
+      expect(
+        find.text('Kamu tetap bisa mengetik pesannya, ya.'),
+        findsOneWidget,
+      );
+      expect(speech.starts, 0);
+      await t.tap(find.byKey(const ValueKey('dictation-download')));
+      await settle(t);
+      expect(speech.calls, ['download:id-ID']);
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('refused microphone → toast, nothing listens', (t) async {
+      await pumpChat(t, mic: MicPermissionStatus.denied);
+      await t.tap(find.byKey(const ValueKey('killa-dictate')));
+      await settle(t);
+      await t.tap(find.byKey(const ValueKey('mic-allow')));
+      await settle(t);
+      expect(speech.starts, 0);
+      expect(find.text('Izin mikrofon dibutuhkan untuk dikte'), findsOneWidget);
+      expect(find.byKey(const ValueKey('dictation-bar')), findsNothing);
+      await t.pumpWidget(const SizedBox());
+    });
   });
 }
 
