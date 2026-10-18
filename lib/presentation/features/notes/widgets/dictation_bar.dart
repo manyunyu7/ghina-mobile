@@ -136,12 +136,14 @@ class _MicLevel extends StatelessWidget {
 }
 
 /// Explains why "Dikte" can't start here (offline pack missing, no speech
-/// service…) with "Unduh" when the OS can fetch the id-ID model.
+/// service…) with "Unduh" when the OS can fetch the id-ID model. [fallback]
+/// names what still works instead (default: the Notes voice recorder).
 Future<void> showDictationUnavailable(
   BuildContext context,
   WidgetRef ref,
-  SpeechAvailability availability,
-) async {
+  SpeechAvailability availability, {
+  String fallback = 'Tenang, "Rekam suara" tetap bisa dipakai kapan saja.',
+}) async {
   final canDownload = availability.offline == OfflineSpeechSupport.downloadable;
   final download = await showChunkyDialog<bool>(
     context,
@@ -152,7 +154,7 @@ Future<void> showDictationUnavailable(
           'Pengenalan suara belum tersedia di perangkat ini.',
       mood: MascotMood.thinking,
       content: Text(
-        'Tenang, "Rekam suara" tetap bisa dipakai kapan saja.',
+        fallback,
         textAlign: TextAlign.center,
         style: GhinaType.bodyS.copyWith(color: c.ghina.textSecondary),
       ),

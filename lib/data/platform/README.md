@@ -44,6 +44,7 @@ The contract the UI must implement:
 |---|---|---|---|
 | **Voice clip** | "Rekam suara" (tap to toggle, or hold-to-record; long-press on the Notes FAB starts it immediately) | `voiceRecorderControllerProvider` | `VoiceRecording` → note attachment (audio, `transcript = null`) |
 | **Dictation** | "Dikte" (mic icon in the editor toolbar) | `dictationControllerProvider` | text inserted into the note body at the cursor |
+| **Killa dictation** | mic next to the Killa composer (`killa-dictate`) | `dictationControllerProvider` | text inserted into the chat composer at the cursor; editable before Kirim (sending mid-dictation stops it first and keeps the last words) |
 
 - Starting one **cancels/stops the other** automatically (one mic owner): starting a recording
   cancels an active dictation; starting dictation *stops* (keeps) an active recording.

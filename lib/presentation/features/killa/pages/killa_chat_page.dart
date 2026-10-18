@@ -8,9 +8,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/dates.dart';
 import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
+import '../../../../domain/services/services.dart';
 import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../state/platform/platform_state.dart';
+import '../../notes/markdown_edit.dart' show insertAtCursor;
+import '../../notes/widgets/dictation_bar.dart';
+import '../../notes/widgets/mic_permission.dart';
 import '../controllers/killa_chat_controller.dart';
 import '../widgets/killa_common.dart';
 import '../widgets/killa_message_views.dart';
@@ -18,6 +23,12 @@ import '../widgets/killa_message_views.dart';
 /// "Killa": chat with the personal Claude agent (`docs/killa.md`). Online
 /// only. Polls the newest page every 20 s while visible and on app resume, so
 /// WhatsApp-mirrored turns show up on their own.
+///
+/// Voice input ("Dikte", the mic next to the text field): speech becomes text
+/// in the composer as you talk (on-device recognizer, `id-ID`), so it can be
+/// fixed before sending. Text rather than an audio clip because the engine
+/// can't listen to audio (it only saves the file and asks the agent to find a
+/// transcriber) — text is what Killa reliably understands.
 class KillaChatPage extends ConsumerStatefulWidget {
   const KillaChatPage({super.key});
 
@@ -36,6 +47,9 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
   final List<KillaOutgoingMedia> _media = [];
   Timer? _poll;
   bool _resumed = true;
+
+  /// Length of the dictated transcript already put into [_text].
+  int _dictInserted = 0;
 
   @override
   void initState() {
@@ -71,6 +85,12 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
   }
 
   Future<void> _send() async {
+    if (ref.read(killaChatControllerProvider).pending != null) return;
+    // Sending mid-dictation: take the last words along.
+    if (ref.read(dictationControllerProvider).isActive) {
+      await _stopDictation();
+      if (!mounted) return;
+    }
     final s = ref.read(killaChatControllerProvider);
     if (s.pending != null) return;
     final text = _text.text;
@@ -175,6 +195,107 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
     }
   }
 
+  // ------------------------------------------------------------ dictation
+
+  /// Puts newly finalised words into the composer at the cursor.
+  void _onDictation(DictationState? prev, DictationState next) {
+    final committed = next.committed;
+    if (committed.length > _dictInserted) {
+      final delta = committed.substring(_dictInserted);
+      _dictInserted = committed.length;
+      final v = _text.value;
+      final at = v.selection.isValid
+          ? v
+          : v.copyWith(
+              selection: TextSelection.collapsed(offset: v.text.length),
+            );
+      final out = insertAtCursor(at, delta);
+      // The field enforces the limit only on typing.
+      _text.value = out.text.length > killaTextMax ? v : out;
+    } else if (committed.length < _dictInserted) {
+      _dictInserted = committed.length;
+    }
+    if (prev?.phase != DictationPhase.error &&
+        next.phase == DictationPhase.error &&
+        next.error?.kind != SpeechErrorKind.permission) {
+      showErrorToast(context, _dictationError(next.error?.kind));
+    }
+  }
+
+  String _dictationError(SpeechErrorKind? k) => switch (k) {
+    SpeechErrorKind.network =>
+      'Dikte butuh paket suara offline. Ketik dulu pesannya, ya',
+    SpeechErrorKind.languageUnavailable =>
+      'Bahasa Indonesia belum tersedia untuk dikte di HP ini',
+    SpeechErrorKind.busy =>
+      'Mikrofon lagi dipakai aplikasi lain. Coba lagi sebentar, ya',
+    SpeechErrorKind.audio => 'Mikrofon bermasalah. Coba lagi, ya',
+    _ => 'Dikte berhenti. Coba lagi, yuk',
+  };
+
+  Future<void> _toggleDictation() async {
+    final c = ref.read(dictationControllerProvider.notifier);
+    if (ref.read(dictationControllerProvider).isActive) {
+      await _stopDictation();
+      return;
+    }
+    // Availability first (no mic prompt on a device that can't dictate).
+    final avail = await ref
+        .read(speechTranscriberProvider)
+        .availability(locale: ref.read(speechLocaleProvider));
+    if (!mounted) return;
+    const fallback = 'Kamu tetap bisa mengetik pesannya, ya.';
+    if (!avail.canDictate(
+      allowNetwork: ref.read(dictationAllowsNetworkProvider),
+    )) {
+      await showDictationUnavailable(context, ref, avail, fallback: fallback);
+      return;
+    }
+    if (!await ensureMicReady(context, ref, MicPurpose.dictate)) return;
+    if (!mounted) return;
+    c.clear();
+    _dictInserted = 0;
+    HapticFeedback.lightImpact();
+    final ok = await c.start();
+    if (ok || !mounted) return;
+    final s = ref.read(dictationControllerProvider);
+    if (s.phase == DictationPhase.unavailable && s.availability != null) {
+      await showDictationUnavailable(
+        context,
+        ref,
+        s.availability!,
+        fallback: fallback,
+      );
+    } else if (s.error?.kind == SpeechErrorKind.permission) {
+      if (s.permission == MicPermissionStatus.permanentlyDenied) {
+        await showMicSettingsGuide(context, ref);
+      } else {
+        showErrorToast(context, 'Izin mikrofon dibutuhkan untuk dikte');
+      }
+    } else if (s.phase == DictationPhase.error) {
+      showErrorToast(context, _dictationError(s.error?.kind));
+    }
+  }
+
+  /// Stops listening; the final words still land in the composer.
+  Future<void> _stopDictation() async {
+    final c = ref.read(dictationControllerProvider.notifier);
+    await c.stop();
+    if (!mounted) return;
+    c.clear();
+    _dictInserted = 0;
+  }
+
+  /// Stops listening and drops the words not finalised yet (the ones already
+  /// in the composer stay — they can be edited like typed text).
+  Future<void> _cancelDictation() async {
+    final c = ref.read(dictationControllerProvider.notifier);
+    await c.cancel();
+    if (!mounted) return;
+    c.clear();
+    _dictInserted = 0;
+  }
+
   Future<void> _pickModel() async {
     final c = ref.read(killaChatControllerProvider.notifier);
     final cur = ref.read(killaChatControllerProvider).model;
@@ -231,6 +352,10 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
   Widget build(BuildContext context) {
     final g = context.ghina;
     final s = ref.watch(killaChatControllerProvider);
+    // Watching keeps the (auto-dispose) dictation alive while the chat is
+    // open; leaving the page stops it and releases the mic.
+    final dictation = ref.watch(dictationControllerProvider);
+    ref.listen(dictationControllerProvider, _onDictation);
     final locked = s.forbidden;
     return Scaffold(
       backgroundColor: g.background,
@@ -342,11 +467,15 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
                     'otomatis di sini.',
               ),
             Expanded(child: _messages(s)),
+            if (dictation.isActive)
+              DictationBar(onStop: _stopDictation, onCancel: _cancelDictation),
             _Composer(
               controller: _text,
               focus: _focus,
               media: _media,
               sending: s.pending != null,
+              dictating: dictation.isActive,
+              onDictate: _toggleDictation,
               onAttach: _attach,
               onRemove: (m) => setState(() => _media.remove(m)),
               onSend: _send,
@@ -410,8 +539,8 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
           mood: MascotMood.waving,
           title: 'Hai, aku Killa 👋',
           message:
-              'Tanya apa aja, minta dibuatkan catatan, atau kirim foto & PDF '
-              'untuk dibahas.',
+              'Tanya apa aja (ketik atau ucapkan lewat 🎙️), minta dibuatkan '
+              'catatan, atau kirim foto & PDF untuk dibahas.',
           actionLabel: 'Mulai ngobrol',
           onAction: _focus.requestFocus,
         ),
@@ -468,6 +597,8 @@ class _Composer extends StatelessWidget {
     required this.focus,
     required this.media,
     required this.sending,
+    required this.dictating,
+    required this.onDictate,
     required this.onAttach,
     required this.onRemove,
     required this.onSend,
@@ -477,6 +608,10 @@ class _Composer extends StatelessWidget {
   final FocusNode focus;
   final List<KillaOutgoingMedia> media;
   final bool sending;
+
+  /// "Dikte" is listening (the mic button turns into stop).
+  final bool dictating;
+  final VoidCallback onDictate;
   final VoidCallback onAttach;
   final ValueChanged<KillaOutgoingMedia> onRemove;
   final VoidCallback onSend;
@@ -528,6 +663,15 @@ class _Composer extends StatelessWidget {
                   child: const Icon(Icons.attach_file_rounded),
                 ),
               ),
+              IconButton(
+                key: const ValueKey('killa-dictate'),
+                tooltip: dictating ? 'Selesai dikte' : 'Dikte (ucapkan pesan)',
+                onPressed: sending ? null : onDictate,
+                icon: Icon(
+                  dictating ? Icons.stop_circle_rounded : Icons.mic_rounded,
+                  color: dictating ? GhinaColors.blue.base : null,
+                ),
+              ),
               Expanded(
                 child: TextField(
                   key: const ValueKey('killa-input'),
@@ -543,6 +687,8 @@ class _Composer extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: sending
                         ? 'Tunggu Killa selesai menjawab…'
+                        : dictating
+                        ? 'Ngomong aja, teksnya muncul di sini…'
                         : 'Tulis pesan ke Killa…',
                     counterText: '',
                     isDense: true,
