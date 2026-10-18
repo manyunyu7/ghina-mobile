@@ -193,7 +193,7 @@ class _DreamsPageState extends ConsumerState<DreamsPage> {
                   _filter.isActive
                       ? Icons.filter_alt_rounded
                       : Icons.filter_alt_outlined,
-                  color: _filter.isActive ? GhinaColors.green.base : null,
+                  color: _filter.isActive ? context.ghina.accent.base : null,
                 ),
                 onPressed: () => _filterSheet(cats, tags),
               ),

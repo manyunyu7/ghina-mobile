@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../mascot/mascot_view.dart';
 import '../theme/ghina_tokens.dart';
 import '../theme/typography.dart';
-import '../tokens/colors.dart';
 import '../tokens/dimens.dart';
 import '../widgets/chunky_button.dart';
 
@@ -137,7 +136,6 @@ Future<bool> showChunkyConfirm(
         ChunkyButton(
           label: cancelLabel,
           variant: ChunkyButtonVariant.ghost,
-          color: destructive ? null : GhinaColors.blue,
           onPressed: () => Navigator.of(c).pop(false),
         ),
       ],

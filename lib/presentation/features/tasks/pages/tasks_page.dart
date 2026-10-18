@@ -758,7 +758,7 @@ class _AddButton extends StatelessWidget {
     icon: Icons.add_rounded,
     size: ChunkyButtonSize.medium,
     expand: false,
-    color: GhinaColors.green,
+    color: context.ghina.accent,
     onPressed: onPressed,
   );
 }

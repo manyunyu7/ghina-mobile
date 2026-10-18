@@ -449,7 +449,7 @@ class _TabsRow extends StatelessWidget {
             key: ValueKey('notes-tab-$id'),
             label: label,
             icon: icon,
-            color: c ?? GhinaColors.green,
+            color: c ?? context.ghina.accent,
             selected: selected == id,
             onTap: () => onSelect(id),
           ),
@@ -507,7 +507,7 @@ class _NotesFab extends StatelessWidget {
           semanticLabel: 'Checklist baru',
           child: Icon(
             Icons.checklist_rounded,
-            color: GhinaColors.green.base,
+            color: context.ghina.accent.base,
             size: 24,
           ),
         ),
@@ -516,8 +516,8 @@ class _NotesFab extends StatelessWidget {
           message: 'Tahan untuk rekam suara',
           child: ChunkySurface(
             key: const ValueKey('notes-fab'),
-            color: GhinaColors.green.base,
-            edgeColor: GhinaColors.green.edge,
+            color: context.ghina.accent.base,
+            edgeColor: context.ghina.accent.edge,
             depth: GhinaDepth.md,
             borderRadius: GhinaRadii.rLg,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -527,20 +527,30 @@ class _NotesFab extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+                Icon(
+                  Icons.add_rounded,
+                  color: context.ghina.accent.on,
+                  size: 24,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'CATATAN',
-                  style: GhinaType.button.copyWith(color: Colors.white),
+                  style: GhinaType.button.copyWith(
+                    color: context.ghina.accent.on,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Container(
                   width: 2,
                   height: 18,
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: context.ghina.accent.on.withValues(alpha: 0.35),
                 ),
                 const SizedBox(width: 10),
-                const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
+                Icon(
+                  Icons.mic_rounded,
+                  color: context.ghina.accent.on,
+                  size: 20,
+                ),
               ],
             ),
           ),

@@ -744,7 +744,7 @@ class _Stepper extends StatelessWidget {
           icon: Icons.add_rounded,
           size: 40,
           tooltip: 'Tambah',
-          color: GhinaColors.green,
+          color: context.ghina.accent,
           onPressed: value < max ? () => onChanged(value + 1) : null,
         ),
       ],

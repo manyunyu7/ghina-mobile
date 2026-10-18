@@ -118,6 +118,24 @@ const kAppMenu = <AppMenuItem>[
     synonyms: ['analisis', 'statistik', 'grafik', 'chart', 'analytics', 'tren'],
   ),
   AppMenuItem(
+    label: 'Email',
+    icon: Icons.mark_email_unread_rounded,
+    color: GhinaColors.red,
+    path: '/email',
+    group: AppMenuGroup.money,
+    synonyms: [
+      'email',
+      'gmail',
+      'inbox',
+      'surel',
+      'tagihan',
+      'struk',
+      'receipt',
+      'kwitansi',
+      'perlu dicek',
+    ],
+  ),
+  AppMenuItem(
     label: 'Investasi',
     icon: Icons.trending_up_rounded,
     color: GhinaColors.purple,
@@ -203,7 +221,14 @@ const kAppMenu = <AppMenuItem>[
     path: '/dreams',
     group: AppMenuGroup.life,
     longPressPath: '/dreams/new',
-    synonyms: ['impian', 'cita-cita', 'bucket list', 'target', 'dream', 'goals'],
+    synonyms: [
+      'impian',
+      'cita-cita',
+      'bucket list',
+      'target',
+      'dream',
+      'goals',
+    ],
   ),
   // ---- PRODUKTIF
   AppMenuItem(
@@ -296,6 +321,35 @@ const kAppMenu = <AppMenuItem>[
     ],
   ),
   AppMenuItem(
+    label: 'Pilih maskot',
+    icon: Icons.pets_rounded,
+    color: GhinaColors.lime,
+    path: '/settings/mascot',
+    group: AppMenuGroup.other,
+    synonyms: ['maskot', 'mascot', 'karakter', 'avatar', 'tampilan', 'pohon'],
+  ),
+  AppMenuItem(
+    label: 'Tema & warna',
+    icon: Icons.palette_rounded,
+    color: GhinaColors.purple,
+    path: '/settings/appearance',
+    group: AppMenuGroup.other,
+    synonyms: [
+      'tema',
+      'theme',
+      'warna',
+      'aksen',
+      'gelap',
+      'dark',
+      'terang',
+      'mode',
+      'font',
+      'ukuran teks',
+      'huruf',
+      'tampilan',
+    ],
+  ),
+  AppMenuItem(
     label: 'Sinkronisasi',
     icon: Icons.sync_rounded,
     color: GhinaColors.blue,
@@ -343,8 +397,9 @@ String _norm(String s) => s
 
 /// Items matching [query] by label, group name or a synonym, ignoring case
 /// and punctuation. Words are matched by prefix ("lapor" → Laporan, "sa" →
-/// saldo/saham/salat); when nothing matches, any substring counts. An empty
-/// query returns every item. [items] defaults to [visibleAppMenu].
+/// saldo/saham/salat); when nothing matches, any substring counts. Exact
+/// label / synonym hits rank first, then label prefixes, then the rest (each
+/// in menu order). An empty query returns every item. [items] defaults to [visibleAppMenu].
 List<AppMenuItem> filterAppMenu(String query, [List<AppMenuItem>? only]) {
   final items = only ?? visibleAppMenu;
   final q = _norm(query);
@@ -359,7 +414,19 @@ List<AppMenuItem> filterAppMenu(String query, [List<AppMenuItem>? only]) {
   }
 
   final byPrefix = where(prefix);
-  return byPrefix.isNotEmpty ? byPrefix : where((s) => _norm(s).contains(q));
+  if (byPrefix.isEmpty) return where((s) => _norm(s).contains(q));
+  // Best matches first ("tema" → "Tema & warna" before "Orang" via
+  // "teman"); menu order within a rank.
+  int rank(AppMenuItem i) {
+    final names = [i.label, ...i.synonyms].map(_norm);
+    if (names.any((n) => n == q)) return 0;
+    if (prefix(i.label)) return 1;
+    return 2;
+  }
+
+  return [
+    for (final r in [0, 1, 2]) ...byPrefix.where((i) => rank(i) == r),
+  ];
 }
 
 /// Whether [item] is the screen at [location] (or one of its sub-pages).

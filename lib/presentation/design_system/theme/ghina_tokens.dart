@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../tokens/colors.dart';
+import 'ghina_appearance.dart';
 
 /// Theme-aware neutrals & semantic colors. Read with `context.ghina`.
 ///
@@ -25,6 +26,9 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
     required this.disabled,
     required this.disabledEdge,
     required this.onDisabled,
+    this.accent = GhinaColors.green,
+    this.highlight = GhinaColors.blue,
+    this.style = GhinaStyle.chunky,
   });
 
   static const light = GhinaTokens(
@@ -61,6 +65,48 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
     onDisabled: GhinaColors.darkTextMuted,
   );
 
+  /// Neutrals of the "Minimal" style (light): white page, grey panels.
+  static const minimalLight = GhinaTokens(
+    brightness: Brightness.light,
+    background: Color(0xFFFFFFFF),
+    surface: Color(0xFFF5F5F7),
+    surfaceAlt: Color(0xFFECECEF),
+    border: Color(0xFFE3E3E7),
+    borderEdge: Color(0xFFE3E3E7),
+    textPrimary: Color(0xFF171717),
+    textSecondary: Color(0xFF6B6B70),
+    textMuted: Color(0xFFA1A1A6),
+    skeleton: Color(0xFFEAEAED),
+    skeletonHighlight: Color(0xFFF5F5F7),
+    disabled: Color(0xFFEAEAED),
+    disabledEdge: Color(0xFFE3E3E7),
+    onDisabled: Color(0xFFA1A1A6),
+    accent: GhinaColors.monoLight,
+    highlight: GhinaColors.monoLight,
+    style: GhinaStyle.minimal,
+  );
+
+  /// Neutrals of the "Minimal" style (dark): near-black page.
+  static const minimalDark = GhinaTokens(
+    brightness: Brightness.dark,
+    background: Color(0xFF0B0B0C),
+    surface: Color(0xFF1C1C1E),
+    surfaceAlt: Color(0xFF2C2C2E),
+    border: Color(0xFF2E2E32),
+    borderEdge: Color(0xFF2E2E32),
+    textPrimary: Color(0xFFF5F5F7),
+    textSecondary: Color(0xFFA1A1A6),
+    textMuted: Color(0xFF6B6B70),
+    skeleton: Color(0xFF2C2C2E),
+    skeletonHighlight: Color(0xFF3A3A3D),
+    disabled: Color(0xFF2C2C2E),
+    disabledEdge: Color(0xFF2E2E32),
+    onDisabled: Color(0xFF6B6B70),
+    accent: GhinaColors.monoDark,
+    highlight: GhinaColors.monoDark,
+    style: GhinaStyle.minimal,
+  );
+
   final Brightness brightness;
 
   /// Page background.
@@ -87,6 +133,24 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
   final Color disabledEdge;
   final Color onDisabled;
 
+  /// Brand accent (the user's pick in "Tampilan", green by default): primary
+  /// CTAs, nav center button, switches, progress, FAB. Not for semantic
+  /// meaning (income / success / done stay [GhinaColors.green]).
+  final ChunkySwatch accent;
+
+  /// Selection & focus (selected tab / chip / segment, focused field).
+  /// Blue next to the default green accent, else the accent itself.
+  final ChunkySwatch highlight;
+
+  /// "Gaya": chunky (3D edge), datar (flat) or minimal.
+  final GhinaStyle style;
+
+  /// No 3D bottom edge (Datar / Minimal).
+  bool get flat => style.isFlat;
+
+  /// Minimal: system font, 1px borders, soft shadows, 14 / 24 radii.
+  bool get minimal => style == GhinaStyle.minimal;
+
   bool get isDark => brightness == Brightness.dark;
 
   Color get income => GhinaColors.income.base;
@@ -98,7 +162,13 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
   Color tint(ChunkySwatch s) => s.tint(brightness);
 
   @override
-  GhinaTokens copyWith({Color? background, Color? surface}) => GhinaTokens(
+  GhinaTokens copyWith({
+    Color? background,
+    Color? surface,
+    ChunkySwatch? accent,
+    ChunkySwatch? highlight,
+    GhinaStyle? style,
+  }) => GhinaTokens(
     brightness: brightness,
     background: background ?? this.background,
     surface: surface ?? this.surface,
@@ -113,6 +183,9 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
     disabled: disabled,
     disabledEdge: disabledEdge,
     onDisabled: onDisabled,
+    accent: accent ?? this.accent,
+    highlight: highlight ?? this.highlight,
+    style: style ?? this.style,
   );
 
   @override
@@ -134,6 +207,9 @@ class GhinaTokens extends ThemeExtension<GhinaTokens> {
       disabled: l(disabled, other.disabled),
       disabledEdge: l(disabledEdge, other.disabledEdge),
       onDisabled: l(onDisabled, other.onDisabled),
+      accent: ChunkySwatch.lerp(accent, other.accent, t),
+      highlight: ChunkySwatch.lerp(highlight, other.highlight, t),
+      style: t < 0.5 ? style : other.style,
     );
   }
 }

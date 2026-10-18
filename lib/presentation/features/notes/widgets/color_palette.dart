@@ -62,14 +62,14 @@ class _NoteColorPaletteState extends State<NoteColorPalette> {
               color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? GhinaColors.green.base : g.border,
+                color: selected ? context.ghina.accent.base : g.border,
                 width: selected ? 3 : 2,
               ),
             ),
             child: id == null
                 ? Icon(
                     selected ? Icons.check_rounded : Icons.format_color_reset,
-                    color: selected ? GhinaColors.green.base : g.textMuted,
+                    color: selected ? context.ghina.accent.base : g.textMuted,
                   )
                 : selected
                 ? Icon(Icons.check_rounded, color: g.textPrimary)

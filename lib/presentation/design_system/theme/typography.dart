@@ -43,7 +43,7 @@ abstract final class GhinaType {
 
   // ---- Money / display numbers (tabular figures) ---------------------------
   /// Hero balance, amount entry. 44/900.
-  static final moneyXL = nunito(
+  static final _moneyXL = nunito(
     44,
     weight: 900,
     height: 1.05,
@@ -52,7 +52,7 @@ abstract final class GhinaType {
   );
 
   /// Card totals. 30/900.
-  static final moneyL = nunito(
+  static final _moneyL = nunito(
     30,
     weight: 900,
     height: 1.1,
@@ -61,7 +61,7 @@ abstract final class GhinaType {
   );
 
   /// List amounts. 17/800.
-  static final moneyM = nunito(
+  static final _moneyM = nunito(
     17,
     weight: 800,
     height: 1.2,
@@ -69,7 +69,7 @@ abstract final class GhinaType {
   );
 
   /// Small amounts in captions. 13/800.
-  static final moneyS = nunito(
+  static final _moneyS = nunito(
     13,
     weight: 800,
     height: 1.2,
@@ -78,7 +78,7 @@ abstract final class GhinaType {
 
   // ---- Headings -------------------------------------------------------------
   /// Celebration titles ("Mantap!"). 36/900.
-  static final display = nunito(
+  static final _display = nunito(
     36,
     weight: 900,
     height: 1.1,
@@ -86,24 +86,24 @@ abstract final class GhinaType {
   );
 
   /// Screen titles. 26/900.
-  static final h1 = nunito(26, weight: 900, height: 1.2, letterSpacing: -0.3);
+  static final _h1 = nunito(26, weight: 900, height: 1.2, letterSpacing: -0.3);
 
   /// Section / card titles. 20/800.
-  static final h2 = nunito(20, weight: 800, height: 1.25);
+  static final _h2 = nunito(20, weight: 800, height: 1.25);
 
   /// Tile titles. 17/800.
-  static final h3 = nunito(17, weight: 800, height: 1.3);
+  static final _h3 = nunito(17, weight: 800, height: 1.3);
 
   // ---- Body -----------------------------------------------------------------
-  static final bodyL = nunito(17, weight: 600, height: 1.45);
-  static final body = nunito(15, weight: 600, height: 1.45);
-  static final bodyS = nunito(13, weight: 600, height: 1.4);
+  static final _bodyL = nunito(17, weight: 600, height: 1.45);
+  static final _body = nunito(15, weight: 600, height: 1.45);
+  static final _bodyS = nunito(13, weight: 600, height: 1.4);
 
   /// Small labels, timestamps. 12/700.
-  static final caption = nunito(12, weight: 700, height: 1.3);
+  static final _caption = nunito(12, weight: 700, height: 1.3);
 
   /// ALL-CAPS tracking label ("TOTAL XP", section overlines). 13/800.
-  static final overline = nunito(
+  static final _overline = nunito(
     13,
     weight: 800,
     height: 1.2,
@@ -111,12 +111,79 @@ abstract final class GhinaType {
   );
 
   /// Button label (apply `.toUpperCase()` to text – Duolingo-style caps). 15/800.
-  static final button = nunito(
+  static final _button = nunito(
     15,
     weight: 800,
     height: 1.1,
     letterSpacing: 0.8,
   );
+
+  // ---- Public styles ----------------------------------------------------------
+  // Nunito by default; the system font (SF Pro / Roboto, lighter weights,
+  // tighter headings) while the "Minimal" style is on.
+  static TextStyle get moneyXL => usesSystemFont ? _moneyXLSys : _moneyXL;
+  static TextStyle get moneyL => usesSystemFont ? _moneyLSys : _moneyL;
+  static TextStyle get moneyM => usesSystemFont ? _moneyMSys : _moneyM;
+  static TextStyle get moneyS => usesSystemFont ? _moneySSys : _moneyS;
+  static TextStyle get display => usesSystemFont ? _displaySys : _display;
+  static TextStyle get h1 => usesSystemFont ? _h1Sys : _h1;
+  static TextStyle get h2 => usesSystemFont ? _h2Sys : _h2;
+  static TextStyle get h3 => usesSystemFont ? _h3Sys : _h3;
+  static TextStyle get bodyL => usesSystemFont ? _bodyLSys : _bodyL;
+  static TextStyle get body => usesSystemFont ? _bodySys : _body;
+  static TextStyle get bodyS => usesSystemFont ? _bodySSys : _bodyS;
+  static TextStyle get caption => usesSystemFont ? _captionSys : _caption;
+  static TextStyle get overline => usesSystemFont ? _overlineSys : _overline;
+  static TextStyle get button => usesSystemFont ? _buttonSys : _button;
+
+  static final _moneyXLSys = _system(_moneyXL, _Track.heading);
+  static final _moneyLSys = _system(_moneyL, _Track.heading);
+  static final _moneyMSys = _system(_moneyM, _Track.plain);
+  static final _moneySSys = _system(_moneyS, _Track.plain);
+  static final _displaySys = _system(_display, _Track.heading);
+  static final _h1Sys = _system(_h1, _Track.heading);
+  static final _h2Sys = _system(_h2, _Track.heading);
+  static final _h3Sys = _system(_h3, _Track.heading);
+  static final _bodyLSys = _system(_bodyL, _Track.plain);
+  static final _bodySys = _system(_body, _Track.plain);
+  static final _bodySSys = _system(_bodyS, _Track.plain);
+  static final _captionSys = _system(_caption, _Track.plain);
+  static final _overlineSys = _system(_overline, _Track.overline);
+  static final _buttonSys = _system(_button, _Track.button);
+
+  /// Builds a system-font copy of a Nunito style.
+  static TextStyle _system(TextStyle s, _Track track) {
+    final size = s.fontSize!;
+    return TextStyle(
+      fontSize: size,
+      fontWeight: _fw(_systemWeight(_weightOf(s))),
+      height: s.height,
+      letterSpacing: switch (track) {
+        _Track.heading => -0.01 * size,
+        _Track.overline => 0.02 * size,
+        _Track.button => 0,
+        _Track.plain => s.letterSpacing,
+      },
+      fontFeatures: s.fontFeatures,
+    );
+  }
+
+  static int _weightOf(TextStyle s) => (s.fontWeight?.value ?? 400);
+
+  /// Nunito's heavy weights mapped to the 500–600 range (700 for the
+  /// heaviest).
+  static int _systemWeight(int w) => w >= 900
+      ? 700
+      : w >= 700
+      ? 600
+      : w >= 600
+      ? 500
+      : w;
+
+  /// True while the "Minimal" style is on: every style above (and
+  /// [TextStyleWeight.w]) uses the system font. Set by `GhinaTheme`;
+  /// the app root rebuilds the tree when it flips.
+  static bool usesSystemFont = false;
 
   /// Material [TextTheme] mapping, colored for a brightness.
   static TextTheme textTheme(Color primary, Color secondary) {
@@ -143,8 +210,17 @@ abstract final class GhinaType {
 /// Weight helper that keeps the variable-font axis in sync.
 extension TextStyleWeight on TextStyle {
   /// Returns this style at [weight] (100–1000), e.g. `GhinaType.body.w(800)`.
-  TextStyle w(int weight) => copyWith(
-    fontWeight: GhinaType._fw(weight),
-    fontVariations: [FontVariation('wght', weight.toDouble())],
-  );
+  TextStyle w(int weight) {
+    if (GhinaType.usesSystemFont && fontFamily == null) {
+      return copyWith(
+        fontWeight: GhinaType._fw(GhinaType._systemWeight(weight)),
+      );
+    }
+    return copyWith(
+      fontWeight: GhinaType._fw(weight),
+      fontVariations: [FontVariation('wght', weight.toDouble())],
+    );
+  }
 }
+
+enum _Track { heading, overline, button, plain }

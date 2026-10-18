@@ -129,7 +129,7 @@ class _HabitsViewState extends ConsumerState<_HabitsView> {
               key: const ValueKey('habit-add'),
               icon: Icons.add_rounded,
               size: 40,
-              color: GhinaColors.green,
+              color: context.ghina.accent,
               tooltip: 'Kebiasaan baru',
               onPressed: () => context.push('/habits/new'),
             ),

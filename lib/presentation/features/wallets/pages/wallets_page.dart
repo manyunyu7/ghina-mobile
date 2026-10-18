@@ -122,7 +122,7 @@ class _WalletsPageState extends ConsumerState<WalletsPage> {
             key: const ValueKey('wallet-add'),
             tooltip: 'Tambah dompet',
             icon: const Icon(Icons.add_circle_rounded),
-            color: GhinaColors.green.base,
+            color: context.ghina.accent.base,
             onPressed: () => context.push('/wallets/new'),
           ),
           const SizedBox(width: 8),

@@ -230,7 +230,7 @@ class _ForecastBody extends ConsumerWidget {
               children: [
                 Icon(
                   Icons.add_circle_rounded,
-                  color: GhinaColors.green.base,
+                  color: context.ghina.accent.base,
                   size: 30,
                 ),
                 const SizedBox(width: 12),

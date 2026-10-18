@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../core/clock.dart';
 import '../../core/failure.dart';
 import '../../core/ids.dart';
@@ -14,17 +16,36 @@ final class WatchCapturedNotifications {
   const WatchCapturedNotifications(this._repo);
   final CapturedNotificationRepository _repo;
 
-  Stream<List<CapturedNotification>> call({
-    String? packageName,
-    String? search,
-  }) => _repo.watch(packageName: packageName, search: search);
+  Stream<List<CapturedNotification>> call(
+    NotificationLogFilter filter, {
+    int limit = 300,
+  }) => _repo.watch(filter, limit: limit);
 }
 
+/// Apps under a filter (its app ignored), with counts and newest entry.
 final class WatchNotificationSources {
   const WatchNotificationSources(this._repo);
   final CapturedNotificationRepository _repo;
 
-  Stream<List<NotificationSource>> call() => _repo.watchSources();
+  Stream<List<NotificationSource>> call(NotificationLogFilter filter) =>
+      _repo.watchSources(filter);
+}
+
+/// Entries per local day under a filter (activity strip).
+final class WatchNotificationDayCounts {
+  const WatchNotificationDayCounts(this._repo);
+  final CapturedNotificationRepository _repo;
+
+  Stream<List<NotificationDayCount>> call(NotificationLogFilter filter) =>
+      _repo.watchDayCounts(filter);
+}
+
+/// Deletes one log entry (the transaction made from it, if any, stays).
+final class DeleteCapturedNotification {
+  const DeleteCapturedNotification(this._repo);
+  final CapturedNotificationRepository _repo;
+
+  Future<Result<void>> call(int id) => guard(() => _repo.delete(id));
 }
 
 /// Deletes the log (or one app's part). → number of rows deleted.
@@ -34,6 +55,58 @@ final class ClearCapturedNotifications {
 
   Future<Result<int>> call({String? packageName}) =>
       guard(() => _repo.clear(packageName: packageName));
+}
+
+/// Deletes reposts logged before repost detection existed. → rows deleted.
+final class RemoveNotificationReposts {
+  const RemoveNotificationReposts(this._repo);
+  final CapturedNotificationRepository _repo;
+
+  Future<Result<int>> call() => guard(_repo.removeReposts);
+}
+
+/// The log under a filter as pretty JSON, newest first.
+final class ExportCapturedNotifications {
+  const ExportCapturedNotifications(this._repo, this._clock);
+  final CapturedNotificationRepository _repo;
+  final Clock _clock;
+
+  Future<Result<({String json, int count})>> call(
+    NotificationLogFilter filter,
+  ) => guard(() async {
+    final rows = await _repo.all(filter);
+    final json = const JsonEncoder.withIndent('  ').convert({
+      'exportedAt': _clock.now().toIso8601String(),
+      'filter': {
+        if (filter.packageName != null) 'package': filter.packageName,
+        if (filter.query != null) 'search': filter.query,
+        if (filter.from != null) 'from': _day(filter.from!),
+        if (filter.to != null) 'to': _day(filter.to!),
+        if (filter.kind != NotificationLogKind.all) 'kind': filter.kind.name,
+      },
+      'count': rows.length,
+      'notifications': [
+        for (final n in rows)
+          {
+            'id': n.id,
+            'package': n.packageName,
+            'app': n.displayAppName,
+            'title': n.title,
+            'body': n.body,
+            'postedAt': n.postedAt.toIso8601String(),
+            'capturedAt': n.capturedAt.toIso8601String(),
+            if (n.ruleId != null) 'ruleId': n.ruleId,
+            if (n.transactionId != null) 'transactionId': n.transactionId,
+            if (n.txType != null) 'txType': n.txType!.wire,
+            if (n.amount != null) 'amount': n.amount,
+            if (n.parseError != null) 'parseError': n.parseError,
+          },
+      ],
+    });
+    return (json: json, count: rows.length);
+  });
+
+  static String _day(DateTime d) => d.toIso8601String().substring(0, 10);
 }
 
 // ---------------------------------------------------------------- rules

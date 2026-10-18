@@ -283,7 +283,7 @@ class _SubscriptionCardState extends ConsumerState<_SubscriptionCard> {
             dense: true,
             leading: Icon(
               Icons.edit_rounded,
-              color: GhinaColors.green.base,
+              color: context.ghina.accent.base,
               size: 30,
             ),
             title: 'Ubah',

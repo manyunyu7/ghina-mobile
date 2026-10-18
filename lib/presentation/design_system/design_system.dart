@@ -15,6 +15,7 @@ export 'mascot/mascot_painter.dart';
 export 'mascot/mascot_view.dart';
 export 'motion/motion.dart';
 export 'motion/page_transitions.dart';
+export 'theme/ghina_appearance.dart';
 export 'theme/ghina_theme.dart';
 export 'theme/ghina_tokens.dart';
 export 'theme/typography.dart';

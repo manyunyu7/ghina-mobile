@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/ghina_tokens.dart';
 import '../tokens/dimens.dart';
 
 /// The primitive behind every "3D" element: a rounded face sitting on a
@@ -46,7 +47,8 @@ class ChunkySurface extends StatefulWidget {
   final double borderWidth;
   final BorderRadius borderRadius;
 
-  /// Height of the bottom edge (the "3D" part).
+  /// Height of the bottom edge (the "3D" part). Ignored in the flat style
+  /// (`context.ghina.flat`).
   final double depth;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
@@ -102,23 +104,44 @@ class _ChunkySurfaceState extends State<ChunkySurface> {
   @override
   Widget build(BuildContext context) {
     final pressed = widget.pressed ?? (_down && _interactive);
-    final d = widget.depth;
+    // Flat ("Datar"): no edge, thinner borders, the face darkens on press.
+    // Minimal: also 1px borders, 14 / 24 radii and a soft shadow under
+    // raised (bordered, md+) cards.
+    final g = context.ghina;
+    final flat = g.flat;
+    final d = flat ? 0.0 : widget.depth;
+    final borderWidth = g.minimal
+        ? widget.borderWidth.clamp(0.0, 1.0)
+        : flat
+        ? widget.borderWidth.clamp(0.0, 1.5)
+        : widget.borderWidth;
+    final radius = g.minimal
+        ? GhinaRadii.minimal(widget.borderRadius)
+        : widget.borderRadius;
+    final shadow =
+        g.minimal && widget.borderColor != null && widget.depth >= GhinaDepth.md
+        ? (g.isDark ? GhinaShadows.softDark : GhinaShadows.soft)
+        : null;
     final border = widget.borderColor == null
         ? null
-        : Border.all(color: widget.borderColor!, width: widget.borderWidth);
+        : Border.all(color: widget.borderColor!, width: borderWidth);
+    final face = flat && pressed && widget.pressed == null
+        ? Color.lerp(widget.color, widget.edgeColor, 0.5)!
+        : widget.color;
 
     Widget surface = Stack(
       fit: StackFit.passthrough,
       children: [
-        Positioned.fill(
-          top: d,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: widget.edgeColor,
-              borderRadius: widget.borderRadius,
+        if (!flat)
+          Positioned.fill(
+            top: d,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: widget.edgeColor,
+                borderRadius: widget.borderRadius,
+              ),
             ),
           ),
-        ),
         AnimatedContainer(
           duration: GhinaMotion.press,
           curve: Curves.easeOut,
@@ -128,9 +151,10 @@ class _ChunkySurfaceState extends State<ChunkySurface> {
           ),
           padding: widget.padding,
           decoration: BoxDecoration(
-            color: widget.color,
-            borderRadius: widget.borderRadius,
+            color: face,
+            borderRadius: radius,
             border: border,
+            boxShadow: shadow,
           ),
           child: widget.child,
         ),

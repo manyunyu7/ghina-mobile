@@ -225,12 +225,12 @@ class ChecklistEditorState extends State<ChecklistEditor> {
             TextButton.icon(
               key: const ValueKey('check-add'),
               onPressed: addItem,
-              icon: Icon(Icons.add_rounded, color: GhinaColors.green.base),
+              icon: Icon(Icons.add_rounded, color: context.ghina.accent.base),
               label: Text(
                 'Item',
                 style: GhinaType.body
                     .w(800)
-                    .copyWith(color: GhinaColors.green.base),
+                    .copyWith(color: context.ghina.accent.base),
               ),
             ),
             const Spacer(),

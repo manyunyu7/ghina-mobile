@@ -39,6 +39,40 @@ abstract final class GhinaRadii {
   static const BorderRadius rXl = BorderRadius.all(Radius.circular(xl));
   static const BorderRadius rXxl = BorderRadius.all(Radius.circular(xxl));
   static const BorderRadius rPill = BorderRadius.all(Radius.circular(pill));
+
+  /// The "Minimal" style's radii: sections / panels 24, controls / tiles 14,
+  /// pills and small corners unchanged.
+  ///
+  /// ```dart
+  /// GhinaRadii.minimal(GhinaRadii.rXl); // 24
+  /// GhinaRadii.minimal(GhinaRadii.rLg); // 14
+  /// ```
+  static BorderRadius minimal(BorderRadius r) => BorderRadius.only(
+    topLeft: _minimal(r.topLeft),
+    topRight: _minimal(r.topRight),
+    bottomLeft: _minimal(r.bottomLeft),
+    bottomRight: _minimal(r.bottomRight),
+  );
+
+  static Radius _minimal(Radius r) {
+    if (r.x != r.y || r.x >= pill || r.x < md) return r;
+    return Radius.circular(r.x >= xl ? 24 : 14);
+  }
+}
+
+/// Soft shadows for the "Minimal" style (it has no chunky bottom edge).
+abstract final class GhinaShadows {
+  /// Raised cards: `0 1px 2px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.07)`.
+  static const soft = [
+    BoxShadow(color: Color(0x0A101828), offset: Offset(0, 1), blurRadius: 2),
+    BoxShadow(color: Color(0x12101828), offset: Offset(0, 8), blurRadius: 24),
+  ];
+
+  /// Same in the dark theme (stronger, on near-black).
+  static const softDark = [
+    BoxShadow(color: Color(0x33000000), offset: Offset(0, 1), blurRadius: 2),
+    BoxShadow(color: Color(0x40000000), offset: Offset(0, 8), blurRadius: 24),
+  ];
 }
 
 /// "Elevation" in Ghina is a solid darker bottom edge, not a blur shadow.

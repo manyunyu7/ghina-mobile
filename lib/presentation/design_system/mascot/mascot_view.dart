@@ -4,20 +4,25 @@ import '../theme/ghina_tokens.dart';
 import '../theme/typography.dart';
 import '../tokens/colors.dart';
 import '../tokens/dimens.dart';
+import 'mascot_kind.dart';
 import 'mascot_painter.dart';
+import 'mascot_rig_painter.dart';
 
+export 'mascot_kind.dart';
 export 'mascot_painter.dart' show MascotMood;
+export 'mascot_rig_painter.dart' show MascotRigPainter, mascotPainterFor;
 
-/// Ghina the money-tree mascot, animated (crown sway, leaf rustle, blink,
-/// wave, sparkles, popping coins, falling leaf, Zzz).
+/// Ghina's mascot, animated: the one the user picked (from the nearest
+/// [MascotChoice]; the money tree by default), or an explicit [kind].
 ///
 /// ```dart
 /// const MascotView(mood: MascotMood.waving, size: 160);
 /// MascotView(mood: overBudget ? MascotMood.sad : MascotMood.happy);
 /// const MascotView(mood: MascotMood.excited, animate: false); // static
+/// const MascotView(kind: MascotKind.kucing); // preview a specific mascot
 /// ```
 ///
-/// Changing [mood] pops the mascot with a quick squash.
+/// Changing [mood] (or the chosen mascot) pops it with a quick squash.
 class MascotView extends StatefulWidget {
   const MascotView({
     super.key,
@@ -27,14 +32,18 @@ class MascotView extends StatefulWidget {
     this.showShadow = true,
     this.color,
     this.semanticLabel = 'Ghina',
+    this.kind,
   });
 
   final MascotMood mood;
+
+  /// Paint this mascot instead of the user's choice (previews, pickers).
+  final MascotKind? kind;
   final double size;
   final bool animate;
   final bool showShadow;
 
-  /// Optional crown recolor (defaults to leaf green).
+  /// Optional crown recolor of the money tree (defaults to leaf green).
   final ChunkySwatch? color;
   final String semanticLabel;
 
@@ -65,6 +74,23 @@ class _MascotViewState extends State<MascotView> with TickerProviderStateMixin {
     if (widget.animate && !_loop.isAnimating) _loop.repeat();
     if (!widget.animate && _loop.isAnimating) _loop.stop();
     if (old.mood != widget.mood && widget.animate) _pop.forward(from: 0);
+    if (old.kind != widget.kind) _kindChanged();
+  }
+
+  MascotKind? _shownKind;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _kindChanged();
+  }
+
+  void _kindChanged() {
+    final k = widget.kind ?? MascotChoice.of(context);
+    if (_shownKind != null && _shownKind != k && widget.animate) {
+      _pop.forward(from: 0);
+    }
+    _shownKind = k;
   }
 
   @override
@@ -77,6 +103,7 @@ class _MascotViewState extends State<MascotView> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    final kind = widget.kind ?? MascotChoice.of(context);
     final shadow = widget.showShadow
         ? (g.isDark
               ? Colors.black.withValues(alpha: 0.35)
@@ -96,11 +123,12 @@ class _MascotViewState extends State<MascotView> with TickerProviderStateMixin {
               alignment: Alignment.bottomCenter,
               child: CustomPaint(
                 size: Size.square(widget.size),
-                painter: MascotPainter(
+                painter: mascotPainterFor(
+                  kind,
                   mood: widget.mood,
                   phase: _loop.value,
-                  color: widget.color ?? GhinaColors.green,
                   shadowColor: shadow,
+                  treeColor: widget.color ?? GhinaColors.green,
                 ),
               ),
             );

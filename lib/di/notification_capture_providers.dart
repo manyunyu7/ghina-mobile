@@ -16,23 +16,38 @@ export 'core_providers.dart' show deviceNotificationListenerProvider;
 
 // ---------------------------------------------------------------- log
 
-/// Filter of the notification log.
-typedef NotificationLogQuery = ({String? packageName, String? search});
+/// Page of the log: filter + how many rows to show ("Muat lagi" grows it).
+typedef NotificationLogQuery = ({NotificationLogFilter filter, int limit});
 
 final watchCapturedNotificationsProvider = StreamProvider.autoDispose
     .family<List<CapturedNotification>, NotificationLogQuery>(
       (ref, q) => WatchCapturedNotifications(
         ref.watch(capturedNotificationRepositoryProvider),
-      )(packageName: q.packageName, search: q.search),
+      )(q.filter, limit: q.limit),
     );
 
-/// Apps in the log (per-app filter chips), most notifications first.
-final watchNotificationSourcesProvider =
-    StreamProvider.autoDispose<List<NotificationSource>>(
-      (ref) => WatchNotificationSources(
+/// Apps under a filter (its app ignored), most notifications first.
+final watchNotificationSourcesProvider = StreamProvider.autoDispose
+    .family<List<NotificationSource>, NotificationLogFilter>(
+      (ref, f) => WatchNotificationSources(
         ref.watch(capturedNotificationRepositoryProvider),
-      )(),
+      )(f),
     );
+
+/// Entries per local day under a filter, oldest first.
+final watchNotificationDayCountsProvider = StreamProvider.autoDispose
+    .family<List<NotificationDayCount>, NotificationLogFilter>(
+      (ref, f) => WatchNotificationDayCounts(
+        ref.watch(capturedNotificationRepositoryProvider),
+      )(f),
+    );
+
+/// `(id)` → deletes one log entry.
+final deleteCapturedNotificationProvider = Provider<DeleteCapturedNotification>(
+  (ref) => DeleteCapturedNotification(
+    ref.watch(capturedNotificationRepositoryProvider),
+  ),
+);
 
 /// Rows not yet checked against the rules (drives the processor).
 final watchUnprocessedNotificationCountProvider =
@@ -48,6 +63,22 @@ final clearCapturedNotificationsProvider = Provider<ClearCapturedNotifications>(
     ref.watch(capturedNotificationRepositoryProvider),
   ),
 );
+
+/// `()` → reposts deleted from the existing log.
+final removeNotificationRepostsProvider = Provider<RemoveNotificationReposts>(
+  (ref) => RemoveNotificationReposts(
+    ref.watch(capturedNotificationRepositoryProvider),
+  ),
+);
+
+/// `(filter)` → the log under the filter as JSON + row count.
+final exportCapturedNotificationsProvider =
+    Provider<ExportCapturedNotifications>(
+      (ref) => ExportCapturedNotifications(
+        ref.watch(capturedNotificationRepositoryProvider),
+        ref.watch(clockProvider),
+      ),
+    );
 
 /// Checks pending log rows against the rules and creates transactions.
 final processCapturedNotificationsProvider =

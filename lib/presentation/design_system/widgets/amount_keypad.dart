@@ -185,7 +185,7 @@ class _AmountDisplayState extends State<AmountDisplay>
                       height: 46,
                       margin: const EdgeInsets.only(left: 4),
                       decoration: BoxDecoration(
-                        color: widget.color?.base ?? GhinaColors.blue.base,
+                        color: widget.color?.base ?? g.highlight.base,
                         borderRadius: GhinaRadii.rPill,
                       ),
                     ),
@@ -316,11 +316,9 @@ class _AmountKeypadState extends State<AmountKeypad> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChunkySurface(
-                          color: GhinaColors.blue.tint(g.brightness),
-                          edgeColor: GhinaColors.blue.tintBorder(g.brightness),
-                          borderColor: GhinaColors.blue.tintBorder(
-                            g.brightness,
-                          ),
+                          color: g.highlight.tint(g.brightness),
+                          edgeColor: g.highlight.tintBorder(g.brightness),
+                          borderColor: g.highlight.tintBorder(g.brightness),
                           depth: GhinaDepth.sm,
                           borderRadius: GhinaRadii.rMd,
                           padding: const EdgeInsets.symmetric(
@@ -332,7 +330,7 @@ class _AmountKeypadState extends State<AmountKeypad> {
                             '+${GhinaMoney.format(q, currency: c.currency, compact: true).replaceFirst(RegExp(r'^\S+ '), '')}',
                             style: GhinaType.body
                                 .w(900)
-                                .copyWith(color: GhinaColors.blue.base),
+                                .copyWith(color: g.highlight.base),
                           ),
                         ),
                       ),

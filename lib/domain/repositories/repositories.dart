@@ -11,6 +11,7 @@ export 'habit_online_repository.dart';
 export 'people_notes_repository.dart';
 export 'dreams_repositories.dart';
 export 'dreams_online_repository.dart';
+export 'email_repository.dart';
 
 /// Runs several repository calls atomically (one local DB transaction).
 abstract interface class UnitOfWork {
@@ -315,16 +316,22 @@ abstract interface class PortfolioSnapshotRepository {
 /// written by the Android notification listener (also from its background
 /// isolate). Not synced; wiped on sign-out.
 abstract interface class CapturedNotificationRepository {
-  /// Newest first (`postedAt` desc). [search] matches title, body and app
-  /// name (case-insensitive).
-  Stream<List<CapturedNotification>> watch({
-    String? packageName,
-    String? search,
+  /// Newest first (`postedAt` desc), at most [limit]. The filter's search
+  /// matches title, body and app name (case-insensitive).
+  Stream<List<CapturedNotification>> watch(
+    NotificationLogFilter filter, {
     int limit = 300,
   });
 
-  /// Apps present in the log, most notifications first.
-  Stream<List<NotificationSource>> watchSources();
+  /// Apps in the log under [filter] (its app is ignored), most notifications
+  /// first.
+  Stream<List<NotificationSource>> watchSources(NotificationLogFilter filter);
+
+  /// Entries per local day under [filter], oldest first; days without any
+  /// are left out.
+  Stream<List<NotificationDayCount>> watchDayCounts(
+    NotificationLogFilter filter,
+  );
 
   /// Emits the number of rows not yet checked against the rules.
   Stream<int> watchUnprocessedCount();
@@ -341,6 +348,17 @@ abstract interface class CapturedNotificationRepository {
     double? amount,
     String? parseError,
   });
+
+  /// Every row under [filter], newest first.
+  Future<List<CapturedNotification>> all(NotificationLogFilter filter);
+
+  /// Deletes reposts logged before repost detection covered them (same
+  /// title/text as the previous capture of the same notification). Returns
+  /// the count.
+  Future<int> removeReposts();
+
+  /// Deletes one row.
+  Future<void> delete(int id);
 
   /// Deletes every row (or only [packageName]'s). Returns the count.
   Future<int> clear({String? packageName});

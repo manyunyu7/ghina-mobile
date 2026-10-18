@@ -140,7 +140,7 @@ class _LabelPickerState extends ConsumerState<LabelPicker> {
               child: ChunkyIconButton(
                 key: const ValueKey('label-new-add'),
                 icon: _creating ? Icons.hourglass_top_rounded : Icons.add,
-                color: GhinaColors.green,
+                color: context.ghina.accent,
                 tooltip: 'Buat label',
                 onPressed: _creating ? null : _create,
               ),
@@ -201,10 +201,12 @@ class _LabelRow extends StatelessWidget {
               width: 26,
               height: 26,
               decoration: BoxDecoration(
-                color: selected ? GhinaColors.green.base : Colors.transparent,
+                color: selected
+                    ? context.ghina.accent.base
+                    : Colors.transparent,
                 borderRadius: GhinaRadii.rSm,
                 border: Border.all(
-                  color: selected ? GhinaColors.green.edge : g.border,
+                  color: selected ? context.ghina.accent.edge : g.border,
                   width: 2,
                 ),
               ),

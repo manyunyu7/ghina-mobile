@@ -135,16 +135,118 @@ final class NotificationRule {
       );
 }
 
+/// Which entries of the log to show.
+enum NotificationLogKind {
+  all('Semua'),
+
+  /// Mentions a rupiah amount (`Rp 10.000`, `Rp10.000`, `IDR 68,500`).
+  money('Ada nominal'),
+
+  /// Turned into a transaction by a rule.
+  transaction('Jadi transaksi');
+
+  const NotificationLogKind(this.label);
+  final String label;
+}
+
+/// Filter of the notification log. [from] and [to] are local days, both
+/// inclusive (time of day ignored); null = open-ended.
+final class NotificationLogFilter {
+  const NotificationLogFilter({
+    this.packageName,
+    this.search,
+    this.from,
+    this.to,
+    this.kind = NotificationLogKind.all,
+  });
+
+  final String? packageName;
+  final String? search;
+  final DateTime? from;
+  final DateTime? to;
+  final NotificationLogKind kind;
+
+  /// Trimmed, lower-cased search, or null when blank.
+  String? get query {
+    final q = search?.trim().toLowerCase();
+    return q == null || q.isEmpty ? null : q;
+  }
+
+  bool get hasDateRange => from != null || to != null;
+
+  /// Anything narrowing the log besides the app.
+  bool get narrows =>
+      query != null || hasDateRange || kind != NotificationLogKind.all;
+
+  NotificationLogFilter withPackage(String? packageName) =>
+      NotificationLogFilter(
+        packageName: packageName,
+        search: search,
+        from: from,
+        to: to,
+        kind: kind,
+      );
+
+  NotificationLogFilter withSearch(String? search) => NotificationLogFilter(
+    packageName: packageName,
+    search: search,
+    from: from,
+    to: to,
+    kind: kind,
+  );
+
+  NotificationLogFilter withRange(DateTime? from, DateTime? to) =>
+      NotificationLogFilter(
+        packageName: packageName,
+        search: search,
+        from: from,
+        to: to,
+        kind: kind,
+      );
+
+  NotificationLogFilter withKind(NotificationLogKind kind) =>
+      NotificationLogFilter(
+        packageName: packageName,
+        search: search,
+        from: from,
+        to: to,
+        kind: kind,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is NotificationLogFilter &&
+      other.packageName == packageName &&
+      other.query == query &&
+      other.from == from &&
+      other.to == to &&
+      other.kind == kind;
+
+  @override
+  int get hashCode => Object.hash(packageName, query, from, to, kind);
+}
+
+/// Number of log entries posted on one local [day].
+final class NotificationDayCount {
+  const NotificationDayCount(this.day, this.count);
+  final DateTime day;
+  final int count;
+}
+
 /// An app that has notifications in the log (for the per-app filter).
 final class NotificationSource {
   const NotificationSource({
     required this.packageName,
     this.appName,
     required this.count,
+    this.lastPostedAt,
   });
   final String packageName;
   final String? appName;
   final int count;
+
+  /// Its newest entry (inside the filter it was counted with).
+  final DateTime? lastPostedAt;
 
   String get displayAppName =>
       (appName?.trim().isNotEmpty ?? false) ? appName!.trim() : packageName;

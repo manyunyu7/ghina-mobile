@@ -16,6 +16,7 @@ export 'notification_overrides.dart' show reminderOverrides;
 export 'notes_content_providers.dart';
 export 'notification_capture_providers.dart';
 export 'dreams_providers.dart';
+export 'email_providers.dart';
 export 'people_providers.dart';
 export 'prayer_reminder_providers.dart';
 export 'usecase_providers.dart';

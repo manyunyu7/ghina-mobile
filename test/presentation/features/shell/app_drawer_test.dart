@@ -210,6 +210,7 @@ void main() {
             'Proyeksi',
             'Laporan',
             'Analitik',
+            'Email',
             'Investasi',
             'Kategori',
           ],
@@ -219,6 +220,8 @@ void main() {
             'Belajar',
             'Pencapaian',
             'Log Notifikasi',
+            'Pilih maskot',
+            'Tema & warna',
             'Sinkronisasi',
             'Pengaturan',
           ],
@@ -247,6 +250,17 @@ void main() {
       expect(labels('sa'), ['Dompet', 'Investasi', 'Sholat']);
       // … any substring only when no word starts with it.
       expect(labels('biasa'), ['Kebiasaan']);
+    });
+
+    test('exact and label matches rank before other prefixes', () {
+      // "tema" is also a prefix of Orang's "teman": the theme page wins.
+      final tema = labels('tema');
+      expect(tema.first, 'Tema & warna');
+      expect(tema, contains('Orang'));
+      expect(labels('Tema & warna').first, 'Tema & warna');
+      expect(labels('gelap').first, 'Tema & warna');
+      // A label prefix beats a synonym prefix.
+      expect(labels('pengat').first, 'Pengaturan');
     });
 
     test('active: the screen itself and its sub-pages', () {

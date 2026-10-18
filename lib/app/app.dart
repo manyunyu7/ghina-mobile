@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../presentation/design_system/design_system.dart';
 import '../presentation/features/shell/app_shortcut_listener.dart';
 import '../presentation/features/shell/notification_navigation.dart';
+import '../presentation/state/appearance_provider.dart';
 import '../presentation/state/balance_privacy_provider.dart';
+import '../presentation/state/mascot_kind_provider.dart';
 import '../presentation/state/session_controller.dart';
 import 'router.dart';
 
@@ -18,28 +20,38 @@ class GhinaApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final look = ref.watch(appearanceProvider);
     return MaterialApp.router(
       title: 'Ghina',
       debugShowCheckedModeBanner: false,
-      theme: GhinaTheme.light(),
-      darkTheme: GhinaTheme.dark(),
+      theme: GhinaTheme.light(accent: look.accent, style: look.style),
+      darkTheme: GhinaTheme.dark(accent: look.accent, style: look.style),
+      themeMode: look.mode,
       locale: const Locale('id', 'ID'),
       supportedLocales: const [Locale('id', 'ID'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: router,
       // Reminder taps open `/tasks/<id>` (cold start included: waits until
       // signed in and past splash/onboarding).
-      // Balance privacy wraps the navigator so dialogs/sheets are masked too.
-      builder: (context, child) => BalancePrivacyScope(
-        child: NotificationRouteGate(
-          router: router,
-          canOpen: () =>
-              ref.read(sessionControllerProvider) is SignedIn &&
-              !_notReadyPaths.contains(
-                router.routerDelegate.currentConfiguration.uri.path,
+      // Balance privacy wraps the navigator so dialogs/sheets are masked too;
+      // the chosen mascot likewise reaches every MascotView (sheets included),
+      // and the chosen text size every Text.
+      builder: (context, child) => AppearanceScope(
+        child: MascotKindScope(
+          child: BalancePrivacyScope(
+            child: NotificationRouteGate(
+              router: router,
+              canOpen: () =>
+                  ref.read(sessionControllerProvider) is SignedIn &&
+                  !_notReadyPaths.contains(
+                    router.routerDelegate.currentConfiguration.uri.path,
+                  ),
+              // Launcher shortcuts (long-press the icon) use the same gate.
+              child: AppShortcutListener(
+                child: child ?? const SizedBox.shrink(),
               ),
-          // Launcher shortcuts (long-press the icon) use the same gate.
-          child: AppShortcutListener(child: child ?? const SizedBox.shrink()),
+            ),
+          ),
         ),
       ),
     );

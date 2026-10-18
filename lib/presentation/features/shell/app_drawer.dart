@@ -173,41 +173,35 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          for (final group in AppMenuGroup.values)
-                            if (items.any((i) => i.group == group)) ...[
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  10,
-                                  10,
-                                  10,
-                                  2,
-                                ),
-                                child: Text(
-                                  group.label,
-                                  style: GhinaType.overline.copyWith(
-                                    color: g.textMuted,
-                                  ),
+                          // Groups in order of their first (best-ranked)
+                          // item, so a search's top hit is on top.
+                          for (final group in {
+                            for (final i in items) i.group,
+                          }) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
+                              child: Text(
+                                group.label,
+                                style: GhinaType.overline.copyWith(
+                                  color: g.textMuted,
                                 ),
                               ),
-                              for (final item in items)
-                                if (item.group == group)
-                                  _MenuRow(
-                                    key:
-                                        isAppMenuItemActive(
-                                          item,
-                                          widget.location,
-                                        )
-                                        ? _activeKey
-                                        : null,
-                                    item: item,
-                                    active: isAppMenuItemActive(
-                                      item,
-                                      widget.location,
-                                    ),
-                                    onTap: () =>
-                                        _go(item.path, tab: item.isTab),
+                            ),
+                            for (final item in items)
+                              if (item.group == group)
+                                _MenuRow(
+                                  key:
+                                      isAppMenuItemActive(item, widget.location)
+                                      ? _activeKey
+                                      : null,
+                                  item: item,
+                                  active: isAppMenuItemActive(
+                                    item,
+                                    widget.location,
                                   ),
-                            ],
+                                  onTap: () => _go(item.path, tab: item.isTab),
+                                ),
+                          ],
                         ],
                       ),
                     ),
@@ -240,7 +234,7 @@ class _Header extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
       child: Material(
         color: active
-            ? GhinaColors.green.tint(g.brightness)
+            ? context.ghina.accent.tint(g.brightness)
             : Colors.transparent,
         borderRadius: GhinaRadii.rXl,
         child: InkWell(

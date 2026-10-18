@@ -11,7 +11,7 @@ import '../tokens/dimens.dart';
 /// Lesson progress, budget usage, daily goal.
 ///
 /// ```dart
-/// ChunkyProgressBar(value: 0.6);                                     // green
+/// ChunkyProgressBar(value: 0.6);                                     // accent
 /// ChunkyProgressBar(value: spent / budget, color: GhinaColors.orange, height: 20,
 ///                   label: 'Rp 600rb / Rp 1jt');
 /// ChunkyProgressBar.budget(used: spent / limit);   // auto green→orange→red
@@ -20,7 +20,7 @@ class ChunkyProgressBar extends StatelessWidget {
   const ChunkyProgressBar({
     super.key,
     required this.value,
-    this.color = GhinaColors.green,
+    this.color,
     this.height = 16,
     this.label,
     this.animate = true,
@@ -50,7 +50,9 @@ class ChunkyProgressBar extends StatelessWidget {
 
   /// 0..1 (clamped).
   final double value;
-  final ChunkySwatch color;
+
+  /// Null = `context.ghina.accent` (green by default).
+  final ChunkySwatch? color;
   final double height;
 
   /// Text drawn centered inside the bar (use height >= 20).
@@ -62,6 +64,7 @@ class ChunkyProgressBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final v = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
+    final color = this.color ?? g.accent;
     Widget bar(double t) => CustomPaint(
       size: Size(double.infinity, height),
       painter: _BarPainter(

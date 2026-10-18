@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../domain/services/app_shortcuts.dart';
+import '../../domain/services/gmail_authorizer.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/killa_media_picker.dart';
 import '../../domain/services/microphone_permission.dart';
@@ -23,6 +24,7 @@ import 'channel_share_intake.dart';
 import 'device_location.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
+import 'google_gmail_authorizer.dart';
 import 'just_audio_playback.dart';
 import 'killa_media_picker_impl.dart';
 import 'notification_listener_bridge.dart';
@@ -34,6 +36,7 @@ export 'app_info.dart';
 export 'battery_optimization_bridge.dart' show NoopBatteryOptimization;
 export 'device_location.dart' show NoopDeviceLocation;
 export 'fakes.dart';
+export 'google_gmail_authorizer.dart' show NoopGmailAuthorizer;
 export 'notification_listener_bridge.dart'
     show NoopDeviceNotificationListener, notificationCaptureDatabase;
 
@@ -88,3 +91,8 @@ BatteryOptimization createBatteryOptimization() =>
 /// Killa composer attachments (photos → JPEG ≤ 2048 px, PDFs).
 KillaMediaPicker createKillaMediaPicker() =>
     isMobileDevice ? DeviceKillaMediaPicker() : const NoopKillaMediaPicker();
+
+/// Email "Hubungkan Gmail" (google_sign_in `authorizeServer`).
+GmailAuthorizer createGmailAuthorizer() => isMobileDevice
+    ? const GoogleGmailAuthorizer()
+    : const NoopGmailAuthorizer();

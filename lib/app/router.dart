@@ -27,6 +27,10 @@ import '../presentation/features/investments/pages/portfolio_page.dart';
 import '../presentation/features/investments/pages/trade_form_page.dart';
 import '../presentation/features/habits/pages/habit_routes.dart';
 import '../presentation/features/home/pages/home_page.dart';
+import '../presentation/features/email/pages/email_inbox_page.dart';
+import '../presentation/features/email/pages/email_page.dart';
+import '../presentation/features/email/pages/email_review_page.dart';
+import '../presentation/features/email/pages/email_rules_page.dart';
 import '../presentation/features/killa/pages/killa_chat_page.dart';
 import '../presentation/features/killa/pages/killa_commits_page.dart';
 import '../presentation/features/killa/pages/killa_file_page.dart';
@@ -52,6 +56,8 @@ import '../presentation/features/people/pages/person_form_page.dart';
 import '../presentation/features/reminders/pages/reminder_form_page.dart';
 import '../presentation/features/reminders/pages/reminders_page.dart';
 import '../presentation/features/reports/pages/reports_page.dart';
+import '../presentation/features/settings/pages/appearance_page.dart';
+import '../presentation/features/settings/pages/mascot_picker_page.dart';
 import '../presentation/features/settings/pages/settings_page.dart';
 import '../presentation/features/settings/pages/sync_page.dart';
 import '../presentation/features/shell/app_shell.dart';
@@ -321,6 +327,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/calendar/:id',
         builder: (_, s) => EventFormPage(id: s.pathParameters['id']),
       ),
+      // Email (Gmail read-only) — online-only.
+      GoRoute(path: '/email', builder: (_, _) => const EmailPage()),
+      GoRoute(
+        path: '/email/review',
+        builder: (_, _) => const EmailReviewPage(),
+      ),
+      GoRoute(
+        path: '/email/inbox',
+        builder: (_, _) => const EmailImportantPage(),
+      ),
+      GoRoute(path: '/email/rules', builder: (_, _) => const EmailRulesPage()),
       // Killa (docs/killa.md) — online-only.
       GoRoute(path: '/killa', builder: (_, _) => const KillaChatPage()),
       GoRoute(
@@ -384,6 +401,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => NotificationRuleFormPage(id: s.pathParameters['id']),
       ),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
+      GoRoute(
+        path: '/settings/mascot',
+        builder: (_, _) => const MascotPickerPage(),
+      ),
+      GoRoute(
+        path: '/settings/appearance',
+        builder: (_, _) => const AppearancePage(),
+      ),
       GoRoute(path: '/sync', builder: (_, _) => const SyncPage()),
     ],
   );

@@ -81,7 +81,9 @@ class ChunkyNavBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: g.background,
-        border: Border(top: BorderSide(color: g.border, width: 2)),
+        border: Border(
+          top: BorderSide(color: g.border, width: g.minimal ? 1 : 2),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -99,8 +101,8 @@ class ChunkyNavBar extends StatelessWidget {
                   child: Transform.translate(
                     offset: const Offset(0, -14),
                     child: ChunkySurface(
-                      color: GhinaColors.green.base,
-                      edgeColor: GhinaColors.green.edge,
+                      color: g.accent.base,
+                      edgeColor: g.accent.edge,
                       depth: GhinaDepth.lg,
                       borderRadius: GhinaRadii.rXl,
                       semanticLabel: centerLabel,
@@ -108,7 +110,7 @@ class ChunkyNavBar extends StatelessWidget {
                       child: SizedBox(
                         width: 62,
                         height: 58,
-                        child: Icon(centerIcon, color: Colors.white, size: 38),
+                        child: Icon(centerIcon, color: g.accent.on, size: 38),
                       ),
                     ),
                   ),
@@ -140,7 +142,7 @@ class _NavTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final sw = item.color ?? GhinaColors.blue;
+    final sw = item.color ?? g.highlight;
     final fg = selected ? sw.base : g.textMuted;
     return Semantics(
       button: true,

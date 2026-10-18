@@ -16,16 +16,26 @@ import '../tokens/dimens.dart';
 /// showToastBadge(context, message: 'Tersimpan offline, nanti disinkron 👍',
 ///     icon: Icons.cloud_off_rounded, color: GhinaColors.blue);
 /// ```
+///
+/// A [tag] makes toasts replace each other instead of stacking (fast
+/// repeated taps show only the latest). [haptics] = false when the caller
+/// already gave feedback.
 void showToastBadge(
   BuildContext context, {
   required String message,
   IconData icon = Icons.star_rounded,
   ChunkySwatch color = GhinaColors.yellow,
   Duration duration = const Duration(milliseconds: 2200),
+  String? tag,
+  bool haptics = true,
 }) {
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return;
-  HapticFeedback.lightImpact();
+  if (haptics) HapticFeedback.lightImpact();
+  if (tag != null) {
+    final old = _tagged.remove(tag);
+    if (old != null && old.mounted) old.remove();
+  }
   late OverlayEntry entry;
   entry = OverlayEntry(
     builder: (_) => _ToastBadge(
@@ -33,11 +43,18 @@ void showToastBadge(
       icon: icon,
       color: color,
       duration: duration,
-      onDone: () => entry.remove(),
+      onDone: () {
+        if (tag != null && _tagged[tag] == entry) _tagged.remove(tag);
+        if (entry.mounted) entry.remove();
+      },
     ),
   );
+  if (tag != null) _tagged[tag] = entry;
   overlay.insert(entry);
 }
+
+/// Live tagged toasts (see `showToastBadge(tag:)`).
+final _tagged = <String, OverlayEntry>{};
 
 class _ToastBadge extends StatefulWidget {
   const _ToastBadge({

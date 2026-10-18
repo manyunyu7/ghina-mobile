@@ -45,6 +45,18 @@ class ChunkySwatch {
       ? base.withValues(alpha: 0.7)
       : Color.lerp(light, base, 0.45)!;
 
+  /// Blends two swatches (theme animations).
+  static ChunkySwatch lerp(ChunkySwatch a, ChunkySwatch b, double t) {
+    if (identical(a, b) || a == b) return t < 0.5 ? a : b;
+    Color l(Color x, Color y) => Color.lerp(x, y, t)!;
+    return ChunkySwatch(
+      base: l(a.base, b.base),
+      edge: l(a.edge, b.edge),
+      light: l(a.light, b.light),
+      on: l(a.on, b.on),
+    );
+  }
+
   @override
   bool operator ==(Object other) =>
       other is ChunkySwatch && other.base == base && other.edge == edge;
@@ -115,6 +127,29 @@ abstract final class GhinaColors {
     base: Color(0xFFFF86D0),
     edge: Color(0xFFD663AB),
     light: Color(0xFFFFE3F4),
+  );
+
+  /// Lagoon teal – an accent choice in "Tampilan". Not part of [swatches].
+  static const teal = ChunkySwatch(
+    base: Color(0xFF00C2A8),
+    edge: Color(0xFF00A08A),
+    light: Color(0xFFD2F7F1),
+  );
+
+  /// Near-black "Monokrom" accent (light theme) – the Minimal style's
+  /// default primary. Not part of [swatches].
+  static const monoLight = ChunkySwatch(
+    base: Color(0xFF171717),
+    edge: Color(0xFF000000),
+    light: Color(0xFFEFEFF2),
+  );
+
+  /// Near-white "Monokrom" accent for the dark theme.
+  static const monoDark = ChunkySwatch(
+    base: Color(0xFFF5F5F7),
+    edge: Color(0xFFC7C7CC),
+    light: Color(0xFF2C2C2E),
+    on: Color(0xFF171717),
   );
 
   /// Neutral gray swatch (disabled / neutral buttons).

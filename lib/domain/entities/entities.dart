@@ -8,6 +8,7 @@ export 'category.dart';
 export 'content.dart';
 export 'content_views.dart';
 export 'dreams.dart';
+export 'email.dart';
 export 'enums.dart';
 export 'food_log.dart';
 export 'habit.dart';

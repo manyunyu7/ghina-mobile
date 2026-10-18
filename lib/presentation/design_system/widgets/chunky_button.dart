@@ -7,7 +7,8 @@ import '../tokens/dimens.dart';
 import 'chunky_surface.dart';
 
 enum ChunkyButtonVariant {
-  /// Solid green CTA ("LANJUT", "SIMPAN"). One per screen.
+  /// Solid accent CTA ("LANJUT", "SIMPAN"), green by default. One per
+  /// screen.
   primary,
 
   /// Solid blue – secondary positive action.
@@ -114,7 +115,7 @@ class ChunkyButton extends StatelessWidget {
             switch (variant) {
               ChunkyButtonVariant.secondary => GhinaColors.blue,
               ChunkyButtonVariant.danger => GhinaColors.red,
-              _ => GhinaColors.green,
+              _ => g.accent,
             };
         face = s.base;
         edge = s.edge;
@@ -123,11 +124,11 @@ class ChunkyButton extends StatelessWidget {
         face = g.surface;
         edge = g.border;
         border = g.border;
-        fg = color?.base ?? (g.isDark ? g.textPrimary : GhinaColors.blue.base);
+        fg = color?.base ?? (g.isDark ? g.textPrimary : g.highlight.base);
       case ChunkyButtonVariant.ghost:
         face = Colors.transparent;
         edge = Colors.transparent;
-        fg = color?.base ?? GhinaColors.blue.base;
+        fg = color?.base ?? g.highlight.base;
     }
 
     if (!enabled && !loading) {
@@ -143,7 +144,8 @@ class ChunkyButton extends StatelessWidget {
 
     final style = GhinaType.button.copyWith(fontSize: _fontSize, color: fg);
     final iconSize = _fontSize + 6;
-    final text = uppercase ? label.toUpperCase() : label;
+    // Minimal keeps sentence case.
+    final text = uppercase && !g.minimal ? label.toUpperCase() : label;
 
     final content = loading
         ? SizedBox(

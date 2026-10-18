@@ -13,6 +13,8 @@ import '../../../design_system/design_system.dart';
 import '../../../design_system/gallery/ui_gallery_screen.dart';
 import '../../../state/balance_privacy_provider.dart';
 import '../../../state/game/game_providers.dart';
+import '../../../state/appearance_provider.dart';
+import '../../../state/mascot_kind_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../state/sync_status_provider.dart';
 import '../../habits/lock/habit_lock_gate.dart' show HabitLockSettingTile;
@@ -250,6 +252,42 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               subtitle: 'Berapa aktivitas yang mau kamu kejar tiap hari?',
             ),
             DailyGoalPicker(selected: goal, onChanged: _setGoal),
+            GhinaSpace.gapXl,
+            const SectionHeader(title: 'Tampilan'),
+            ChunkyCard(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ChunkyTile(
+                key: const ValueKey('settings-mascot'),
+                framed: false,
+                title: 'Maskot',
+                subtitle:
+                    '${ref.watch(mascotKindProvider).label} · ketuk buat ganti',
+                leading: const MascotView(
+                  size: 44,
+                  animate: false,
+                  showShadow: false,
+                ),
+                showChevron: true,
+                onTap: () => context.push('/settings/mascot'),
+              ),
+            ),
+            GhinaSpace.gapMd,
+            ChunkyCard(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ChunkyTile(
+                key: const ValueKey('settings-appearance'),
+                framed: false,
+                title: 'Tema & warna',
+                subtitle: _appearanceSummary(ref.watch(appearanceProvider)),
+                leading: CategoryAvatar(
+                  icon: Icons.palette_rounded,
+                  color: context.ghina.accent.base,
+                  size: 40,
+                ),
+                showChevron: true,
+                onTap: () => context.push('/settings/appearance'),
+              ),
+            ),
             GhinaSpace.gapXl,
             const SectionHeader(title: 'Privasi'),
             const _BalancePrivacyCard(),
@@ -516,3 +554,15 @@ class _ProfileHeader extends StatelessWidget {
     );
   }
 }
+
+/// "Gelap · Ungu · teks Besar" for the "Tema & warna" row.
+String _appearanceSummary(GhinaAppearance a) => [
+  switch (a.mode) {
+    ThemeMode.system => 'Ikut sistem',
+    ThemeMode.light => 'Terang',
+    ThemeMode.dark => 'Gelap',
+  },
+  a.accent.label,
+  if (a.textSize != GhinaTextSize.normal) 'teks ${a.textSize.label}',
+  if (a.style != GhinaStyle.chunky) a.style.label,
+].join(' · ');

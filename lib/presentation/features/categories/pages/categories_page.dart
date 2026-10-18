@@ -55,7 +55,7 @@ class _CategoriesPageState extends ConsumerState<CategoriesPage> {
             key: const ValueKey('category-add'),
             tooltip: 'Tambah kategori',
             icon: const Icon(Icons.add_circle_rounded),
-            color: GhinaColors.green.base,
+            color: context.ghina.accent.base,
             onPressed: _add,
           ),
           const SizedBox(width: 8),

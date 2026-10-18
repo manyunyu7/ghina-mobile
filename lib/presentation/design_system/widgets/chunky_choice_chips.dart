@@ -19,7 +19,7 @@ class ChunkyChoice<T> {
   final String label;
   final IconData? icon;
 
-  /// Selected color (defaults to blue).
+  /// Selected color (defaults to `context.ghina.highlight`, blue).
   final ChunkySwatch? color;
 }
 
@@ -82,7 +82,7 @@ class ChunkyChoiceChips<T> extends StatelessWidget {
         ChunkyChip(
           label: o.label,
           icon: o.icon,
-          color: o.color ?? GhinaColors.blue,
+          color: o.color,
           selected: selected.contains(o.value),
           onTap: () => _toggle(o.value),
         ),
@@ -110,19 +110,22 @@ class ChunkyChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.icon,
-    this.color = GhinaColors.blue,
+    this.color,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
   final IconData? icon;
-  final ChunkySwatch color;
+
+  /// Null = `context.ghina.highlight` (blue by default).
+  final ChunkySwatch? color;
 
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
     final b = g.brightness;
+    final color = this.color ?? g.highlight;
     final fg = selected ? color.base : g.textSecondary;
     return AnimatedScale(
       scale: selected ? 1.0 : 0.98,

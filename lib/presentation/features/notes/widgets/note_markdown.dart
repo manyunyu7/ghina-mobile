@@ -48,7 +48,7 @@ class NoteMarkdown extends StatelessWidget {
         blockquoteDecoration: BoxDecoration(
           color: g.surfaceAlt.withValues(alpha: 0.6),
           border: Border(
-            left: BorderSide(color: GhinaColors.green.base, width: 4),
+            left: BorderSide(color: context.ghina.accent.base, width: 4),
           ),
         ),
         blockquotePadding: const EdgeInsets.fromLTRB(12, 6, 8, 6),

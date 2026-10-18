@@ -643,6 +643,13 @@ class _Menu extends StatelessWidget {
       '/food',
     ),
     (
+      Icons.pets_rounded,
+      Color(0xFF58CC02),
+      'Pilih maskot',
+      'Ganti teman maskotmu',
+      '/settings/mascot',
+    ),
+    (
       Icons.settings_rounded,
       Color(0xFF777777),
       'Pengaturan',

@@ -20,6 +20,7 @@ class ChunkySegment<T> {
   final IconData? icon;
 
   /// Thumb color when this segment is active (e.g. red for Pengeluaran).
+  /// Null = `context.ghina.highlight` (blue by default).
   final ChunkySwatch? color;
 }
 
@@ -58,16 +59,18 @@ class ChunkySegmented<T> extends StatelessWidget {
         .indexWhere((s) => s.value == value)
         .clamp(0, segments.length - 1);
     final active = segments[index];
-    final sw = active.color ?? GhinaColors.blue;
+    final sw = active.color ?? g.highlight;
     const pad = 4.0;
-    const depth = 3.0;
+    final depth = g.flat ? 0.0 : 3.0;
 
     return Container(
       padding: const EdgeInsets.all(pad),
       decoration: BoxDecoration(
         color: g.surfaceAlt,
-        borderRadius: GhinaRadii.rLg,
-        border: Border.all(color: g.border, width: 2),
+        borderRadius: g.minimal
+            ? GhinaRadii.minimal(GhinaRadii.rLg)
+            : GhinaRadii.rLg,
+        border: Border.all(color: g.border, width: g.minimal ? 1 : 2),
       ),
       child: SizedBox(
         height: height,
@@ -91,7 +94,7 @@ class ChunkySegmented<T> extends StatelessWidget {
                     color: sw.edge,
                     borderRadius: GhinaRadii.rMd,
                   ),
-                  padding: const EdgeInsets.only(bottom: depth),
+                  padding: EdgeInsets.only(bottom: depth),
                   child: AnimatedContainer(
                     duration: GhinaMotion.medium,
                     decoration: BoxDecoration(
@@ -118,7 +121,7 @@ class ChunkySegmented<T> extends StatelessWidget {
                           onChanged(segments[i].value);
                         },
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: depth),
+                          padding: EdgeInsets.only(bottom: depth),
                           child: Center(
                             child: AnimatedDefaultTextStyle(
                               duration: GhinaMotion.fast,
