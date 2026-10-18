@@ -19,6 +19,8 @@ export 'health_entry.dart';
 export 'investment.dart';
 export 'investment_views.dart';
 export 'killa.dart';
+export 'screener.dart';
+export 'stockbit.dart';
 export 'note.dart';
 export 'notification_capture.dart';
 export 'people.dart';

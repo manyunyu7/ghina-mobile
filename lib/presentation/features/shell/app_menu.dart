@@ -154,6 +154,22 @@ const kAppMenu = <AppMenuItem>[
     ],
   ),
   AppMenuItem(
+    label: 'Screener',
+    icon: Icons.filter_alt_rounded,
+    color: GhinaColors.blue,
+    path: '/investments/screener',
+    group: AppMenuGroup.money,
+    synonyms: [
+      'saham',
+      'emiten',
+      'pemegang',
+      'shareholder',
+      'stockbit',
+      'screening',
+      'ksei',
+    ],
+  ),
+  AppMenuItem(
     label: 'Kategori',
     icon: Icons.category_rounded,
     color: GhinaColors.purple,
@@ -430,5 +446,12 @@ List<AppMenuItem> filterAppMenu(String query, [List<AppMenuItem>? only]) {
 }
 
 /// Whether [item] is the screen at [location] (or one of its sub-pages).
-bool isAppMenuItemActive(AppMenuItem item, String location) =>
-    location == item.path || location.startsWith('${item.path}/');
+bool isAppMenuItemActive(AppMenuItem item, String location) {
+  // Screener lives under /investments but is its own menu entry.
+  if (item.path == '/investments' &&
+      (location == '/investments/screener' ||
+          location.startsWith('/investments/screener/'))) {
+    return false;
+  }
+  return location == item.path || location.startsWith('${item.path}/');
+}

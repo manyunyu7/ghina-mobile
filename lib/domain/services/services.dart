@@ -11,4 +11,5 @@ export 'notification_listener.dart';
 export 'prayer_reminders.dart';
 export 'share_intake.dart';
 export 'speech_transcriber.dart';
+export 'stockbit_session_store.dart';
 export 'voice_recorder.dart';

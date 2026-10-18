@@ -37,6 +37,8 @@ import '../presentation/features/killa/pages/killa_file_page.dart';
 import '../presentation/features/killa/pages/killa_files_page.dart';
 import '../presentation/features/killa/pages/killa_reminders_page.dart';
 import '../presentation/features/killa/pages/killa_usage_page.dart';
+import '../presentation/features/screener/pages/screener_page.dart';
+import '../presentation/features/screener/pages/screener_ticker_page.dart';
 import '../presentation/features/learn/pages/learn_page.dart';
 import '../presentation/features/learn/pages/lesson_page.dart';
 import '../presentation/features/prayers/pages/prayer_reminder_settings_page.dart';
@@ -215,6 +217,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/investments/new',
         builder: (_, _) => const AssetFormPage(),
+      ),
+      // Screener (online-only) — before `/investments/:id`.
+      GoRoute(
+        path: '/investments/screener',
+        builder: (_, _) => const ScreenerPage(),
+      ),
+      GoRoute(
+        path: '/investments/screener/:ticker',
+        builder: (_, s) =>
+            ScreenerTickerPage(ticker: s.pathParameters['ticker']!),
       ),
       GoRoute(
         path: '/investments/cash/:txId',

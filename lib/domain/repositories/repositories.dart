@@ -7,6 +7,8 @@ import '../../core/dates.dart';
 import '../entities/entities.dart';
 
 export 'killa_repository.dart';
+export 'screener_repository.dart';
+export 'stockbit_gateway.dart';
 export 'habit_online_repository.dart';
 export 'people_notes_repository.dart';
 export 'dreams_repositories.dart';

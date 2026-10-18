@@ -10,6 +10,7 @@ import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../state/screener_access_provider.dart';
 import '../../../state/session_controller.dart';
 import '../investment_format.dart';
 import '../widgets/portfolio_charts.dart';
@@ -72,6 +73,13 @@ class _PortfolioPageState extends ConsumerState<PortfolioPage> {
         title: const Text('Investasi'),
         actions: [
           const MoneyVisibilityToggle(key: ValueKey('invest-privacy')),
+          if (ref.watch(screenerAccessProvider) != ScreenerAccess.forbidden)
+            IconButton(
+              key: const ValueKey('invest-screener'),
+              tooltip: 'Screener saham',
+              icon: const Icon(Icons.filter_alt_rounded),
+              onPressed: () => context.push('/investments/screener'),
+            ),
           IconButton(
             key: const ValueKey('invest-add'),
             tooltip: 'Tambah aset',

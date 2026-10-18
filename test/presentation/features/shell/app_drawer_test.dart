@@ -212,6 +212,7 @@ void main() {
             'Analitik',
             'Email',
             'Investasi',
+            'Screener',
             'Kategori',
           ],
           ['Sholat', 'Kebiasaan', 'Kesehatan', 'Makanan', 'Orang', 'Mimpi'],
@@ -230,7 +231,7 @@ void main() {
     });
 
     test('matches labels, synonyms and groups, case-insensitively', () {
-      expect(labels('saham'), ['Investasi']);
+      expect(labels('saham'), ['Investasi', 'Screener']);
       expect(labels('HABIT'), ['Kebiasaan']);
       for (final q in ['doa', 'salat', 'shalat']) {
         expect(labels(q), ['Sholat'], reason: q);
@@ -247,7 +248,7 @@ void main() {
       ]);
       expect(labels('xyzzy'), isEmpty);
       // Word prefixes first ("sa" → saldo, saham, salat) …
-      expect(labels('sa'), ['Dompet', 'Investasi', 'Sholat']);
+      expect(labels('sa'), ['Dompet', 'Investasi', 'Screener', 'Sholat']);
       // … any substring only when no word starts with it.
       expect(labels('biasa'), ['Kebiasaan']);
     });
@@ -309,7 +310,7 @@ void main() {
       expect(_visibleItems().length, greaterThan(8));
 
       await _search(tester, 'saham');
-      expect(_visibleItems(), ['/investments']);
+      expect(_visibleItems(), ['/investments', '/investments/screener']);
       expect(find.text('UANG'), findsOneWidget);
       expect(find.text('HIDUP'), findsNothing);
 

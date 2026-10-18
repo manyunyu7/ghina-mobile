@@ -12,6 +12,7 @@ import '../../design_system/design_system.dart';
 import '../../state/balance_privacy_provider.dart';
 import '../../state/game/game_providers.dart';
 import '../../state/killa_access_provider.dart';
+import '../../state/screener_access_provider.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_status_provider.dart';
 import '../settings/pages/settings_page.dart' show ghinaVersionLabel;
@@ -112,9 +113,13 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
     final g = context.ghina;
     // Killa is for allowlisted accounts only: hidden after a 403.
     final killaLocked = ref.watch(killaAccessProvider) == KillaAccess.forbidden;
+    final screenerLocked =
+        ref.watch(screenerAccessProvider) == ScreenerAccess.forbidden;
     final items = [
       for (final i in filterAppMenu(_query))
-        if (!(killaLocked && i.path == '/killa')) i,
+        if (!(killaLocked && i.path == '/killa') &&
+            !(screenerLocked && i.path == '/investments/screener'))
+          i,
     ];
     final width = math.min(320.0, MediaQuery.sizeOf(context).width * 0.86);
     return Drawer(
