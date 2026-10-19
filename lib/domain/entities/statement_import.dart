@@ -303,3 +303,50 @@ final class StatementException implements Exception {
   @override
   String toString() => 'StatementException($kind, $status): $message';
 }
+
+/// What the Transactions page flags about imports (the badge on "Impor
+/// mutasi" and the status cards): imports Killa is still reading, imports
+/// with rows waiting for the user, and recent failures. A failure stops
+/// being flagged after [failedFor] (retry or delete it from the list).
+final class StatementAttention {
+  const StatementAttention({
+    this.parsing = const [],
+    this.ready = const [],
+    this.failed = const [],
+  });
+
+  static const none = StatementAttention();
+  static const failedFor = Duration(days: 3);
+
+  final List<StatementImport> parsing;
+  final List<StatementImport> ready;
+  final List<StatementImport> failed;
+
+  bool get isEmpty => parsing.isEmpty && ready.isEmpty && failed.isEmpty;
+
+  /// Most actionable first: ready to review, then failed, then being read.
+  List<StatementImport> get items => [...ready, ...failed, ...parsing];
+
+  static StatementAttention of(
+    Iterable<StatementImport> imports,
+    DateTime now,
+  ) {
+    final parsing = <StatementImport>[];
+    final ready = <StatementImport>[];
+    final failed = <StatementImport>[];
+    for (final i in imports) {
+      switch (i.status) {
+        case StatementStatus.parsing:
+          parsing.add(i);
+        case StatementStatus.ready when i.counts.pending > 0:
+          ready.add(i);
+        case StatementStatus.failed:
+          final at = i.updatedAt ?? i.createdAt;
+          if (at == null || now.difference(at) <= failedFor) failed.add(i);
+        case StatementStatus.ready || StatementStatus.done:
+          break;
+      }
+    }
+    return StatementAttention(parsing: parsing, ready: ready, failed: failed);
+  }
+}

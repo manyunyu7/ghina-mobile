@@ -14,6 +14,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../statement_state.dart';
 import '../widgets/statement_confirm_sheet.dart';
+import '../widgets/statement_status.dart';
 import '../widgets/statement_upload_sheet.dart';
 
 /// "Impor mutasi" (`/transactions/import`): the bank statements uploaded
@@ -130,8 +131,10 @@ class _StatementImportsPageState extends ConsumerState<StatementImportsPage> {
             child: RefreshIndicator(
               onRefresh: () async =>
                   ref.refresh(statementImportsProvider.future),
+              // Any known list wins, so the badge's background refetch
+              // (statementAttentionProvider) never flashes a skeleton.
               child: switch (async) {
-                AsyncData(:final value) => _list([
+                AsyncValue(:final value?) => _list([
                   for (final i in value)
                     if (!_hidden.contains(i.id)) i,
                 ]),
@@ -263,12 +266,7 @@ class _ImportTile extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          CategoryAvatar(
-            icon: statementStatusIcon(i.status),
-            color: swatch.base,
-            size: 40,
-            soft: true,
-          ),
+          StatementStatusAvatar(status: i.status),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

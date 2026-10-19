@@ -1,6 +1,8 @@
 /// Read providers and shared bits of "Impor mutasi" (statement import).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,6 +49,41 @@ final statementDetailProvider = FutureProvider.autoDispose
       ),
       retry: _noRetry,
     );
+
+/// How often [statementAttentionProvider] rechecks while Killa is reading.
+const statementAttentionPoll = Duration(seconds: 8);
+
+/// Imports the Transactions page flags (badge + status cards), so an upload
+/// can be left behind: rechecked every [statementAttentionPoll] while one is
+/// being read and whenever the app comes back to the foreground. Offline,
+/// errors and accounts without Killa → [StatementAttention.none] (the page
+/// shows nothing rather than an error).
+final statementAttentionProvider = Provider.autoDispose<StatementAttention>((
+  ref,
+) {
+  if (ref.watch(killaAccessProvider) == KillaAccess.forbidden) {
+    return StatementAttention.none;
+  }
+  final lifecycle = AppLifecycleListener(
+    onResume: () => ref.invalidate(statementImportsProvider),
+  );
+  ref.onDispose(lifecycle.dispose);
+  // `.value` keeps the previous list while a refetch is in flight.
+  final imports = ref.watch(statementImportsProvider).value;
+  if (imports == null) return StatementAttention.none;
+  final attention = StatementAttention.of(
+    imports,
+    ref.read(clockProvider).now(),
+  );
+  if (attention.parsing.isNotEmpty) {
+    final poll = Timer(
+      statementAttentionPoll,
+      () => ref.invalidate(statementImportsProvider),
+    );
+    ref.onDispose(poll.cancel);
+  }
+  return attention;
+});
 
 /// Refreshes the list and every open detail (after a decision).
 void invalidateStatements(WidgetRef ref) {

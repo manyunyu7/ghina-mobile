@@ -14,6 +14,7 @@ import '../../shell/app_drawer.dart';
 import '../../../state/killa_access_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../import/widgets/statement_status.dart';
 import '../widgets/tx_visuals.dart';
 
 /// The Transaksi tab: month selector, month summary, filters, search, and the
@@ -258,12 +259,7 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         actions: [
           if (widget.walletId == null &&
               ref.watch(killaAccessProvider) != KillaAccess.forbidden)
-            IconButton(
-              key: const ValueKey('tx-import'),
-              tooltip: 'Impor mutasi',
-              icon: const Icon(Icons.upload_file_rounded),
-              onPressed: () => context.push('/transactions/import'),
-            ),
+            const StatementImportButton(),
           IconButton(
             key: const ValueKey('tx-analytics'),
             tooltip: 'Analitik',
@@ -319,6 +315,11 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
                     ),
                     const SizedBox(height: GhinaSpace.md),
                   ],
+                  // Statement imports being read / ready / failed: an upload
+                  // can be left behind and picked up from here.
+                  if (widget.walletId == null &&
+                      ref.watch(killaAccessProvider) != KillaAccess.forbidden)
+                    const StatementStatusCards(),
                   MonthSwitcher(
                     value: _month,
                     current: YearMonth.of(now),

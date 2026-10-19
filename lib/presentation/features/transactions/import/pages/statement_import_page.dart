@@ -195,8 +195,9 @@ class _StatementImportPageState extends ConsumerState<StatementImportPage> {
               _CenterText(
                 title: 'Killa lagi baca mutasimu…',
                 message:
-                    'Biasanya cuma sebentar. Halaman ini kebarui '
-                    'sendiri.',
+                    'Biasanya 1–4 menit. Boleh ditinggal ke layar lain: '
+                    'statusnya kelihatan di halaman Transaksi, dan tombol '
+                    'Impor mutasi dapat tanda begitu siap direview.',
               ),
             ],
           ),
