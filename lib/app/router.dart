@@ -82,6 +82,8 @@ import '../presentation/features/tasks/pages/task_areas_page.dart';
 import '../presentation/features/tasks/pages/task_form_page.dart';
 import '../presentation/features/tasks/pages/tasks_page.dart';
 import '../presentation/features/tasks/task_draft.dart';
+import '../presentation/features/transactions/import/pages/statement_import_page.dart';
+import '../presentation/features/transactions/import/pages/statement_imports_page.dart';
 import '../presentation/features/transactions/pages/transaction_form_page.dart';
 import '../presentation/features/transactions/pages/transactions_page.dart';
 import '../presentation/features/wallets/pages/wallet_form_page.dart';
@@ -159,6 +161,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+      // Impor mutasi: before `/transactions/:id` so "import" isn't read as an id.
+      GoRoute(
+        path: '/transactions/import',
+        builder: (_, s) =>
+            StatementImportsPage(sharedPdfPath: s.extra as String?),
+      ),
+      GoRoute(
+        path: '/transactions/import/:id',
+        builder: (_, s) => StatementImportPage(id: s.pathParameters['id']!),
       ),
       ..._crud(
         '/transactions',

@@ -8,6 +8,9 @@ const kMaxSharedLinks = 20;
 /// Max images taken from one share.
 const kMaxSharedImages = 20;
 
+/// Max PDFs taken from one share (a statement is imported one at a time).
+const kMaxSharedPdfs = 1;
+
 /// What another app shared with Ghina, already normalised
 /// (see [SharedPayload.normalize]).
 final class SharedPayload {
@@ -16,6 +19,7 @@ final class SharedPayload {
     this.text,
     this.urls = const [],
     this.imagePaths = const [],
+    this.pdfPaths = const [],
   });
 
   /// `EXTRA_SUBJECT` — e.g. the page title when sharing from a browser.
@@ -33,11 +37,19 @@ final class SharedPayload {
   /// keep; move/import them into note photos and delete what you don't use.
   final List<String> imagePaths;
 
+  /// Shared PDFs (a bank statement for "Impor mutasi"), copied by the activity
+  /// into its cache dir (`share_intake/<n>/<original name>.pdf`). A payload
+  /// with PDFs goes to the statement import, not to Notes.
+  final List<String> pdfPaths;
+
+  bool get hasPdf => pdfPaths.isNotEmpty;
+
   bool get isEmpty =>
       (title == null || title!.isEmpty) &&
       (text == null || text!.isEmpty) &&
       urls.isEmpty &&
-      imagePaths.isEmpty;
+      imagePaths.isEmpty &&
+      pdfPaths.isEmpty;
 
   /// Suggested note body: the text, or the title when only a link was shared.
   String get suggestedBody => text ?? '';
@@ -47,6 +59,7 @@ final class SharedPayload {
     String? subject,
     Iterable<String> texts = const [],
     Iterable<String> imagePaths = const [],
+    Iterable<String> pdfPaths = const [],
   }) {
     final title = _clean(subject);
     final parts = texts.map(_clean).whereType<String>().toList();
@@ -72,17 +85,24 @@ final class SharedPayload {
       if (images.length >= kMaxSharedImages) break;
       images.add(p);
     }
+    final pdfs = <String>[];
+    for (final p in pdfPaths) {
+      if (p.trim().isEmpty || pdfs.contains(p)) continue;
+      if (pdfs.length >= kMaxSharedPdfs) break;
+      pdfs.add(p);
+    }
     return SharedPayload(
       title: title == text ? null : title,
       text: text,
       urls: List.unmodifiable(urls),
       imagePaths: List.unmodifiable(images),
+      pdfPaths: List.unmodifiable(pdfs),
     );
   }
 
   @override
   String toString() =>
-      'SharedPayload(title: $title, text: $text, urls: $urls, images: $imagePaths)';
+      'SharedPayload(title: $title, text: $text, urls: $urls, images: $imagePaths, pdfs: $pdfPaths)';
 }
 
 String? _clean(String? s) {

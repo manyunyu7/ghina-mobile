@@ -18,7 +18,8 @@ Future<Directory> sharedImagesDirectory() async {
 }
 
 /// [ShareIntake] over the native bridge in `MainActivity.kt` (Android
-/// `ACTION_SEND` / `ACTION_SEND_MULTIPLE` for `text/*` and `image/*`).
+/// `ACTION_SEND` / `ACTION_SEND_MULTIPLE` for `text/*` and `image/*`, `ACTION_SEND`
+/// for `application/pdf`).
 ///
 /// The activity copies shared `content://` images into its cache dir (the
 /// grant expires with the intent); this class moves them into app documents
@@ -91,9 +92,17 @@ Future<SharedPayload> payloadFromRaw(
       stored.add(target);
     }
   }
+  // PDFs stay where the activity copied them (cache dir): the statement
+  // import reads and deletes them right away.
+  final pdfs = <String>[];
+  final sharedPdfs = (raw['pdfs'] as List?)?.whereType<String>() ?? <String>[];
+  for (final src in sharedPdfs) {
+    if (await File(src).exists()) pdfs.add(src);
+  }
   return SharedPayload.normalize(
     subject: subject,
     texts: texts,
     imagePaths: stored,
+    pdfPaths: pdfs,
   );
 }

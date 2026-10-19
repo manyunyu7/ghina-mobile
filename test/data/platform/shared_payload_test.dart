@@ -76,6 +76,17 @@ void main() {
       expect(p.imagePaths, hasLength(kMaxSharedImages));
     });
 
+    test('a shared PDF makes the payload non-empty; only one is kept', () {
+      final p = SharedPayload.normalize(
+        pdfPaths: ['/c/1/mutasi.pdf', '', '/c/1/mutasi.pdf', '/c/2/lain.pdf'],
+      );
+      expect(p.pdfPaths, ['/c/1/mutasi.pdf']);
+      expect(p.pdfPaths, hasLength(kMaxSharedPdfs));
+      expect(p.hasPdf, isTrue);
+      expect(p.isEmpty, isFalse);
+      expect(SharedPayload.normalize(texts: ['hai']).hasPdf, isFalse);
+    });
+
     test('empty share', () {
       expect(
         SharedPayload.normalize(subject: ' ', texts: ['']).isEmpty,
@@ -114,4 +125,27 @@ void main() {
     expect(File(p.imagePaths.single).readAsBytesSync(), [1, 2, 3]);
     expect(img.existsSync(), isFalse);
   });
+
+  test(
+    'payloadFromRaw keeps shared PDFs where the activity put them',
+    () async {
+      final tmp = await Directory.systemTemp.createTemp('share_pdf_test');
+      addTearDown(() => tmp.delete(recursive: true));
+      final dir = Directory('${tmp.path}/share_intake/1')
+        ..createSync(recursive: true);
+      final pdf = File('${dir.path}/mutasi-oktober.pdf')
+        ..writeAsBytesSync([37, 80, 68, 70]);
+
+      final p = await payloadFromRaw({
+        'subject': 'mutasi-oktober.pdf',
+        'texts': <String>[],
+        'images': <String>[],
+        'pdfs': [pdf.path, '${dir.path}/missing.pdf'],
+      }, () async => tmp);
+
+      expect(p.pdfPaths, [pdf.path]);
+      expect(pdf.existsSync(), isTrue);
+      expect(p.isEmpty, isFalse);
+    },
+  );
 }

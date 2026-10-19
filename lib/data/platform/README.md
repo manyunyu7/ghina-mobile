@@ -161,7 +161,8 @@ If the Google app is disabled/removed (some Transsion ROMs ship with "Go" varian
 ## 2. Android share target
 
 Intent filters on `MainActivity` (`AndroidManifest.xml`): `SEND` `text/plain`, `SEND`
-`image/*`, `SEND_MULTIPLE` `image/*`, `SEND_MULTIPLE` `text/plain`, label "Catatan Ghina".
+`image/*`, `SEND_MULTIPLE` `image/*`, `SEND_MULTIPLE` `text/plain`, label "Catatan Ghina"; plus `SEND`
+`application/pdf`, label "Impor mutasi Ghina" (bank statement → `/transactions/import`).
 
 **Why no `receive_sharing_intent`:** its 1.9 release is Swift-Package-Manager-only on iOS and
 this project's iOS target doesn't use SPM (it breaks `pub get`/iOS builds), and we only need
@@ -187,6 +188,7 @@ SharedPayload {
   String? text;           // trimmed body; null if the text was only link(s)
   List<String> urls;      // http(s)/www links from text+subject, deduped, ≤ 20
   List<String> imagePaths;// files in app storage — import into note photos
+  List<String> pdfPaths;  // shared PDF (≤ 1) in cacheDir/share_intake/<n>/<name>.pdf — statement import
 }
 ```
 
@@ -250,5 +252,7 @@ permanent. `openAppSettings()` opens the app's settings page (Android; returns f
 - Recording pauses during a phone call (`record`'s interruption handling); the reported
   duration excludes the pause.
 - Share: only the first 20 images; images > 25 MB are skipped; `SEND_MULTIPLE` with mixed
-  types (image + video) keeps only the images. Videos/PDFs are not accepted (no filter).
+  types (image + video) keeps only the images. Videos are not accepted (no filter). A shared
+  PDF (`SEND` only, ≤ 11 MB copied; the upload itself refuses > 10 MB) is routed by
+  `dispatchSharedPayload` to "Impor mutasi" instead of Notes; the intake copy is deleted once read.
 - iOS: share target not implemented; `openAppSettings()` unsupported.

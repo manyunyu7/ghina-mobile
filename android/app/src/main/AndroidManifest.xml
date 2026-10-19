@@ -83,6 +83,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!-- Impor mutasi: a bank statement PDF shared from a file manager / mail /
+                 WhatsApp opens the upload (own label so it is told apart from Notes). -->
+            <intent-filter android:label="Impor mutasi Ghina">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
         </activity>
         <!-- Launcher entries, one per mascot ("Pilih maskot" → LauncherIcon.kt enables the
              chosen one and disables the rest). Exactly one is enabled; the tree is the

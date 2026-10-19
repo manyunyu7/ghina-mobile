@@ -1,14 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../domain/services/services.dart';
 import '../../state/platform/platform_state.dart';
 import '../../state/session_controller.dart';
 import '../notes/share/share_note_flow.dart';
 
+/// Sends one share where it belongs: a PDF (a bank statement) opens the
+/// statement import upload ("Impor mutasi Ghina"); everything else becomes a
+/// note ("Catatan Ghina").
+Future<void> dispatchSharedPayload(
+  BuildContext context,
+  WidgetRef ref,
+  SharedPayload payload,
+) async {
+  if (payload.hasPdf) {
+    await context.push<void>(
+      '/transactions/import',
+      extra: payload.pdfPaths.first,
+    );
+    return;
+  }
+  await handleSharedPayload(context, ref, payload);
+}
+
 /// The share-target hook of the signed-in shell (`lib/data/platform/README.md`
 /// → "Wiring hook"): creates `pendingShareProvider` at startup, turns each
-/// pending share into a note and opens the "Catatan dari share" sheet — one at
+/// pending share into a note and opens the "Catatan dari share" sheet (a PDF
+/// opens "Impor mutasi" instead) — one at
 /// a time, oldest first. The shell only exists after login + onboarding, so a
 /// cold-start share waits in the queue until then. Sign-out drops the queue.
 class ShareIntakeListener extends ConsumerStatefulWidget {
@@ -53,7 +73,7 @@ class _ShareIntakeListenerState extends ConsumerState<ShareIntakeListener> {
       while (mounted && ref.read(currentUserProvider) != null) {
         final p = ref.read(pendingShareProvider.notifier).take();
         if (p == null) break;
-        await handleSharedPayload(context, ref, p);
+        await dispatchSharedPayload(context, ref, p);
       }
     } finally {
       _handling = false;

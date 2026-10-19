@@ -11,6 +11,7 @@ import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
 import '../../shell/app_drawer.dart';
+import '../../../state/killa_access_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../widgets/tx_visuals.dart';
@@ -255,6 +256,14 @@ class _TransactionsPageState extends ConsumerState<TransactionsPage> {
         ),
         centerTitle: false,
         actions: [
+          if (widget.walletId == null &&
+              ref.watch(killaAccessProvider) != KillaAccess.forbidden)
+            IconButton(
+              key: const ValueKey('tx-import'),
+              tooltip: 'Impor mutasi',
+              icon: const Icon(Icons.upload_file_rounded),
+              onPressed: () => context.push('/transactions/import'),
+            ),
           IconButton(
             key: const ValueKey('tx-analytics'),
             tooltip: 'Analitik',

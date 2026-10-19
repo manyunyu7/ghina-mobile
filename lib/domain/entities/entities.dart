@@ -20,6 +20,7 @@ export 'investment.dart';
 export 'investment_views.dart';
 export 'killa.dart';
 export 'screener.dart';
+export 'statement_import.dart';
 export 'stockbit.dart';
 export 'note.dart';
 export 'notification_capture.dart';

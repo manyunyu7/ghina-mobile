@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -25,8 +26,8 @@ import java.util.concurrent.Executors
 
 /**
  * Hosts the small Ghina platform bridge (see lib/data/platform/platform_bridge.dart):
- *  - Android share target: ACTION_SEND / ACTION_SEND_MULTIPLE (text/..., image/...).
- *    Shared content:// images are copied into cacheDir/share_intake right away (the
+ *  - Android share target: ACTION_SEND / ACTION_SEND_MULTIPLE (text/..., image/...,
+ *    application/pdf for "Impor mutasi"). Shared content:// images and PDFs are copied into cacheDir/share_intake right away (the
  *    read grant dies with the intent); Dart moves them into app documents.
  *    Every share (cold start or while running) is queued until Dart listens on the
  *    share EventChannel, so none is lost.
@@ -166,14 +167,18 @@ class MainActivity : FlutterFragmentActivity() {
 
         io.execute {
             val images = mutableListOf<String>()
+            val pdfs = mutableListOf<String>()
             for (uri in streams.take(MAX_IMAGES)) {
                 val mime = runCatching { contentResolver.getType(uri) }.getOrNull() ?: type
                 when {
+                    mime == "application/pdf" -> {
+                        if (pdfs.isEmpty()) copyPdfToCache(uri)?.let { pdfs.add(it) }
+                    }
                     mime.startsWith("image/") -> copyToCache(uri, mime)?.let { images.add(it) }
                     mime.startsWith("text/") && texts.isEmpty() -> readText(uri)?.let { texts.add(it) }
                 }
             }
-            val payload = mapOf("subject" to subject, "texts" to texts, "images" to images)
+            val payload = mapOf("subject" to subject, "texts" to texts, "images" to images, "pdfs" to pdfs)
             main.post { deliverShare(payload) }
         }
     }
@@ -218,6 +223,46 @@ class MainActivity : FlutterFragmentActivity() {
         } ?: return@runCatching null
         out.absolutePath
     }.getOrElse { null }
+
+    /**
+     * Copies a shared PDF to cacheDir/share_intake/<n>/<original name>.pdf (the file
+     * name is what the statement import shows). Up to MAX_PDF_BYTES; Dart rejects
+     * anything over the server's 10 MB with a friendly message.
+     */
+    private fun copyPdfToCache(uri: Uri): String? {
+        val dir = File(cacheDir, "share_intake/${System.currentTimeMillis()}_${fileSeq++}")
+        return runCatching { copyPdfInto(dir, uri) }.getOrNull()
+            ?: run { dir.deleteRecursively(); null } // too large / unreadable: no half copy left behind
+    }
+
+    private fun copyPdfInto(dir: File, uri: Uri): String? {
+        dir.mkdirs()
+        val name = displayName(uri)
+            ?.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            ?.takeIf { it.isNotBlank() }
+            ?: "mutasi.pdf"
+        val out = File(dir, if (name.endsWith(".pdf", ignoreCase = true)) name else "$name.pdf")
+        var total = 0L
+        contentResolver.openInputStream(uri)?.use { input ->
+            out.outputStream().use { output ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > MAX_PDF_BYTES) throw IllegalStateException("too large")
+                    output.write(buf, 0, n)
+                }
+            }
+        } ?: return null
+        return out.absolutePath
+    }
+
+    private fun displayName(uri: Uri): String? = runCatching {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull()
 
     private fun readText(uri: Uri): String? = runCatching {
         contentResolver.openInputStream(uri)?.use { input ->
@@ -425,6 +470,7 @@ class MainActivity : FlutterFragmentActivity() {
         private const val SHARE_EVENTS = "com.henryaugusta.ghina/share"
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
+        private const val MAX_PDF_BYTES = 11L * 1024 * 1024
         private const val MAX_TEXT_BYTES = 100 * 1024
 
         /** FlutterNotificationListenerPlugin.FLUTTER_ENGINE_CACHE_KEY. */
