@@ -8,6 +8,7 @@ export 'gmail_authorizer.dart';
 export 'killa_media_picker.dart';
 export 'microphone_permission.dart';
 export 'notification_listener.dart';
+export 'notification_log_export.dart';
 export 'prayer_reminders.dart';
 export 'share_intake.dart';
 export 'speech_transcriber.dart';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,6 +13,9 @@ import '../../state/session_controller.dart';
 /// * starts [notificationCaptureProvider] on every app start (registers this
 ///   engine with the listener service) and refreshes it on resume — the user
 ///   may come back from Settings › Notification access;
+/// * refreshes the adb-pullable copy of the log (`notificationLogExportProvider`,
+///   tool/pull_notification_log.sh) on start, on resume and after processing —
+///   so opening the app is enough to bring the copy up to date;
 /// * turns captured notifications into transactions: whenever the log has
 ///   unchecked rows (also ones stored by the background isolate while the app
 ///   was closed) it runs `ProcessCapturedNotifications` and toasts what was
@@ -29,6 +34,8 @@ class _NotificationCaptureListenerState
     extends ConsumerState<NotificationCaptureListener> {
   bool _processing = false;
   bool _again = false;
+  bool _exporting = false;
+  DateTime? _exportedAt;
   AppLifecycleListener? _lifecycle;
 
   @override
@@ -36,8 +43,12 @@ class _NotificationCaptureListenerState
     super.initState();
     if (!ref.read(deviceNotificationListenerProvider).isSupported) return;
     _lifecycle = AppLifecycleListener(
-      onResume: () => ref.read(notificationCaptureProvider.notifier).refresh(),
+      onResume: () {
+        ref.read(notificationCaptureProvider.notifier).refresh();
+        _export();
+      },
     );
+    _export();
     ref.listenManual(notificationCaptureProvider, (_, _) {});
     ref.listenManual<AsyncValue<int>>(
       watchUnprocessedNotificationCountProvider,
@@ -49,6 +60,27 @@ class _NotificationCaptureListenerState
     ref.listenManual(currentUserProvider, (_, user) {
       if (user != null) _process();
     });
+  }
+
+  /// Rewrites the adb copy of the log. At most one at a time and not more often
+  /// than every 15 s (resume and processing can fire together); never throws.
+  Future<void> _export({bool force = false}) async {
+    final last = _exportedAt;
+    if (_exporting ||
+        (!force &&
+            last != null &&
+            DateTime.now().difference(last) < const Duration(seconds: 15))) {
+      return;
+    }
+    _exporting = true;
+    try {
+      await ref.read(notificationLogExportProvider).export();
+      _exportedAt = DateTime.now();
+    } catch (e) {
+      debugPrint('notification log export failed: $e');
+    } finally {
+      _exporting = false;
+    }
   }
 
   @override
@@ -84,6 +116,8 @@ class _NotificationCaptureListenerState
       // Rows stay unprocessed and are retried on the next change / start.
     } finally {
       _processing = false;
+      // The copy should carry the outcome (rule, transaction) just recorded.
+      if (mounted) unawaited(_export(force: true));
     }
   }
 

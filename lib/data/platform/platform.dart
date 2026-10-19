@@ -15,10 +15,12 @@ import '../../domain/services/audio_playback.dart';
 import '../../domain/services/killa_media_picker.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/notification_listener.dart';
+import '../../domain/services/notification_log_export.dart';
 import '../../domain/services/prayer_reminders.dart';
 import '../../domain/services/share_intake.dart';
 import '../../domain/services/speech_transcriber.dart';
 import '../../domain/services/voice_recorder.dart';
+import '../datasources/local/app_database.dart';
 import 'battery_optimization_bridge.dart';
 import 'channel_share_intake.dart';
 import 'device_location.dart';
@@ -27,6 +29,7 @@ import 'fakes.dart';
 import 'google_gmail_authorizer.dart';
 import 'just_audio_playback.dart';
 import 'killa_media_picker_impl.dart';
+import 'notification_log_exporter.dart';
 import 'notification_listener_bridge.dart';
 import 'quick_actions_app_shortcuts.dart';
 import 'record_voice_recorder.dart';
@@ -78,6 +81,12 @@ AppShortcuts createAppShortcuts() =>
 DeviceNotificationListener createDeviceNotificationListener() => _isAndroid
     ? FlutterDeviceNotificationListener()
     : const NoopDeviceNotificationListener();
+
+/// Android only: the adb-pullable copy of "Log Notifikasi"
+/// (tool/pull_notification_log.sh).
+NotificationLogExport createNotificationLogExport(AppDatabase db) => _isAndroid
+    ? NotificationLogExporter(db)
+    : const NoopNotificationLogExport();
 
 /// Reminder Sholat "Pakai lokasi GPS" (one-shot coarse fix).
 DeviceLocationService createDeviceLocation() => isMobileDevice

@@ -18,7 +18,10 @@ import '../data/datasources/remote/sync_api.dart';
 import '../data/datasources/remote/token_store.dart';
 import '../data/notifications/notifications.dart' show prayerActionDatabase;
 import '../data/platform/platform.dart'
-    show createDeviceNotificationListener, notificationCaptureDatabase;
+    show
+        createDeviceNotificationListener,
+        createNotificationLogExport,
+        notificationCaptureDatabase;
 import '../data/repositories/agenda_repositories.dart';
 import '../data/repositories/auth_repository_impl.dart';
 import '../data/repositories/content_repositories.dart';
@@ -41,6 +44,7 @@ import '../data/sync/sync_engine.dart';
 import '../data/sync/sync_triggers.dart';
 import '../domain/repositories/repositories.dart';
 import '../domain/services/notification_listener.dart';
+import '../domain/services/notification_log_export.dart';
 import '../domain/usecases/task_usecases.dart' show TickSource;
 
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
@@ -75,6 +79,12 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 /// under `flutter test`.
 final deviceNotificationListenerProvider = Provider<DeviceNotificationListener>(
   (ref) => createDeviceNotificationListener(),
+);
+
+/// Copy of "Log Notifikasi" pullable over adb; a no-op on iOS and under
+/// `flutter test`.
+final notificationLogExportProvider = Provider<NotificationLogExport>(
+  (ref) => createNotificationLogExport(ref.watch(appDatabaseProvider)),
 );
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => SecureTokenStore());

@@ -12,7 +12,8 @@ import '../domain/usecases/usecases.dart';
 import 'core_providers.dart';
 import 'usecase_providers.dart' show createTransactionProvider;
 
-export 'core_providers.dart' show deviceNotificationListenerProvider;
+export 'core_providers.dart'
+    show deviceNotificationListenerProvider, notificationLogExportProvider;
 
 // ---------------------------------------------------------------- log
 
