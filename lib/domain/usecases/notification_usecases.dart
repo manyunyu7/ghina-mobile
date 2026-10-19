@@ -398,6 +398,19 @@ final class ProcessCapturedNotifications {
           await _log.markProcessed(n.id, appName: appName);
           continue;
         }
+        if (isCancelledTransactionNotice(n.title, n.body)) {
+          await _log.markProcessed(
+            n.id,
+            appName: appName,
+            ruleId: rule.id,
+            parseError: 'Transaksinya dibatalkan, jadi nggak dicatat',
+          );
+          continue;
+        }
+        // The text wins over the rule's type ("You received" caught by an
+        // expense rule is income); the rule's category is for the other type.
+        final type = notificationDirection(n.title, n.body) ?? rule.type;
+        final categoryId = type == rule.type ? rule.categoryId : null;
         final amount = detectRupiahAmount(
           '${n.title}\n${n.body}',
           customPattern: rule.amountPattern,
@@ -407,7 +420,7 @@ final class ProcessCapturedNotifications {
             n.id,
             appName: appName,
             ruleId: rule.id,
-            txType: rule.type,
+            txType: type,
             parseError: 'Nominal rupiah nggak ketemu',
           );
           continue;
@@ -418,7 +431,7 @@ final class ProcessCapturedNotifications {
             n.id,
             appName: appName,
             ruleId: rule.id,
-            txType: rule.type,
+            txType: type,
             amount: amount.value,
             parseError: 'Belum ada dompet',
           );
@@ -426,10 +439,10 @@ final class ProcessCapturedNotifications {
         }
         final r = await _createTransaction(
           TransactionInput(
-            type: rule.type,
+            type: type,
             amount: amount.value,
             walletId: walletId,
-            categoryId: rule.categoryId,
+            categoryId: categoryId,
             note: notificationTransactionNote(n.title, n.body),
             date: n.postedAt,
           ),
@@ -442,7 +455,7 @@ final class ProcessCapturedNotifications {
               appName: appName,
               ruleId: rule.id,
               transactionId: value.id,
-              txType: rule.type,
+              txType: type,
               amount: amount.value,
             );
           case Err(:final failure):
@@ -450,7 +463,7 @@ final class ProcessCapturedNotifications {
               n.id,
               appName: appName,
               ruleId: rule.id,
-              txType: rule.type,
+              txType: type,
               amount: amount.value,
               parseError: failure.message,
             );

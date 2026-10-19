@@ -198,6 +198,58 @@ NotificationRule? findMatchingRule(
   return null;
 }
 
+/// Phrases of a notice that a transaction did not go through (myBCA's
+/// "Spending of IDR 68,300.00 … was cancelled."). No money moved, so it never
+/// becomes a transaction, whatever rule matches it.
+const _cancelledPhrases = [
+  'was cancelled',
+  'was canceled',
+  'has been cancelled',
+  'has been canceled',
+  'dibatalkan',
+  'transaksi gagal',
+  'transfer gagal',
+  'pembayaran gagal',
+  'transaction failed',
+  'payment failed',
+];
+
+/// Whether the notification says the transaction was cancelled or failed.
+bool isCancelledTransactionNotice(String title, String body) {
+  final lower = '$title\n$body'.toLowerCase();
+  return _cancelledPhrases.any(lower.contains);
+}
+
+/// Phrases that say unambiguously which way the money went. A broad rule
+/// ("Financial Diary" → expense) also catches myBCA's "You received IDR …".
+const _incomePhrases = [
+  'you received',
+  'earning of',
+  'kamu menerima',
+  'anda menerima',
+  'dana masuk',
+  'transfer masuk',
+  'uang masuk',
+];
+const _expensePhrases = [
+  'you spent',
+  'spending of',
+  'kamu membayar',
+  'anda membayar',
+  'transfer keluar',
+  'uang keluar',
+];
+
+/// The direction the notification states, or null when it says neither or
+/// both (then the rule's type decides).
+TxType? notificationDirection(String title, String body) {
+  final lower = '$title\n$body'.toLowerCase();
+  final income = _incomePhrases.any(lower.contains);
+  final expense = _expensePhrases.any(lower.contains);
+  if (income == expense) return null;
+  return income ? TxType.income : TxType.expense;
+}
+
 /// Result of "Tes rule" on a sample notification.
 final class RuleTestResult {
   const RuleTestResult({

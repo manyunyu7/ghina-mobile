@@ -32,7 +32,8 @@ void main() {
       ..s.put(wallet('bca', createdAt: DateTime(2026, 2)));
     txs = FakeTransactionRepository();
     final categories = FakeCategoryRepository()
-      ..s.put(category('gaji', type: CategoryType.income));
+      ..s.put(category('gaji', type: CategoryType.income))
+      ..s.put(category('makan'));
     process = ProcessCapturedNotifications(
       log,
       rules,
@@ -351,6 +352,45 @@ void main() {
       expect((await process()).created, isEmpty);
     },
   );
+
+  test('a broad expense rule: "You received" becomes income without the '
+      'rule category, cancelled notices are skipped', () async {
+    await SaveNotificationRule(rules, clock)(
+      null,
+      const NotificationRuleInput(
+        name: 'Financial Diary',
+        packages: ['com.bca.mybca.omni.android'],
+        pattern: 'Financial Diary',
+        type: TxType.expense,
+        walletId: 'bca',
+        categoryId: 'makan',
+      ),
+    );
+    await capture('Financial Diary', 'You spent IDR 71,500.00 at Transport.');
+    await capture(
+      'Financial Diary',
+      'Spending of IDR 71,500.00 in Transportation category in 08 October '
+          '2026 was cancelled.',
+      at: posted.add(const Duration(minutes: 1)),
+    );
+    await capture(
+      'Financial Diary',
+      'You received IDR 698,000.00 from SAWERIA at Account Transfer category.',
+      at: posted.add(const Duration(minutes: 2)),
+    );
+
+    final created = (await process()).created;
+    expect(
+      [for (final t in created) (t.type, t.amount, t.categoryId)],
+      [(TxType.expense, 71500, 'makan'), (TxType.income, 698000, null)],
+    );
+    final rows = await log.watch(all).first;
+    final cancelled = rows.firstWhere((n) => n.body.contains('cancelled'));
+    expect(cancelled.transactionId, isNull);
+    expect(cancelled.parseError, contains('dibatalkan'));
+    final received = rows.firstWhere((n) => n.body.contains('received'));
+    expect(received.txType, TxType.income);
+  });
 
   test('preset enable creates a rule on the first active wallet', () async {
     final save = SaveNotificationRule(rules, clock);

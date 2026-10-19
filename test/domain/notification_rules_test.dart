@@ -165,6 +165,43 @@ void main() {
     expect(long.endsWith('…'), isTrue);
   });
 
+  test('cancelled / failed notices', () {
+    expect(
+      isCancelledTransactionNotice(
+        'Financial Diary',
+        'Spending of IDR 68,300.00 in Transportation category in 08 October '
+            '2026 was cancelled.',
+      ),
+      isTrue,
+    );
+    expect(isCancelledTransactionNotice('Transfer gagal', 'Rp 50.000'), isTrue);
+    expect(
+      isCancelledTransactionNotice('Financial Diary', 'You spent IDR 9,000.00'),
+      isFalse,
+    );
+  });
+
+  test('direction stated by the text', () {
+    expect(
+      notificationDirection('Financial Diary', 'You received IDR 698,000.00'),
+      TxType.income,
+    );
+    expect(
+      notificationDirection('Financial Diary', 'RDN earning of IDR 1.00'),
+      TxType.income,
+    );
+    expect(
+      notificationDirection('Financial Diary', 'You spent IDR 75,000.00'),
+      TxType.expense,
+    );
+    expect(notificationDirection('QRIS', 'Pembayaran Rp 10.000'), isNull);
+    expect(
+      notificationDirection('Transfer masuk', 'uang keluar dari rekening X'),
+      isNull,
+      reason: 'both directions → the rule decides',
+    );
+  });
+
   group('presets', () {
     test('unique keys, income before expense per app, valid packages', () {
       final keys = notificationRulePresets.map((p) => p.key).toList();
