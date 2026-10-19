@@ -9,6 +9,8 @@
 # scales down): drawable-xxxhdpi/ic_launcher_fg_<id>.png (adaptive foreground,
 # 108dp = 432px), mipmap-xxxhdpi/ic_launcher_<id>.png (legacy, 192px) and
 # mipmap-anydpi-v26/ic_launcher_<id>.xml. The aliases live in AndroidManifest.xml.
+# Also the notification small icons drawable-*/ic_stat_<id>.png
+# (tool/mascot_stat_icons.py, needs Pillow; see FlutterNotificationGateway).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -31,3 +33,4 @@ for fg in "$TMP"/*_foreground.png; do
 XML
   echo "$id"
 done
+python3 tool/mascot_stat_icons.py "$TMP" "$RES"

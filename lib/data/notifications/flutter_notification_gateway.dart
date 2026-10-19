@@ -3,6 +3,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -36,6 +37,43 @@ class FlutterNotificationGateway implements NotificationGateway {
   static const prayerSilentChannelName = 'Reminder Sholat (senyap)';
 
   static const smallIcon = 'ic_stat_ghina';
+
+  /// Mascots with their own small icon (`ic_stat_<id>`, white silhouettes made
+  /// by tool/mascot_icons.sh). The tree is [smallIcon].
+  @visibleForTesting
+  static const mascotIcons = {
+    'ayam',
+    'kucing',
+    'kapibara',
+    'loko',
+    'bibit',
+    'koin',
+    'hantu',
+    'kura',
+    'dompet',
+    'beluga',
+    'hiupaus',
+    'komodo',
+    'orangutan',
+    'cendrawasih',
+  };
+
+  /// The small icon follows "Pilih maskot" like the launcher icon. Read from
+  /// shared_preferences (SharedPrefsMascotKindPrefs.key) on every notification,
+  /// so the background isolate (prayer_notification_actions.dart) agrees with
+  /// the app. Scheduled notifications keep the icon they were scheduled with
+  /// until the next reschedule (every app start).
+  @visibleForTesting
+  static Future<String> smallIconForMascot() async {
+    try {
+      final id = (await SharedPreferences.getInstance()).getString(
+        'mascot.kind',
+      );
+      if (mascotIcons.contains(id)) return 'ic_stat_$id';
+    } catch (_) {}
+    return smallIcon;
+  }
+
   static const _accent = Color(0xFF58CC02);
 
   AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
@@ -185,7 +223,7 @@ class FlutterNotificationGateway implements NotificationGateway {
   ];
 
   @override
-  Future<void> schedule(NotificationRequest r) => _plugin.zonedSchedule(
+  Future<void> schedule(NotificationRequest r) async => _plugin.zonedSchedule(
     id: r.id,
     title: r.title,
     body: r.body,
@@ -204,19 +242,19 @@ class FlutterNotificationGateway implements NotificationGateway {
     androidScheduleMode: r.exact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle,
-    notificationDetails: _details(r),
+    notificationDetails: _details(r, await smallIconForMascot()),
   );
 
   @override
-  Future<void> show(NotificationRequest r) => _plugin.show(
+  Future<void> show(NotificationRequest r) async => _plugin.show(
     id: r.id,
     title: r.title,
     body: r.body,
     payload: r.payload,
-    notificationDetails: _details(r),
+    notificationDetails: _details(r, await smallIconForMascot()),
   );
 
-  static NotificationDetails _details(NotificationRequest r) {
+  static NotificationDetails _details(NotificationRequest r, String icon) {
     final (id, name, description) = switch (r.channel) {
       NotificationChannelKind.taskReminder => (
         channelId,
@@ -243,7 +281,7 @@ class FlutterNotificationGateway implements NotificationGateway {
         importance: Importance.high,
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
-        icon: smallIcon,
+        icon: icon,
         color: _accent,
         playSound: !silent,
         enableVibration: !silent,
