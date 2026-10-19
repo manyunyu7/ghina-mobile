@@ -40,7 +40,8 @@ import java.util.concurrent.Executors
  *    takes the same path.
  *  - Log Notifikasi: launchable apps + app labels (apps.list / apps.label), and a
  *    hand-over of the flutter_notification_listener service to a background engine
- *    when this activity's engine dies (see onDestroy).
+ *    when this activity's engine dies (see onDestroy), and the listener watchdog
+ *    (NotificationListenerWatchdog: scheduled here, checked on every resume).
  *
  * A FlutterFragmentActivity (not FlutterActivity) because local_auth ("Kunci
  * Kebiasaan") shows the BiometricPrompt as a fragment. The share / settings / speech
@@ -62,6 +63,12 @@ class MainActivity : FlutterFragmentActivity() {
         if (savedInstanceState != null || fromHistory) intent.removeExtra(QUICK_ACTION_EXTRA)
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null && !fromHistory) handleShareIntent(intent)
+        ListenerWatchdogJob.schedule(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        NotificationListenerWatchdog.check(this, "resume")
     }
 
     override fun onNewIntent(intent: Intent) {

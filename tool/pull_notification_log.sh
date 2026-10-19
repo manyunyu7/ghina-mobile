@@ -5,6 +5,7 @@
 #   GHINA_NOTIF_DIR=/elsewhere tool/pull_notification_log.sh
 #
 # The app rewrites Android/data/<pkg>/files/notification-log/{notifications.jsonl,meta.json}
+# (plus listener-watchdog.jsonl, appended by NotificationListenerWatchdog.kt)
 # on start, on resume and after processing (lib/data/platform/notification_log_exporter.dart).
 # This opens Ghina to trigger that, waits for meta.json to change, then pulls. The phone must
 # be unlocked for the app to come to the front; otherwise the last copy is pulled as-is.
@@ -41,6 +42,10 @@ chmod 700 "$DEST"
 adb pull "$SRC/notifications.jsonl" "$DEST/notifications.jsonl" >/dev/null
 printf '%s\n' "$now" > "$DEST/meta.json"
 chmod 600 "$DEST/notifications.jsonl" "$DEST/meta.json"
+# Listener watchdog checks (rebinds, backfills) — tells holes in the log from quiet hours.
+if adb pull "$SRC/listener-watchdog.jsonl" "$DEST/listener-watchdog.jsonl" >/dev/null 2>&1; then
+  chmod 600 "$DEST/listener-watchdog.jsonl"
+fi
 
 lines=$(wc -l < "$DEST/notifications.jsonl" | tr -d ' ')
 echo "OK: $lines notifikasi → $DEST/notifications.jsonl"

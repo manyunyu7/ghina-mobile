@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/notification_capture_controller.dart';
 
+/// Android battery-optimisation exemption; re-read whenever the capture state
+/// refreshes (app resume), so coming back from Settings updates it. Null where
+/// there is nothing to exempt (iOS, tests).
+final _batteryExemptProvider = FutureProvider.autoDispose<bool?>((ref) {
+  ref.watch(notificationCaptureProvider);
+  return ref.watch(batteryOptimizationProvider).isIgnoring();
+});
+
 /// On/off switch of the notification listener, the notification-access state
 /// and a button to Settings › Notification access, with a short explanation.
+/// While active, warns when battery optimisation still applies to Ghina: the
+/// ROM then freezes the listener in the background and the log gets holes.
 class ListenerStatusCard extends ConsumerWidget {
   const ListenerStatusCard({super.key});
 
@@ -14,6 +25,7 @@ class ListenerStatusCard extends ConsumerWidget {
     final g = context.ghina;
     final s = ref.watch(notificationCaptureProvider);
     final c = ref.read(notificationCaptureProvider.notifier);
+    final batteryExempt = ref.watch(_batteryExemptProvider).value;
     final (ChunkySwatch color, IconData icon, String status) = switch (s) {
       NotificationCaptureState(loading: true) => (
         GhinaColors.gray,
@@ -107,6 +119,43 @@ class ListenerStatusCard extends ConsumerWidget {
               variant: ChunkyButtonVariant.outline,
               color: GhinaColors.blue,
               onPressed: c.openAccessSettings,
+            ),
+          ],
+          if (s.active && batteryExempt == false) ...[
+            const SizedBox(height: 12),
+            Row(
+              key: const ValueKey('notif-listener-battery'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.battery_alert_rounded,
+                  size: 18,
+                  color: GhinaColors.orange.base,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Ghina masih dibatasi hemat baterai — saat HP lama nggak '
+                    'dipakai, pencatatan bisa berhenti berjam-jam. Pilih Ghina '
+                    '→ "Tanpa batasan". Di Samsung, tambahkan juga ke Baterai › '
+                    'Batas penggunaan latar belakang › "Aplikasi yang tidak '
+                    'pernah tidur".',
+                    style: GhinaType.caption
+                        .w(700)
+                        .copyWith(color: g.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ChunkyButton(
+              key: const ValueKey('notif-listener-battery-open'),
+              label: 'Buka pengaturan baterai',
+              icon: Icons.battery_charging_full_rounded,
+              size: ChunkyButtonSize.small,
+              variant: ChunkyButtonVariant.outline,
+              color: GhinaColors.orange,
+              onPressed: () => ref.read(batteryOptimizationProvider).request(),
             ),
           ],
         ],
