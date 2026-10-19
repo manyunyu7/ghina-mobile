@@ -31,6 +31,7 @@ import java.util.concurrent.Executors
  *    Every share (cold start or while running) is queued until Dart listens on the
  *    share EventChannel, so none is lost.
  *  - App settings shortcut + "should show rationale" for the mic permission.
+ *  - Launcher icon = chosen mascot (LauncherIcon: one activity-alias per mascot).
  *  - Offline speech support query / model download (Android 13+ RecognitionSupport).
  *  - Launcher shortcuts come from the quick_actions plugin (dynamic shortcuts set
  *    from Dart; the plugin reads the launch extra on cold start and gets warm
@@ -69,6 +70,13 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onResume() {
         super.onResume()
         NotificationListenerWatchdog.check(this, "resume")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // A new launcher icon closes the task launched from the old one: switch it
+        // only once Ghina is in the background.
+        if (!isChangingConfigurations) LauncherIcon.applyPending(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -120,6 +128,10 @@ class MainActivity : FlutterFragmentActivity() {
                 "apps.label" -> result.success(appLabel(call.argument<String>("package")))
                 "battery.isIgnoring" -> result.success(isIgnoringBatteryOptimizations())
                 "battery.openSettings" -> result.success(openBatteryOptimizationSettings())
+                "launcherIcon.current" -> result.success(LauncherIcon.current(this))
+                "launcherIcon.set" -> result.success(
+                    LauncherIcon.set(this, call.argument<String>("id") ?: "")
+                )
                 else -> result.notImplemented()
             }
         }

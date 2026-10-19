@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../di/di.dart' show launcherIconProvider;
 import '../design_system/mascot/mascot_kind.dart';
 
 /// The chosen mascot ("Pilih maskot"): device-local, not synced.
@@ -65,7 +66,10 @@ class MascotKindController extends Notifier<MascotKind> {
   @override
   MascotKind build() {
     final initial = ref.watch(mascotKindInitialProvider);
-    if (initial != null) return initial;
+    if (initial != null) {
+      Future.microtask(syncLauncherIcon);
+      return initial;
+    }
     _touched = false;
     _load();
     return MascotKind.fallback;
@@ -81,12 +85,23 @@ class MascotKindController extends Notifier<MascotKind> {
     // A pick made before the load finished wins.
     if (!ref.mounted || _touched) return;
     state = v;
+    await syncLauncherIcon();
   }
 
   Future<void> select(MascotKind kind) async {
     _touched = true;
     state = kind;
     await _prefs.save(kind);
+    await syncLauncherIcon();
+  }
+
+  /// Points the home-screen icon (and the Android 12+ splash) at the current
+  /// mascot. Called on every pick and once per app start, which also repairs
+  /// a mismatch (e.g. restored prefs after a reinstall). Never throws.
+  Future<void> syncLauncherIcon() async {
+    try {
+      await ref.read(launcherIconProvider).apply(state.id);
+    } catch (_) {}
   }
 }
 

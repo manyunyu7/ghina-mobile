@@ -45,7 +45,8 @@ class MascotPickerPage extends ConsumerWidget {
                   title: 'Halo, aku ${current.label}!',
                   message:
                       'Pilih teman yang paling cocok buat nemenin kamu '
-                      'nabung. Ketuk salah satu buat lihat ekspresinya.',
+                      'nabung. Ketuk salah satu buat lihat ekspresinya.'
+                      '${Theme.of(context).platform == TargetPlatform.android ? ' Ikon & layar pembuka Ghina ikut ganti begitu kamu keluar dari aplikasi.' : ''}',
                 ),
               ),
             ),

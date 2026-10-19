@@ -2,10 +2,15 @@
 // mascot so they always match it. Opt-in (not part of the normal suite):
 //   GHINA_ICON_OUT=assets/icon flutter test test/tool/app_icon_render_test.dart
 //   GHINA_WEB_ICON_OUT=/tmp/web flutter test test/tool/app_icon_render_test.dart
+//   GHINA_MASCOT_ICON_OUT=/tmp/m flutter test test/tool/app_icon_render_test.dart
 // App icon: resize assets/icon/icon.png (opaque) into ios/…/AppIcon.appiconset
 // and android mipmap-*/ic_launcher.png, icon_foreground.png into
 // drawable-*/ic_launcher_foreground.png (108dp canvas) with `sips`; the adaptive
 // background is [iconBackground] in values/ic_launcher_background.xml.
+// Per-mascot launcher icons (the icon follows "Pilih maskot", see
+// LauncherIcon.kt): <id>.png + <id>_foreground.png for every MascotKind but the
+// tree (which is ic_launcher itself); tool/mascot_icons.sh resizes them into
+// mipmap-xxxhdpi/ic_launcher_<id>.png and drawable-*/ic_launcher_fg_<id>.png.
 // Web: copy icon.png → src/app/icon.png, apple-icon.png → src/app/apple-icon.png,
 // logo.png → public/logo.png, and pack favicon-16/32.png into src/app/favicon.ico.
 import 'dart:io';
@@ -18,6 +23,7 @@ import 'package:ghina/presentation/design_system/design_system.dart';
 
 const _out = String.fromEnvironment('GHINA_ICON_OUT');
 const _webOut = String.fromEnvironment('GHINA_WEB_ICON_OUT');
+const _mascotOut = String.fromEnvironment('GHINA_MASCOT_ICON_OUT');
 
 /// Background of the icon: sky blue, so the green money tree pops like a tree
 /// against a clear sky (and stays distinct on light and dark home screens).
@@ -54,8 +60,9 @@ Future<void> _render(
   });
 }
 
-Widget _mascot(double size) => Center(
+Widget _mascot(double size, {MascotKind? kind}) => Center(
   child: MascotView(
+    kind: kind,
     mood: MascotMood.happy,
     size: size,
     animate: false,
@@ -75,6 +82,7 @@ String _env(String define, String name) =>
 void main() {
   final out = _env(_out, 'GHINA_ICON_OUT');
   final web = _env(_webOut, 'GHINA_WEB_ICON_OUT');
+  final mascots = _env(_mascotOut, 'GHINA_MASCOT_ICON_OUT');
 
   testWidgets('render app icon', (tester) async {
     // Full-bleed square: iOS icon + legacy Android icon.
@@ -104,4 +112,24 @@ void main() {
     await _render(tester, _mascot(256), '$web/logo.png', size: 256);
     addTearDown(tester.view.reset);
   }, skip: web.isEmpty);
+
+  testWidgets('render per-mascot launcher icons', (tester) async {
+    for (final k in MascotKind.values) {
+      if (k == MascotKind.fallback) continue;
+      await _render(
+        tester,
+        ColoredBox(
+          color: iconBackground,
+          child: _mascot(800, kind: k),
+        ),
+        '$mascots/${k.id}.png',
+      );
+      await _render(
+        tester,
+        _mascot(610, kind: k),
+        '$mascots/${k.id}_foreground.png',
+      );
+    }
+    addTearDown(tester.view.reset);
+  }, skip: mascots.isEmpty);
 }

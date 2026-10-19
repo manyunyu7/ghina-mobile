@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/gmail_authorizer.dart';
+import '../../domain/services/launcher_icon.dart';
 import '../../domain/services/audio_playback.dart';
 import '../../domain/services/killa_media_picker.dart';
 import '../../domain/services/microphone_permission.dart';
@@ -28,6 +29,7 @@ import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'google_gmail_authorizer.dart';
 import 'just_audio_playback.dart';
+import 'launcher_icon_bridge.dart';
 import 'killa_media_picker_impl.dart';
 import 'notification_log_exporter.dart';
 import 'notification_listener_bridge.dart';
@@ -37,6 +39,7 @@ import 'stt_speech_transcriber.dart';
 
 export 'app_info.dart';
 export 'battery_optimization_bridge.dart' show NoopBatteryOptimization;
+export 'launcher_icon_bridge.dart' show NoopLauncherIcon;
 export 'device_location.dart' show NoopDeviceLocation;
 export 'fakes.dart';
 export 'google_gmail_authorizer.dart' show NoopGmailAuthorizer;
@@ -96,6 +99,10 @@ DeviceLocationService createDeviceLocation() => isMobileDevice
 /// Android battery-optimisation shortcut (Reminder Sholat).
 BatteryOptimization createBatteryOptimization() =>
     _isAndroid ? BridgeBatteryOptimization() : const NoopBatteryOptimization();
+
+/// Launcher icon = chosen mascot (Android activity-aliases).
+LauncherIcon createLauncherIcon() =>
+    _isAndroid ? BridgeLauncherIcon() : const NoopLauncherIcon();
 
 /// Killa composer attachments (photos → JPEG ≤ 2048 px, PDFs).
 KillaMediaPicker createKillaMediaPicker() =>

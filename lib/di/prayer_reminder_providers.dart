@@ -1,5 +1,6 @@
 /// Composition root, part 6: "Reminder Sholat" (offline prayer times, prayer
-/// notifications, GPS / battery helpers) and the app version.
+/// notifications, GPS / battery helpers), the mascot launcher icon and the app
+/// version.
 ///
 /// Tests override [prayerReminderSettingsStoreProvider],
 /// [prayerReminderSchedulerProvider], [deviceLocationProvider] and
@@ -14,7 +15,12 @@ import '../data/notifications/notifications.dart'
         SharedPrefsPrayerReminderSettingsStore,
         createPrayerReminderScheduler;
 import '../data/platform/platform.dart'
-    show createBatteryOptimization, createDeviceLocation, readAppVersion;
+    show
+        createBatteryOptimization,
+        createDeviceLocation,
+        createLauncherIcon,
+        readAppVersion;
+import '../domain/services/launcher_icon.dart';
 import '../domain/services/prayer_reminders.dart';
 import '../domain/usecases/usecases.dart'
     show BuildPrayerReminderPlan, ComputePrayerTimes;
@@ -39,6 +45,11 @@ final deviceLocationProvider = Provider<DeviceLocationService>(
 
 final batteryOptimizationProvider = Provider<BatteryOptimization>(
   (ref) => createBatteryOptimization(),
+);
+
+/// Home-screen icon that follows "Pilih maskot". No-op off Android.
+final launcherIconProvider = Provider<LauncherIcon>(
+  (ref) => createLauncherIcon(),
 );
 
 /// `(day, settings)` → the five fardhu times of that day.

@@ -1,11 +1,23 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghina/di/di.dart' show launcherIconProvider;
+import 'package:ghina/domain/services/launcher_icon.dart';
 import 'package:ghina/presentation/design_system/mascot/mascot_kind.dart';
 import 'package:ghina/presentation/state/mascot_kind_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
+
+class _Icon implements LauncherIcon {
+  final applied = <String>[];
+
+  @override
+  Future<bool> apply(String mascotId) async {
+    applied.add(mascotId);
+    return true;
+  }
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -108,5 +120,31 @@ void main() {
       final d = container([mascotKindInitialProvider.overrideWithValue(pre)]);
       expect(d.read(mascotKindProvider), MascotKind.hiuPaus);
     });
+
+    test(
+      'the launcher icon follows: on load, on preload and on every pick',
+      () async {
+        final icon = _Icon();
+        final prefs = InMemoryMascotKindPrefs(MascotKind.kucing);
+        final c = container([
+          mascotKindPrefsProvider.overrideWithValue(prefs),
+          launcherIconProvider.overrideWithValue(icon),
+        ]);
+        c.read(mascotKindProvider);
+        await _flush();
+        expect(icon.applied, ['kucing']);
+        await c.read(mascotKindProvider.notifier).select(MascotKind.hiuPaus);
+        expect(icon.applied, ['kucing', 'hiupaus']);
+
+        final preIcon = _Icon();
+        final d = container([
+          mascotKindInitialProvider.overrideWithValue(MascotKind.loko),
+          launcherIconProvider.overrideWithValue(preIcon),
+        ]);
+        d.read(mascotKindProvider);
+        await _flush();
+        expect(preIcon.applied, ['loko']);
+      },
+    );
   });
 }
