@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/num_safe.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
@@ -226,6 +227,25 @@ class _TokenBreakdown extends StatelessWidget {
   }
 }
 
+/// [_DailyBars] for widget tests (the metric enum is private).
+@visibleForTesting
+class KillaDailyBars extends StatelessWidget {
+  const KillaDailyBars({
+    super.key,
+    required this.days,
+    required this.costMetric,
+  });
+
+  final List<KillaUsageDay> days;
+  final bool costMetric;
+
+  @override
+  Widget build(BuildContext context) => _DailyBars(
+    days: days,
+    metric: costMetric ? _Metric.cost : _Metric.tokens,
+  );
+}
+
 class _DailyBars extends StatelessWidget {
   const _DailyBars({required this.days, required this.metric});
 
@@ -239,7 +259,7 @@ class _DailyBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final values = [for (final d in days) _v(d)];
+    final values = [for (final d in days) finite(_v(d))];
     final maxV = values.fold<double>(0, math.max);
     final top = maxV <= 0 ? 1.0 : maxV * 1.15;
     final n = days.length;
@@ -300,7 +320,9 @@ class _DailyBars extends StatelessWidget {
                     meta: meta,
                     space: 4,
                     child: Text(
-                      d.length >= 10 ? '${int.parse(d.substring(8, 10))}' : d,
+                      d.length >= 10
+                          ? '${int.tryParse(d.substring(8, 10)) ?? d}'
+                          : d,
                       style: axis,
                     ),
                   );

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/num_safe.dart';
+import '../../../shared/widgets/chart_empty.dart';
 import '../../../design_system/design_system.dart';
 import '../forecast_state.dart';
 
@@ -25,10 +27,11 @@ class BalanceChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final start = points.first.balance;
-    final end = points.last.balance;
-    final minB = points.map((p) => p.balance).reduce(math.min);
-    final maxB = points.map((p) => p.balance).reduce(math.max);
+    if (points.isEmpty) return const ChartEmpty();
+    final start = finite(points.first.balance);
+    final end = finite(points.last.balance);
+    final minB = points.map((p) => finite(p.balance)).reduce(math.min);
+    final maxB = points.map((p) => finite(p.balance)).reduce(math.max);
     final sw = minB < 0
         ? GhinaColors.red
         : end < start
@@ -39,7 +42,8 @@ class BalanceChart extends StatelessWidget {
     final minY = minB - pad;
     final maxY = maxB + pad;
     final interval = _niceInterval((maxY - minY) / 3);
-    final lastDay = points.last.day.toDouble();
+    // One point (day 0) would give minX == maxX: widen to one day.
+    final lastDay = math.max(1, points.last.day).toDouble();
     final labelStyle = GhinaType.caption.copyWith(
       color: g.textSecondary,
       fontSize: 11,
@@ -159,7 +163,8 @@ class BalanceChart extends StatelessWidget {
         lineBarsData: [
           LineChartBarData(
             spots: [
-              for (final p in points) FlSpot(p.day.toDouble(), p.balance),
+              for (final p in points)
+                FlSpot(p.day.toDouble(), finite(p.balance)),
             ],
             isCurved: true,
             curveSmoothness: 0.18,
@@ -171,7 +176,9 @@ class BalanceChart extends StatelessWidget {
             shadow: Shadow(color: sw.edge, offset: const Offset(0, 3)),
             dotData: FlDotData(
               checkToShowDot: (spot, _) =>
-                  spot.x == 0 || points[spot.x.round()].event,
+                  spot.x == 0 ||
+                  (spot.x.round() < points.length &&
+                      points[spot.x.round()].event),
               getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                 radius: spot.x == 0 ? 5 : 4.5,
                 color: spot.x == 0 ? g.surface : sw.base,

@@ -3,4 +3,6 @@
     <!-- Static launcher shortcut (res/xml/shortcuts.xml). -->
     <string name="shortcut_killa_short">Chat Killa</string>
     <string name="shortcut_killa_long">Chat dengan Killa</string>
+    <!-- Home-screen widget "Kantor" -->
+    <string name="kantor_widget_description">Izin yang menunggu dan agen Kantor yang sedang bekerja</string>
 </resources>

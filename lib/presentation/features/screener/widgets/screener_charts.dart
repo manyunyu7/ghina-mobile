@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/formatters.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
+import '../../../shared/widgets/chart_empty.dart';
 import '../screener_format.dart';
 
 /// The line / bar colour of "fewer shareholders" (the signal).
@@ -125,6 +126,10 @@ class Sparkline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final values = [
+      for (final v in this.values)
+        if (v.isFinite) v,
+    ];
     if (values.length < 2) return SizedBox(width: width);
     final lo = values.reduce(math.min);
     final hi = values.reduce(math.max);
@@ -179,7 +184,12 @@ class HoldersPriceChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final primary = screenerPrimary(context);
+    if (holders.isEmpty) return const ChartEmpty();
     final blue = GhinaColors.blue.base;
+    final prices = [
+      for (final p in this.prices)
+        if (p.close.isFinite) p,
+    ];
     final showPrices = prices.length >= 2;
     final dates = [
       for (final h in holders) h.date,
@@ -458,6 +468,7 @@ class BreadthChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final primary = screenerPrimary(context);
+    if (months.isEmpty) return const ChartEmpty();
     final muted = g.textMuted.withValues(alpha: 0.55);
     final maxY = months
         .map((m) => (m.declining + m.rising).toDouble())

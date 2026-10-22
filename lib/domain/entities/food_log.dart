@@ -14,6 +14,7 @@ final class FoodLog {
     this.photoUrl,
     this.localPhotoPath,
     this.note,
+    this.transactionId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -47,10 +48,34 @@ final class FoodLog {
   /// [photoUrl] for display when non-null.
   final String? localPhotoPath;
   final String? note;
+
+  /// The expense this meal was paid with (`docs/food-transaction-link.md`);
+  /// several food logs may share one. Null = not linked.
+  final String? transactionId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   bool get hasPhoto => photoUrl != null || localPhotoPath != null;
+
+  bool get isLinked => transactionId != null;
+
+  /// The same log linked to [transactionId] (null = unlinked), edited at [at].
+  FoodLog withTransaction(String? transactionId, DateTime at) => FoodLog(
+    id: id,
+    date: date,
+    name: name,
+    meal: meal,
+    mealLabel: mealLabel,
+    calories: calories,
+    caloriesMax: caloriesMax,
+    tags: tags,
+    photoUrl: photoUrl,
+    localPhotoPath: localPhotoPath,
+    note: note,
+    transactionId: transactionId,
+    createdAt: createdAt,
+    updatedAt: at,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -66,6 +91,7 @@ final class FoodLog {
       other.photoUrl == photoUrl &&
       other.localPhotoPath == localPhotoPath &&
       other.note == note &&
+      other.transactionId == transactionId &&
       other.createdAt == createdAt &&
       other.updatedAt == updatedAt;
 
@@ -82,6 +108,7 @@ final class FoodLog {
     photoUrl,
     localPhotoPath,
     note,
+    transactionId,
     createdAt,
     updatedAt,
   );

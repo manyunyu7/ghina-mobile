@@ -8,6 +8,8 @@ export 'budget_usecases.dart';
 export 'category_usecases.dart';
 export 'content_rules.dart';
 export 'content_usecases.dart';
+export 'food_link_rules.dart';
+export 'food_link_usecases.dart';
 export 'food_rules.dart';
 export 'forecast_usecases.dart';
 export 'habit_enrichment_rules.dart';

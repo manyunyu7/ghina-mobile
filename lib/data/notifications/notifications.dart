@@ -6,12 +6,15 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 
 import '../../domain/services/prayer_reminders.dart';
+import '../datasources/remote/api_client.dart';
 import 'device_reminder_scheduler.dart';
 import 'flutter_notification_gateway.dart';
+import 'kantor_notice_poller.dart';
 import 'prayer_reminder_scheduler.dart';
 
 export 'device_reminder_scheduler.dart';
 export 'flutter_notification_gateway.dart' show FlutterNotificationGateway;
+export 'kantor_notice_poller.dart';
 export 'notification_gateway.dart';
 export 'adhan_prayer_times_calculator.dart';
 export 'notification_settings_store.dart';
@@ -36,6 +39,11 @@ DeviceReminderScheduler createDeviceReminderScheduler() => _supported
 PrayerReminderScheduler createPrayerReminderScheduler() => _supported
     ? LocalPrayerReminderScheduler(FlutterNotificationGateway())
     : const NoopPrayerReminderScheduler();
+
+/// Kantor Claude notices poller; null off Android/iOS and under `flutter test`.
+KantorNoticePoller? createKantorNoticePoller(ApiClient client) => _supported
+    ? KantorNoticePoller(client, FlutterNotificationGateway())
+    : null;
 
 bool get _supported =>
     !kIsWeb &&

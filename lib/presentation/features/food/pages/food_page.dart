@@ -9,6 +9,8 @@ import '../../../../domain/entities/entities.dart';
 import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
+import '../../../state/session_controller.dart' show currencyProvider;
+import '../widgets/food_link_widgets.dart';
 import '../widgets/food_photo.dart';
 
 /// Food diary: today's calories and meals, then every day's logs with photos.
@@ -122,6 +124,10 @@ class _FoodPageState extends ConsumerState<FoodPage> {
     }
     final todayItems = all.where((l) => isSameDay(l.date, now)).toList();
     final weekly = weeklyFoodSummary(all, now);
+    final suggestions =
+        ref.watch(foodLinkSuggestionsProvider).value ??
+        const <FoodLinkSuggestion>[];
+    final stats = ref.watch(foodMonthStatsProvider).value;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         GhinaSpace.page,
@@ -131,9 +137,17 @@ class _FoodPageState extends ConsumerState<FoodPage> {
       ),
       children: [
         _TodayCard(items: todayItems),
+        for (final s in suggestions.take(3)) ...[
+          const SizedBox(height: 12),
+          FoodLinkSuggestionCard(suggestion: s),
+        ],
         if (weekly.days.isNotEmpty) ...[
           const SizedBox(height: 12),
           _WeeklyCard(summary: weekly),
+        ],
+        if (stats != null && !stats.isEmpty) ...[
+          const SizedBox(height: 12),
+          FoodSpendCard(stats: stats),
         ],
         if (counts.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -477,6 +491,8 @@ class _FoodCard extends StatelessWidget {
                             .w(900)
                             .copyWith(color: g.textPrimary),
                       ),
+                    if (log.transactionId case final txId?)
+                      _LinkedAmount(key: ValueKey('linked-$txId'), id: txId),
                   ],
                 ),
                 if (log.tags.isNotEmpty) ...[
@@ -509,6 +525,26 @@ class _FoodCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The linked expense's amount on a food card.
+class _LinkedAmount extends ConsumerWidget {
+  const _LinkedAmount({super.key, required this.id});
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final v = ref.watch(watchTransactionProvider(id)).value;
+    return FoodLinkBadge(
+      label: v == null
+          ? 'Tertaut'
+          : Fmt.money(
+              v.amount,
+              currency: v.wallet?.currency ?? ref.watch(currencyProvider),
+            ),
     );
   }
 }

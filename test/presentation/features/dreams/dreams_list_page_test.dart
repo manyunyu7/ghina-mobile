@@ -39,11 +39,7 @@ void main() {
         priority: 1,
         updated: stale,
       ),
-      dreamFixture(
-        'd3',
-        title: 'Buku contoh',
-        status: DreamStatus.done,
-      ),
+      dreamFixture('d3', title: 'Buku contoh', status: DreamStatus.done),
     ],
     steps: [
       DreamStep(
@@ -174,9 +170,7 @@ void main() {
   });
 
   testWidgets('no review button when nothing is stale or tagged', (t) async {
-    final rig = DreamsRig(
-      dreams: [dreamFixture('d1', title: 'Buku contoh')],
-    );
+    final rig = DreamsRig(dreams: [dreamFixture('d1', title: 'Buku contoh')]);
     await rig.pump(t, '/dreams', () => const DreamsPage());
     expect(find.byKey(const ValueKey('dreams-review')), findsNothing);
   });

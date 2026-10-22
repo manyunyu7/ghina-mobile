@@ -165,6 +165,9 @@ Json foodToWire(FoodLog f) => {
   'tags': f.tags,
   'photoUrl': f.photoUrl,
   'note': f.note,
+  // docs/food-transaction-link.md. Left out while null until the server is
+  // known to store links (SyncEngine, `sync_meta.food_links_seen`).
+  'transactionId': f.transactionId,
 };
 
 // ---------------------------------------------------------------- from wire
@@ -377,6 +380,10 @@ FoodCompanion foodFromWire(Json j) => FoodCompanion(
   photoUrl: Value(_strN(j['photoUrl'])),
   localPhotoPath: const Value(null),
   note: Value(_strN(j['note'])),
+  // A server without links (key absent) keeps the local value.
+  transactionId: j.containsKey('transactionId')
+      ? Value(_strN(j['transactionId']))
+      : const Value.absent(),
   createdAt: _created(j),
   updatedAt: _updated(j),
 );

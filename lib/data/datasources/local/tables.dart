@@ -175,6 +175,7 @@ class Health extends Table with Timestamps {
 
 @DataClassName('FoodRow')
 @TableIndex(name: 'idx_food_date', columns: {#date})
+@TableIndex(name: 'idx_food_tx', columns: {#transactionId})
 class Food extends Table with Timestamps {
   TextColumn get id => text()();
   IntColumn get date => integer().map(epochMs)();
@@ -192,6 +193,10 @@ class Food extends Table with Timestamps {
   /// Device-only: photo waiting to be uploaded. Never sent on the wire.
   TextColumn get localPhotoPath => text().nullable()();
   TextColumn get note => text().nullable()();
+
+  /// v10: the expense this meal was paid with (`docs/food-transaction-link.md`).
+  /// Many food rows may share one transaction; deleting it nulls this.
+  TextColumn get transactionId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -1027,6 +1032,12 @@ class SyncMeta extends Table {
   /// `habits.tools`, `habitLogs.extra`, `food.tags/caloriesMax`, so pushes
   /// leave those keys out ("absent = unchanged") rather than wipe the server's.
   BoolColumn get enrichmentSeen =>
+      boolean().withDefault(const Constant(false))();
+
+  /// v10: a pull delivered a food row carrying `transactionId` (the server
+  /// knows food ⇄ transaction links). Until then a `null` link is left out of
+  /// pushes ("absent = unchanged") so it can't wipe a link made on the web.
+  BoolColumn get foodLinksSeen =>
       boolean().withDefault(const Constant(false))();
 
   @override

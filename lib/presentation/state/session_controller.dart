@@ -110,6 +110,13 @@ class SessionController extends Notifier<SessionState> {
     if (r case Ok(:final value) when ref.mounted) state = SignedIn(value);
     return r;
   }
+
+  /// "Kategori makanan" on the server (needs connectivity); null = automatic.
+  Future<Result<AppUser>> setFoodCategories(List<String>? ids) async {
+    final r = await ref.read(setFoodCategoriesProvider)(ids);
+    if (r case Ok(:final value) when ref.mounted) state = SignedIn(value);
+    return r;
+  }
 }
 
 final sessionControllerProvider =

@@ -62,6 +62,10 @@ class FakeServer implements SyncApi {
   /// (`tools`, `extra`, `tags`, `caloriesMax`) ignored.
   bool preEnrichment = false;
 
+  /// Pretend to be a v9-era server: food rows carry no `transactionId` and a
+  /// pushed one is ignored (`docs/food-transaction-link.md`).
+  bool preFoodLinks = false;
+
   /// Markdown notes of people (never travel through sync).
   final personNotes = <String, String>{};
 
@@ -221,6 +225,7 @@ class FakeServer implements SyncApi {
       out.remove('caloriesMax');
       if (entity == SyncEntity.food) out.remove('tags');
     }
+    if (preFoodLinks && entity == SyncEntity.food) out.remove('transactionId');
     return out;
   }
 
@@ -316,6 +321,19 @@ class FakeServer implements SyncApi {
         out['photos'] = existing?['photos'] ?? <String>[];
       } else if (out['photos'] == null) {
         out['photos'] = <String>[];
+      }
+    }
+    if (e == SyncEntity.food) {
+      // docs/food-transaction-link.md: absent = unchanged; a soft link (not
+      // one of the user's expenses → null).
+      if (preFoodLinks || !out.containsKey('transactionId')) {
+        out['transactionId'] = existing?['transactionId'];
+      }
+      final tx = out['transactionId'] as String?;
+      if (tx != null &&
+          (!_owned(SyncEntity.transactions, tx) ||
+              rows[SyncEntity.transactions]![tx]!['type'] != 'expense')) {
+        out['transactionId'] = null;
       }
     }
     if (e == SyncEntity.taskAreas && out['code'] is String) {
@@ -1192,6 +1210,7 @@ class FakeServer implements SyncApi {
 
   void _detachTransaction(String txId) {
     _nullRef(SyncEntity.notes, 'linkedTransactionId', txId);
+    _nullRef(SyncEntity.food, 'transactionId', txId);
     for (final i in rows[SyncEntity.contentItems]!.values) {
       final sp = i['sponsor'];
       if (sp is Map && sp['transactionId'] == txId) {

@@ -26,6 +26,7 @@ import 'generated_migrations/schema_v4.dart' as v4;
 import 'generated_migrations/schema_v6.dart' as v6;
 import 'generated_migrations/schema_v7.dart' as v7;
 import 'generated_migrations/schema_v8.dart' as v8;
+import 'generated_migrations/schema_v9.dart' as v9;
 
 void main() {
   late SchemaVerifier verifier;
@@ -156,6 +157,76 @@ void main() {
     final schema = await verifier.schemaAt(9);
     final db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, 9);
+    await db.close();
+  });
+
+  for (final from in [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    test('upgrade v$from → v10 yields exactly the v10 schema', () async {
+      final schema = await verifier.schemaAt(from);
+      final db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 10);
+      await db.close();
+    });
+  }
+
+  test('fresh install creates the v10 schema', () async {
+    final schema = await verifier.schemaAt(10);
+    final db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 10);
+    await db.close();
+  });
+
+  test('v9 data survives v9 → v10 on a real file; food rows read unlinked, '
+      'a full pull is scheduled and the link flag starts unseen', () async {
+    final dir = await Directory.systemTemp.createTemp('ghina_migration_v10');
+    final file = File('${dir.path}/ghina.sqlite');
+    addTearDown(() => dir.delete(recursive: true));
+
+    // 1. A v9 database: a meal and an expense, a pending food upsert (no
+    //    `transactionId` key — the v9 app never knew it) and a cursor.
+    final old = v9.DatabaseAtV9(NativeDatabase(file));
+    for (final sql in [
+      "INSERT INTO food (id, date, name, meal, calories, tags, photo_url, created_at, updated_at) "
+          "VALUES ('f1', 1790000000000, 'Nasi contoh', 'lunch', 600, '[\"pedas\"]', '/uploads/abc.jpg', 1, 1)",
+      "INSERT INTO wallets (id, name, type, balance, currency, color, icon, archived, created_at, updated_at) "
+          "VALUES ('w1', 'Tunai', 'cash', 100000, 'IDR', '#58CC02', 'wallet', 0, 1, 1)",
+      "INSERT INTO transactions (id, wallet_id, type, amount, note, date, photos, created_at, updated_at) "
+          "VALUES ('t1', 'w1', 'expense', 25000, 'Warung contoh', 1790000000000, '[\"/uploads/struk.jpg\"]', 1, 1)",
+      "INSERT INTO outbox (mutation_id, entity, op, entity_id, data, is_create, in_flight, client_updated_at) "
+          "VALUES ('m1', 'food', 'upsert', 'f1', '{\"name\":\"Nasi contoh\"}', 0, 0, 2000)",
+      "INSERT INTO sync_meta (id, cursor, epoch, user_id, full_pull_required, enrichment_seen) "
+          "VALUES (1, 1790000000000, 'epoch-1', 'u1', 0, 1)",
+    ]) {
+      await old.customStatement(sql);
+    }
+    await old.close();
+
+    // 2. Open with the current app → onUpgrade(9, 10).
+    final db = AppDatabase(NativeDatabase(file));
+    final f = (await db.select(db.food).getSingle()).toEntity();
+    expect(f.name, 'Nasi contoh');
+    expect(f.calories, 600);
+    expect(f.tags, ['pedas']);
+    expect(f.photoUrl, '/uploads/abc.jpg');
+    expect(f.transactionId, isNull);
+    final t = await db.select(db.transactions).getSingle();
+    expect(t.photos, '["/uploads/struk.jpg"]');
+    expect((await db.select(db.outbox).getSingle()).entityId, 'f1');
+
+    final meta = await db.getMeta();
+    expect(meta.fullPullRequired, isTrue);
+    expect(meta.cursor, 1790000000000);
+    expect(meta.enrichmentSeen, isTrue);
+    expect(meta.foodLinksSeen, isFalse);
+
+    // The new column is writable and indexed lookups work.
+    await (db.update(db.food)..where((x) => x.id.equals('f1'))).write(
+      const FoodCompanion(transactionId: Value('t1')),
+    );
+    final linked = await (db.select(
+      db.food,
+    )..where((x) => x.transactionId.equals('t1'))).get();
+    expect(linked.single.id, 'f1');
     await db.close();
   });
 

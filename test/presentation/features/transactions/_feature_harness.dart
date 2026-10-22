@@ -66,6 +66,8 @@ class _FakeAuth implements AuthRepository {
   @override
   Future<AppUser> updateProfile({String? name, String? currency}) async => user;
   @override
+  Future<AppUser> setFoodCategories(List<String>? ids) async => user;
+  @override
   Future<void> signOut() async {}
   @override
   Stream<void> get sessionExpired => _expired.stream;

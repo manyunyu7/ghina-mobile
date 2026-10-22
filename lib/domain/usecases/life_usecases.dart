@@ -267,27 +267,33 @@ final class CreateFoodLog {
   final FoodRepository _repo;
   final Clock _clock;
 
-  Future<Result<FoodLog>> call(FoodInput input, {String? photoPath}) => guard(
-    () async {
-      final now = _clock.now();
-      final calories = _calories(input.calories);
-      final log = FoodLog(
-        id: newId(),
-        date: input.date,
-        name: requireName(input.name, max: 120),
-        meal: input.meal,
-        mealLabel: input.meal == null ? _mealLabel(input.mealLabel) : null,
-        calories: calories,
-        caloriesMax: _caloriesMax(calories, input.caloriesMax, explicit: true),
-        tags: _foodTags(input.tags ?? const []),
-        note: optionalText(input.note),
-        createdAt: now,
-        updatedAt: now,
-      );
-      await _repo.save(log, newPhotoPath: photoPath);
-      return log;
-    },
-  );
+  /// [transactionId] links the new log to an expense
+  /// (`docs/food-transaction-link.md`; checked by `LinkFoodToTransaction`'s
+  /// callers — the server stores a non-expense id as null).
+  Future<Result<FoodLog>> call(
+    FoodInput input, {
+    String? photoPath,
+    String? transactionId,
+  }) => guard(() async {
+    final now = _clock.now();
+    final calories = _calories(input.calories);
+    final log = FoodLog(
+      id: newId(),
+      date: input.date,
+      name: requireName(input.name, max: 120),
+      meal: input.meal,
+      mealLabel: input.meal == null ? _mealLabel(input.mealLabel) : null,
+      calories: calories,
+      caloriesMax: _caloriesMax(calories, input.caloriesMax, explicit: true),
+      tags: _foodTags(input.tags ?? const []),
+      note: optionalText(input.note),
+      transactionId: transactionId,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _repo.save(log, newPhotoPath: photoPath);
+    return log;
+  });
 }
 
 /// Updates a food log. Pass [photoPath] to replace the photo, or [removePhoto].
@@ -329,6 +335,8 @@ final class UpdateFoodLog {
       photoUrl: keepPhoto ? old.photoUrl : null,
       localPhotoPath: keepPhoto ? old.localPhotoPath : null,
       note: optionalText(input.note),
+      // Links change through LinkFoodToTransaction only.
+      transactionId: old.transactionId,
       createdAt: old.createdAt,
       updatedAt: _clock.now(),
     );

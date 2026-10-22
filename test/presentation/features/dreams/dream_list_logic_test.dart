@@ -56,17 +56,14 @@ DreamStep _s(
   updatedAt: updated ?? _now,
 );
 
-DreamRow _row(
-  Dream d, {
-  List<DreamStep> steps = const [],
-  DateTime? now,
-}) => buildDreamRow(
-  d,
-  steps: steps,
-  metrics: const [],
-  nowMs: (now ?? _now).millisecondsSinceEpoch,
-  today: _today,
-);
+DreamRow _row(Dream d, {List<DreamStep> steps = const [], DateTime? now}) =>
+    buildDreamRow(
+      d,
+      steps: steps,
+      metrics: const [],
+      nowMs: (now ?? _now).millisecondsSinceEpoch,
+      today: _today,
+    );
 
 void main() {
   group('buildDreamRow', () {
@@ -93,7 +90,9 @@ void main() {
     test('done and dropped dreams are never stale or for review', () {
       final old = _now.subtract(const Duration(days: 200));
       for (final s in [DreamStatus.done, DreamStatus.dropped]) {
-        final r = _row(_d('a', status: s, updated: old, tags: ['Perlu-Ditinjau']));
+        final r = _row(
+          _d('a', status: s, updated: old, tags: ['Perlu-Ditinjau']),
+        );
         expect(r.stale, isFalse, reason: s.wire);
         expect(r.needsReview, isFalse, reason: s.wire);
       }
@@ -109,8 +108,9 @@ void main() {
       expect(_row(_d('a', targetDate: '2026-10-09')).overdue, isTrue);
       expect(_row(_d('a', targetDate: '2026-10-10')).overdue, isFalse);
       expect(
-        _row(_d('a', targetDate: '2026-01-01', status: DreamStatus.done))
-            .overdue,
+        _row(
+          _d('a', targetDate: '2026-01-01', status: DreamStatus.done),
+        ).overdue,
         isFalse,
       );
     });
@@ -121,8 +121,10 @@ void main() {
         _s('s2', 'a', 'Langkah contoh dua'),
       ];
       expect(_row(_d('a'), steps: steps).progressPct, 50);
-      expect(_row(_d('a').copyWith(progressManual: 20), steps: steps)
-          .progressPct, 20);
+      expect(
+        _row(_d('a').copyWith(progressManual: 20), steps: steps).progressPct,
+        20,
+      );
       expect(_row(_d('a')).progressPct, isNull);
     });
 
@@ -154,7 +156,12 @@ void main() {
           updated: _now.subtract(const Duration(days: 80)),
         ),
         steps: [
-          _s('s1', 'a', 'Pesan tiket contoh', updated: _now.subtract(const Duration(days: 80))),
+          _s(
+            's1',
+            'a',
+            'Pesan tiket contoh',
+            updated: _now.subtract(const Duration(days: 80)),
+          ),
         ],
       ),
       _row(
@@ -171,8 +178,9 @@ void main() {
       _row(_d('c', title: 'Buku contoh', status: DreamStatus.done)),
     ];
 
-    List<String> ids(DreamFilter f) =>
-        [for (final r in applyDreamFilter(rows, f)) r.id];
+    List<String> ids(DreamFilter f) => [
+      for (final r in applyDreamFilter(rows, f)) r.id,
+    ];
 
     test('an empty filter keeps every row', () {
       expect(ids(DreamFilter.none), ['a', 'b', 'c']);
@@ -205,10 +213,9 @@ void main() {
         ids(const DreamFilter(status: DreamStatus.planned, priority: 1)),
         isEmpty,
       );
-      expect(
-        ids(const DreamFilter(category: 'travel', query: 'contoh')),
-        ['a'],
-      );
+      expect(ids(const DreamFilter(category: 'travel', query: 'contoh')), [
+        'a',
+      ]);
     });
 
     test('allDreamTags is unique, case-insensitive and sorted', () {
@@ -222,27 +229,34 @@ void main() {
 
   group('sorts', () {
     final rows = [
-      _row(_d('a', title: 'Buku contoh', targetDate: '2028-01-31', priority: 3)),
-      _row(_d('b', title: 'Apel contoh', targetDate: '2027-06-30', priority: 1)),
+      _row(
+        _d('a', title: 'Buku contoh', targetDate: '2028-01-31', priority: 3),
+      ),
+      _row(
+        _d('b', title: 'Apel contoh', targetDate: '2027-06-30', priority: 1),
+      ),
       _row(_d('c', title: 'Cermin contoh', priority: 2)),
     ];
 
     test('target: nearest first, undated last', () {
-      expect([
-        for (final r in sortDreamRows(rows, DreamSort.target)) r.id,
-      ], ['b', 'a', 'c']);
+      expect(
+        [for (final r in sortDreamRows(rows, DreamSort.target)) r.id],
+        ['b', 'a', 'c'],
+      );
     });
 
     test('priority: 1 first, unset last', () {
-      expect([
-        for (final r in sortDreamRows(rows, DreamSort.priority)) r.id,
-      ], ['b', 'c', 'a']);
+      expect(
+        [for (final r in sortDreamRows(rows, DreamSort.priority)) r.id],
+        ['b', 'c', 'a'],
+      );
     });
 
     test('title: A to Z', () {
-      expect([
-        for (final r in sortDreamRows(rows, DreamSort.title)) r.id,
-      ], ['b', 'a', 'c']);
+      expect(
+        [for (final r in sortDreamRows(rows, DreamSort.title)) r.id],
+        ['b', 'a', 'c'],
+      );
     });
 
     test('cost: biggest effective cost first, unknown last', () {
@@ -251,9 +265,10 @@ void main() {
         _row(_d('q')),
         _row(_d('r', costEstimate: 900000)),
       ];
-      expect([
-        for (final r in sortDreamRows(costed, DreamSort.cost)) r.id,
-      ], ['r', 'p', 'q']);
+      expect(
+        [for (final r in sortDreamRows(costed, DreamSort.cost)) r.id],
+        ['r', 'p', 'q'],
+      );
     });
   });
 
@@ -264,19 +279,32 @@ void main() {
         _row(_d('b', status: DreamStatus.active)),
       ]);
       expect(cols.map((c) => c.status), DreamStatus.values);
-      expect(cols.firstWhere((c) => c.status == DreamStatus.active).rows.length,
-          2);
-      expect(cols.firstWhere((c) => c.status == DreamStatus.idea).rows, isEmpty);
+      expect(
+        cols.firstWhere((c) => c.status == DreamStatus.active).rows.length,
+        2,
+      );
+      expect(
+        cols.firstWhere((c) => c.status == DreamStatus.idea).rows,
+        isEmpty,
+      );
     });
 
     test('timeline: years, quarters, horizons, then undated last', () {
       final groups = timelineGroups([
         _row(_d('u')),
         _row(_d('h', horizon: DreamHorizon.someday)),
-        _row(_d('q', targetDate: '2027-03-31', precision: TargetPrecision.quarter)),
-        _row(_d('y', targetDate: '2027-12-31', precision: TargetPrecision.year)),
-        _row(_d('m', targetDate: '2026-11-30', precision: TargetPrecision.month)),
-        _row(_d('q2', targetDate: '2027-02-28', precision: TargetPrecision.month)),
+        _row(
+          _d('q', targetDate: '2027-03-31', precision: TargetPrecision.quarter),
+        ),
+        _row(
+          _d('y', targetDate: '2027-12-31', precision: TargetPrecision.year),
+        ),
+        _row(
+          _d('m', targetDate: '2026-11-30', precision: TargetPrecision.month),
+        ),
+        _row(
+          _d('q2', targetDate: '2027-02-28', precision: TargetPrecision.month),
+        ),
       ]);
       expect(groups.map((g) => g.key), [
         '2026-Q4',

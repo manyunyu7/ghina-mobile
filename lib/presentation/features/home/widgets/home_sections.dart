@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/num_safe.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../../domain/game/game.dart' hide MascotMood;
 import '../../../../domain/game/game.dart' as game show MascotMood;
@@ -512,9 +513,11 @@ class SpendingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final top = items.take(4).toList();
-    final restTotal = items.skip(4).fold<double>(0, (s, x) => s + x.total);
-    final restPct = items.skip(4).fold<double>(0, (s, x) => s + x.pct);
-    final total = items.fold<double>(0, (s, x) => s + x.total);
+    final restTotal = items
+        .skip(4)
+        .fold<double>(0, (s, x) => s + nonNegative(x.total));
+    final restPct = items.skip(4).fold<double>(0, (s, x) => s + finite(x.pct));
+    final total = items.fold<double>(0, (s, x) => s + nonNegative(x.total));
 
     Widget legend(Color color, String name, double pct) => Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -539,7 +542,7 @@ class SpendingCard extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '${pct.round()}%',
+            '${finite(pct).round()}%',
             style: GhinaType.bodyS.w(900).copyWith(color: g.textSecondary),
           ),
         ],
@@ -566,7 +569,7 @@ class SpendingCard extends StatelessWidget {
                     sections: [
                       for (final c in top)
                         PieChartSectionData(
-                          value: c.total,
+                          value: nonNegative(c.total),
                           color: CategoryColors.parse(c.color),
                           radius: 20,
                           showTitle: false,

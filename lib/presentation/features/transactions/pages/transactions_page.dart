@@ -766,7 +766,7 @@ class _DayCard extends StatelessWidget {
   }
 }
 
-class _SwipeRow extends StatelessWidget {
+class _SwipeRow extends ConsumerWidget {
   const _SwipeRow({
     required this.view,
     required this.currency,
@@ -782,7 +782,10 @@ class _SwipeRow extends StatelessWidget {
   final Future<bool> Function(TransactionView) onDismiss;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final foods = ref.watch(
+      foodByTransactionProvider.select((m) => m[view.id]),
+    );
     return Dismissible(
       key: ValueKey('tx-${view.id}'),
       direction: DismissDirection.endToStart,
@@ -799,6 +802,7 @@ class _SwipeRow extends StatelessWidget {
       child: TransactionRow(
         view: view,
         currency: currency,
+        foods: [for (final f in foods ?? const <FoodLog>[]) f.name],
         onTap: () => onTap(view),
         onLongPress: () => onLongPress(view),
       ),

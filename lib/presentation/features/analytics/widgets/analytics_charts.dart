@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/dates.dart';
 import '../../../../core/formatters.dart';
+import '../../../../core/num_safe.dart';
 import '../../../../domain/usecases/analytics_spending.dart';
 import '../../../design_system/design_system.dart';
+import '../../../shared/widgets/chart_empty.dart';
 import 'analytics_common.dart';
 
 // ------------------------------------------------------------------ helpers
@@ -33,7 +35,8 @@ double _textScale(BuildContext context) =>
     MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
 
 /// Scale for a max value: (interval, maxY).
-({double interval, double maxY}) _scale(double maxV, {int ticks = 3}) {
+({double interval, double maxY}) _scale(double rawMax, {int ticks = 3}) {
+  final maxV = finite(rawMax);
   final interval = niceStep((maxV <= 0 ? 1 : maxV) / ticks);
   final maxY = maxV <= 0
       ? interval * ticks
@@ -158,7 +161,7 @@ class _SpendDonutState extends State<SpendDonut> {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final slices = topWithOther(widget.rows, top: widget.top);
-    final total = slices.fold<double>(0, (s, r) => s + r.total);
+    final total = slices.fold<double>(0, (s, r) => s + nonNegative(r.total));
     final t = _touched;
     final focus = t != null && t < slices.length ? slices[t] : null;
     final legend = _showAll ? widget.rows : slices;
@@ -188,7 +191,7 @@ class _SpendDonutState extends State<SpendDonut> {
                   sections: [
                     for (var i = 0; i < slices.length; i++)
                       PieChartSectionData(
-                        value: slices[i].total,
+                        value: nonNegative(slices[i].total),
                         color: t == null || t == i
                             ? _catColor(slices[i].color)
                             : _catColor(
@@ -375,7 +378,11 @@ class SpendTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     height: height,
-    child: stacked ? _stacked(context) : _line(context),
+    child: buckets.isEmpty
+        ? const ChartEmpty()
+        : stacked
+        ? _stacked(context)
+        : _line(context),
   );
 
   List<String> get _labels => [
@@ -389,7 +396,7 @@ class SpendTrendChart extends StatelessWidget {
     final hasPrev = buckets.any((b) => b.previous != null);
     final maxV = buckets.fold<double>(
       0,
-      (m, b) => math.max(m, math.max(b.total, b.previous ?? 0)),
+      (m, b) => math.max(m, math.max(finite(b.total), finite(b.previous ?? 0))),
     );
     final s = _scale(maxV);
     final cut = cutoff;
@@ -397,7 +404,7 @@ class SpendTrendChart extends StatelessWidget {
       spots: [
         for (var i = 0; i < n; i++)
           if (cut == null || !buckets[i].start.isAfter(cut))
-            FlSpot(i.toDouble(), buckets[i].total),
+            FlSpot(i.toDouble(), finite(buckets[i].total)),
       ],
       isCurved: n > 2,
       curveSmoothness: 0.25,
@@ -426,7 +433,7 @@ class SpendTrendChart extends StatelessWidget {
     final ghost = LineChartBarData(
       spots: [
         for (var i = 0; i < n; i++)
-          FlSpot(i.toDouble(), buckets[i].previous ?? 0),
+          FlSpot(i.toDouble(), finite(buckets[i].previous ?? 0)),
       ],
       isCurved: n > 2,
       curveSmoothness: 0.25,
@@ -517,7 +524,10 @@ class SpendTrendChart extends StatelessWidget {
     final otherColor = g.isDark
         ? const Color(0xFF64748B)
         : const Color(0xFFB8C2CF);
-    final maxV = buckets.fold<double>(0, (m, b) => math.max(m, b.total));
+    final maxV = buckets.fold<double>(
+      0,
+      (m, b) => math.max(m, finite(b.total)),
+    );
     final s = _scale(maxV);
     return LayoutBuilder(
       builder: (context, box) {
@@ -572,23 +582,24 @@ class SpendTrendChart extends StatelessWidget {
               for (var i = 0; i < n; i++)
                 () {
                   final b = buckets[i];
+                  final total = finite(b.total);
                   var from = 0.0;
                   final items = <BarChartRodStackItem>[];
                   for (var k = 0; k < keys.length; k++) {
-                    final v = b.byKey[keys[k]] ?? 0;
+                    final v = finite(b.byKey[keys[k]] ?? 0);
                     if (v <= 0) continue;
                     items.add(BarChartRodStackItem(from, from + v, colors[k]));
                     from += v;
                   }
-                  final rest = b.total - from;
+                  final rest = total - from;
                   if (rest > 0.0001) {
-                    items.add(BarChartRodStackItem(from, b.total, otherColor));
+                    items.add(BarChartRodStackItem(from, total, otherColor));
                   }
                   return BarChartGroupData(
                     x: i,
                     barRods: [
                       BarChartRodData(
-                        toY: b.total,
+                        toY: total,
                         width: rodW,
                         color: otherColor,
                         rodStackItems: items,
@@ -648,9 +659,13 @@ class PatternBarChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final sw = color ?? GhinaColors.red;
-    final n = values.length;
-    final maxV = values.fold<double>(0, math.max);
-    final peak = maxV > 0 ? values.indexOf(maxV) : -1;
+    if (values.isEmpty) {
+      return SizedBox(height: height, child: const ChartEmpty());
+    }
+    final vals = [for (final v in values) finite(v)];
+    final n = vals.length;
+    final maxV = vals.fold<double>(0, math.max);
+    final peak = maxV > 0 ? vals.indexOf(maxV) : -1;
     final s = _scale(maxV);
     return SizedBox(
       height: height,
@@ -699,7 +714,7 @@ class PatternBarChart extends StatelessWidget {
                     x: i,
                     barRods: [
                       BarChartRodData(
-                        toY: values[i],
+                        toY: vals[i],
                         width: rodW,
                         color: i == peak
                             ? sw.base
@@ -739,10 +754,13 @@ class IncomeExpenseBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    if (buckets.isEmpty) {
+      return SizedBox(height: height, child: const ChartEmpty());
+    }
     final n = buckets.length;
     final maxV = buckets.fold<double>(
       0,
-      (m, b) => math.max(m, math.max(b.income, b.expense)),
+      (m, b) => math.max(m, math.max(finite(b.income), finite(b.expense))),
     );
     final s = _scale(maxV);
     final labels = [for (final b in buckets) bucketLabel(b.start, granularity)];
@@ -816,8 +834,8 @@ class IncomeExpenseBars extends StatelessWidget {
                     x: i,
                     barsSpace: math.min(3, rodW / 3),
                     barRods: [
-                      rod(buckets[i].income, GhinaColors.green.base),
-                      rod(buckets[i].expense, GhinaColors.red.base),
+                      rod(finite(buckets[i].income), GhinaColors.green.base),
+                      rod(finite(buckets[i].expense), GhinaColors.red.base),
                     ],
                   ),
               ],
@@ -849,11 +867,14 @@ class CumulativeFlowLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    if (buckets.isEmpty) {
+      return SizedBox(height: height, child: const ChartEmpty());
+    }
     final n = buckets.length;
     final cum = <double>[];
     var run = 0.0;
     for (final b in buckets) {
-      run += b.net;
+      run += finite(b.net);
       cum.add(run);
     }
     final maxV = cum.fold<double>(0, math.max);
@@ -982,7 +1003,7 @@ class _SpendHeatmapState extends State<SpendHeatmap> {
 
   /// 0 = none, 1–4 = intensity (square-root scale so small days still show).
   static int level(double v, double max) {
-    if (v <= 0 || max <= 0) return 0;
+    if (!v.isFinite || !max.isFinite || v <= 0 || max <= 0) return 0;
     return (math.sqrt(v / max) * 4).ceil().clamp(1, 4);
   }
 
@@ -999,10 +1020,13 @@ class _SpendHeatmapState extends State<SpendHeatmap> {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final m = _month;
-    final max = widget.daily.values.fold<double>(0, math.max);
+    final max = widget.daily.values.fold<double>(
+      0,
+      (m, v) => math.max(m, finite(v)),
+    );
     final monthTotal = widget.daily.entries
         .where((e) => e.key.startsWith('$m'))
-        .fold<double>(0, (s, e) => s + e.value);
+        .fold<double>(0, (s, e) => s + finite(e.value));
     final lead = m.start.weekday - 1;
     final dim = daysInMonth(m.year, m.month);
     final cells = lead + dim;
@@ -1155,7 +1179,7 @@ class _SpendHeatmapState extends State<SpendHeatmap> {
     if (day < 1 || day > dim) return const SizedBox(height: 40);
     final d = DateTime(m.year, m.month, day);
     final inPeriod = widget.period.contains(d);
-    final v = widget.daily[dateKey(d)] ?? 0;
+    final v = finite(widget.daily[dateKey(d)] ?? 0);
     final l = inPeriod ? level(v, max) : 0;
     final selected = _selected != null && isSameDay(_selected!, d);
     final today = isSameDay(d, widget.now);
@@ -1290,7 +1314,7 @@ class HBarRow extends StatelessWidget {
                           ),
                         ),
                         TweenAnimationBuilder<double>(
-                          tween: Tween(end: fraction.clamp(0.0, 1.0)),
+                          tween: Tween(end: finite(fraction).clamp(0.0, 1.0)),
                           duration: GhinaMotion.progress,
                           curve: GhinaMotion.standard,
                           builder: (context, f, _) => Container(

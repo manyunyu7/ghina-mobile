@@ -54,6 +54,16 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<AppUser> refreshProfile() async => stored ?? user;
   @override
+  Future<AppUser> setFoodCategories(List<String>? ids) async =>
+      stored = AppUser(
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        currency: user.currency,
+        syncEpoch: user.syncEpoch,
+        foodCategoryIds: ids,
+      );
+  @override
   Future<AppUser> updateProfile({String? name, String? currency}) async =>
       stored = AppUser(
         id: user.id,

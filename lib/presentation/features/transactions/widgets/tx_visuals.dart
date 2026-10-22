@@ -127,9 +127,14 @@ class TransactionRow extends StatelessWidget {
     required this.currency,
     this.onTap,
     this.onLongPress,
+    this.foods = const [],
   });
 
   final TransactionView view;
+
+  /// Menus of the food logs this transaction carries
+  /// (`docs/food-transaction-link.md`), shown as a small marker.
+  final List<String> foods;
 
   /// Fallback currency when the wallet is unknown.
   final String currency;
@@ -164,11 +169,12 @@ class TransactionRow extends StatelessWidget {
       framed: false,
       leading: TxAvatar(view: view, size: 42),
       title: view.title,
-      titleWidget: photos.isEmpty
+      titleWidget: photos.isEmpty && foods.isEmpty
           ? null
           : Row(
               children: [
                 Flexible(
+                  flex: 3,
                   child: Text(
                     view.title,
                     maxLines: 1,
@@ -178,19 +184,28 @@ class TransactionRow extends StatelessWidget {
                         .copyWith(color: context.ghina.textPrimary),
                   ),
                 ),
-                const SizedBox(width: 6),
-                MediaQuery.withClampedTextScaling(
-                  maxScaleFactor: 1.15,
-                  child: PhotoCountBadge(
-                    key: ValueKey('tx-photos-${view.id}'),
-                    count: photos.length,
-                    onTap: () => showPhotoViewer(
-                      context,
-                      viewerPhotos(photos),
-                      heroScope: 'row-${view.id}',
+                if (photos.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  MediaQuery.withClampedTextScaling(
+                    maxScaleFactor: 1.15,
+                    child: PhotoCountBadge(
+                      key: ValueKey('tx-photos-${view.id}'),
+                      count: photos.length,
+                      onTap: () => showPhotoViewer(
+                        context,
+                        viewerPhotos(photos),
+                        heroScope: 'row-${view.id}',
+                      ),
                     ),
                   ),
-                ),
+                ],
+                if (foods.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    flex: 2,
+                    child: _FoodMarker(id: view.id, foods: foods),
+                  ),
+                ],
               ],
             ),
       subtitle: _subtitle,
@@ -205,6 +220,50 @@ class TransactionRow extends StatelessWidget {
           currency: view.wallet?.currency ?? currency,
           style: GhinaType.moneyM,
         ),
+      ),
+    );
+  }
+}
+
+/// "🍽 Nasi goreng +1": the transaction carries food logs.
+class _FoodMarker extends StatelessWidget {
+  const _FoodMarker({required this.id, required this.foods});
+
+  final String id;
+  final List<String> foods;
+
+  @override
+  Widget build(BuildContext context) {
+    final sw = GhinaColors.orange;
+    return Container(
+      key: ValueKey('tx-food-$id'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: sw.tint(context.ghina.brightness),
+        borderRadius: GhinaRadii.rPill,
+      ),
+      // One Text (icon as a WidgetSpan) so it ellipsizes instead of
+      // overflowing when the title leaves little room.
+      child: Text.rich(
+        TextSpan(
+          children: [
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 3),
+                child: Icon(Icons.restaurant_rounded, size: 12, color: sw.base),
+              ),
+            ),
+            TextSpan(
+              text: foods.length > 1
+                  ? '${foods.first} +${foods.length - 1}'
+                  : foods.first,
+            ),
+          ],
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GhinaType.caption.w(800).copyWith(color: sw.base),
       ),
     );
   }

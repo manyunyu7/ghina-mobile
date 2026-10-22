@@ -15,10 +15,16 @@ import '../../../../domain/usecases/usecases.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/rewards/rewards.dart';
+import '../../../state/session_controller.dart' show currencyProvider;
+import '../../transactions/widgets/tx_visuals.dart' show lastUsedWalletProvider;
+import '../widgets/food_link_widgets.dart';
 import '../widgets/food_photo.dart';
 
 /// Log or edit a meal: photo (camera/gallery, compressed), name, meal type,
-/// calories, date and note.
+/// calories, date and note. A new meal can also be recorded as an expense
+/// (price → "Catat juga sebagai pengeluaran", on by default) or linked to an
+/// existing one; an existing meal shows its linked expense
+/// (`docs/food-transaction-link.md`).
 class FoodFormPage extends ConsumerStatefulWidget {
   const FoodFormPage({super.key, this.id});
 
@@ -38,6 +44,14 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
   List<String> _tags = const [];
   final _note = TextEditingController();
   final _dateText = TextEditingController();
+  final _price = TextEditingController();
+
+  /// New meal: record the price as an expense too (default on), or link
+  /// [_linkTxId] — an existing expense — instead.
+  bool _alsoExpense = true;
+  String? _expenseWalletId;
+  String? _expenseCategoryId;
+  String? _linkTxId;
 
   DateTime? _date;
   FoodLog? _existing;
@@ -59,6 +73,7 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
       _tagInput,
       _note,
       _dateText,
+      _price,
     ]) {
       c.dispose();
     }
@@ -204,17 +219,40 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
       tags: _tags,
       note: _note.text,
     );
+    final wantsExpense =
+        !_isEdit &&
+        _linkTxId == null &&
+        _alsoExpense &&
+        (parseAmountInput(_price.text) ?? 0) > 0;
+    final expense = wantsExpense ? _expenseInput() : null;
+    if (wantsExpense && expense == null) {
+      showErrorToast(context, 'Bikin dompet dulu buat mencatat pengeluaran');
+      return;
+    }
     setState(() => _saving = true);
     final rewards = RewardTracker.start(ref);
-    final r = _isEdit
+    final Result<Object> r = _isEdit
         ? await ref.read(updateFoodLogProvider)(
             widget.id!,
             input,
             photoPath: _pickedPath,
             removePhoto: _removePhoto && _pickedPath == null,
           )
-        : await ref.read(createFoodLogProvider)(input, photoPath: _pickedPath);
+        : expense != null
+        ? await ref.read(createFoodWithExpenseProvider)(
+            input,
+            expense,
+            photoPath: _pickedPath,
+          )
+        : await ref.read(createFoodLogProvider)(
+            input,
+            photoPath: _pickedPath,
+            transactionId: _linkTxId,
+          );
     if (!mounted) return;
+    if (r.isOk && expense != null) {
+      ref.read(lastUsedWalletProvider.notifier).set(expense.walletId);
+    }
     switch (r) {
       case Ok():
         if (_isEdit) {
@@ -241,6 +279,192 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
         });
         showErrorToast(context, failure.message);
     }
+  }
+
+  // ------------------------------------------------------------- link / price
+
+  List<Wallet> get _wallets =>
+      ref.read(watchWalletsProvider).value ?? const <Wallet>[];
+
+  String? _walletIdOrDefault() {
+    final ids = {for (final w in _wallets) w.id};
+    for (final id in [_expenseWalletId, ref.read(lastUsedWalletProvider)]) {
+      if (id != null && ids.contains(id)) return id;
+    }
+    return _wallets.firstOrNull?.id;
+  }
+
+  String? _categoryIdOrDefault() {
+    if (_expenseCategoryId case final id?) return id.isEmpty ? null : id;
+    return defaultFoodCategoryId(
+      ref.read(watchCategoriesProvider(CategoryType.expense)).value ??
+          const <TxCategory>[],
+      ref.read(foodCategoryIdsProvider),
+    );
+  }
+
+  /// The expense to record with a new meal (the price is > 0), or null when
+  /// there is no wallet to take it from.
+  FoodExpenseInput? _expenseInput() {
+    final walletId = _walletIdOrDefault();
+    if (walletId == null) return null;
+    return FoodExpenseInput(
+      amount: parseAmountInput(_price.text)!,
+      walletId: walletId,
+      categoryId: _categoryIdOrDefault(),
+      note: _name.text,
+    );
+  }
+
+  Future<void> _pickLinkTx() async {
+    final id = await showLinkTransactionSheet(context, at: _dateOrNow);
+    if (id == null || !mounted) return;
+    if (_isEdit) {
+      await setFoodLink(context, ref, widget.id!, id);
+    } else {
+      setState(() => _linkTxId = id);
+    }
+  }
+
+  Future<void> _pickExpenseWallet() async {
+    final id = await showWalletPickerSheet(
+      context,
+      wallets: _wallets,
+      currency: ref.read(currencyProvider),
+      selectedId: _walletIdOrDefault(),
+    );
+    if (id == null || id.isEmpty || !mounted) return;
+    setState(() => _expenseWalletId = id);
+  }
+
+  Future<void> _pickExpenseCategory() async {
+    final id = await showCategoryPickerSheet(
+      context,
+      categories:
+          ref.read(watchCategoriesProvider(CategoryType.expense)).value ??
+          const <TxCategory>[],
+      selectedId: _categoryIdOrDefault(),
+      noneLabel: 'Tanpa kategori',
+    );
+    if (id == null || !mounted) return;
+    setState(() => _expenseCategoryId = id);
+  }
+
+  /// Price + "Catat juga sebagai pengeluaran" / "Tautkan ke transaksi"
+  /// (new meal), or the linked expense (existing meal).
+  Widget _moneySection() {
+    final g = context.ghina;
+    if (_isEdit) {
+      final txId = _existing?.transactionId;
+      if (txId != null) {
+        return LinkedTransactionCard(
+          transactionId: txId,
+          onUnlink: () => setFoodLink(context, ref, widget.id!, null),
+        );
+      }
+      final suggestion = ref.watch(
+        foodLinkSuggestionForFoodProvider(widget.id!),
+      );
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (suggestion != null) ...[
+            FoodLinkSuggestionCard(suggestion: suggestion),
+            const SizedBox(height: 8),
+          ],
+          ChunkyButton(
+            key: const ValueKey('food-link-pick'),
+            label: 'Tautkan ke transaksi',
+            icon: Icons.link_rounded,
+            variant: ChunkyButtonVariant.outline,
+            onPressed: _pickLinkTx,
+          ),
+        ],
+      );
+    }
+    if (_linkTxId case final id?) {
+      return LinkedTransactionCard(
+        transactionId: id,
+        onUnlink: () => setState(() => _linkTxId = null),
+      );
+    }
+    // Watched so the defaults below are ready when the user saves.
+    final wallets = ref.watch(watchWalletsProvider).value ?? const <Wallet>[];
+    final cats =
+        ref.watch(watchCategoriesProvider(CategoryType.expense)).value ??
+        const <TxCategory>[];
+    ref.watch(foodCategoryIdsProvider);
+    final walletId = _walletIdOrDefault();
+    final wallet = wallets.where((w) => w.id == walletId).firstOrNull;
+    final catId = _categoryIdOrDefault();
+    final cat = cats.where((c) => c.id == catId).firstOrNull;
+    final hasPrice = (parseAmountInput(_price.text) ?? 0) > 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AmountField(
+          key: const ValueKey('food-price'),
+          controller: _price,
+          currency: wallet?.currency ?? ref.watch(currencyProvider),
+          label: 'Harga (opsional)',
+          onChanged: (_) => setState(() {}),
+        ),
+        if (hasPrice) ...[
+          SwitchListTile(
+            key: const ValueKey('food-also-expense'),
+            value: _alsoExpense,
+            onChanged: (v) => setState(() => _alsoExpense = v),
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'Catat juga sebagai pengeluaran',
+              style: GhinaType.body.w(800),
+            ),
+            subtitle: Text(
+              'Langsung masuk ke transaksi & tertaut ke makanan ini',
+              style: GhinaType.caption.copyWith(color: g.textMuted),
+            ),
+          ),
+          if (_alsoExpense) ...[
+            PickerField(
+              key: const ValueKey('food-expense-wallet'),
+              label: 'Dompet',
+              value: wallet?.name,
+              placeholder: 'Pilih dompet',
+              leading: wallet == null
+                  ? null
+                  : WalletAvatar(wallet: wallet, size: 28),
+              onTap: _pickExpenseWallet,
+            ),
+            const SizedBox(height: 10),
+            PickerField(
+              key: const ValueKey('food-expense-category'),
+              label: 'Kategori',
+              value: cat?.name,
+              placeholder: 'Tanpa kategori',
+              leading: cat == null
+                  ? null
+                  : CategoryAvatar(
+                      iconName: cat.icon,
+                      colorHex: cat.color,
+                      size: 28,
+                    ),
+              onTap: _pickExpenseCategory,
+            ),
+          ],
+        ],
+        const SizedBox(height: 8),
+        ChunkyButton(
+          key: const ValueKey('food-link-pick'),
+          label: hasPrice && _alsoExpense
+              ? 'Atau tautkan ke transaksi yang sudah ada'
+              : 'Tautkan ke transaksi',
+          icon: Icons.link_rounded,
+          size: ChunkyButtonSize.small,
+          variant: ChunkyButtonVariant.ghost,
+          onPressed: _pickLinkTx,
+        ),
+      ],
+    );
   }
 
   Future<void> _delete() async {
@@ -629,6 +853,10 @@ class _FoodFormPageState extends ConsumerState<FoodFormPage> {
           prefixIcon: Icons.event_rounded,
           onTap: _pickDate,
         ),
+        const SizedBox(height: 16),
+        Text(_isEdit ? 'Pengeluaran' : 'Harga', style: GhinaType.h3),
+        const SizedBox(height: 8),
+        _moneySection(),
         const SizedBox(height: 16),
         _tagsEditor(),
         const SizedBox(height: 16),

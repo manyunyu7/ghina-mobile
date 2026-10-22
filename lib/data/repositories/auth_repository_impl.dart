@@ -106,6 +106,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AppUser> setFoodCategories(List<String>? ids) async {
+    final u = await _api.setFoodCategories(ids);
+    await _cache(u);
+    return u;
+  }
+
+  @override
   Future<void> signOut() async {
     await _tokens.clear();
     await _db.wipe(includeMeta: true);

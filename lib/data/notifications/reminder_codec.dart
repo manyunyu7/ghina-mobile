@@ -97,15 +97,19 @@ class ReminderPayload {
   }
 }
 
-/// Route to open for a tapped notification: task reminders and Reminder
-/// Sholat (`{"kind":"prayer_reminder","r":"/prayers",…}`). Null otherwise.
+/// Route to open for a tapped notification: task reminders, Reminder Sholat
+/// (`{"kind":"prayer_reminder","r":"/prayers",…}`) and Kantor Claude notices
+/// (`{"kind":"kantor","r":"/kantor/o/<office>/s/<sid>"}`). Null otherwise.
 String? notificationRouteOf(String? raw) {
   final task = ReminderPayload.tryDecode(raw);
   if (task != null) return task.route;
   if (raw == null || raw.isEmpty) return null;
   try {
     final m = jsonDecode(raw);
-    if (m is Map && m['kind'] == 'prayer_reminder' && m['r'] is String) {
+    // Prayer reminders and Kantor Claude notices carry their route in `r`.
+    if (m is Map &&
+        (m['kind'] == 'prayer_reminder' || m['kind'] == 'kantor') &&
+        m['r'] is String) {
       return m['r'] as String;
     }
   } on FormatException {

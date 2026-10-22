@@ -31,6 +31,14 @@ import '../presentation/features/email/pages/email_inbox_page.dart';
 import '../presentation/features/email/pages/email_page.dart';
 import '../presentation/features/email/pages/email_review_page.dart';
 import '../presentation/features/email/pages/email_rules_page.dart';
+import '../presentation/features/kantor/pages/kantor_complex_page.dart';
+import '../presentation/features/kantor/pages/kantor_settings_page.dart';
+import '../presentation/features/kantor/wizard/kantor_wizard_page.dart';
+import '../presentation/features/kantor/pages/kantor_shell_page.dart';
+import '../presentation/features/kantor/session/kantor_session_page.dart';
+import '../presentation/features/kantor/pratinjau/pratinjau_detail.dart';
+import '../presentation/features/kantor/pratinjau/pratinjau_feed.dart';
+import '../presentation/features/kantor/sysmon/kantor_sysmon_page.dart';
 import '../presentation/features/killa/pages/killa_chat_page.dart';
 import '../presentation/features/killa/pages/killa_commits_page.dart';
 import '../presentation/features/killa/pages/killa_file_page.dart';
@@ -61,6 +69,7 @@ import '../presentation/features/reports/pages/reports_page.dart';
 import '../presentation/features/settings/pages/appearance_page.dart';
 import '../presentation/features/settings/pages/mascot_picker_page.dart';
 import '../presentation/features/settings/pages/settings_page.dart';
+import '../presentation/features/settings/pages/error_log_page.dart';
 import '../presentation/features/settings/pages/sync_page.dart';
 import '../presentation/features/shell/app_shell.dart';
 import '../presentation/features/subscriptions/pages/subscription_form_page.dart';
@@ -383,6 +392,52 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const KillaRemindersPage(),
       ),
       GoRoute(path: '/killa/usage', builder: (_, _) => const KillaUsagePage()),
+      // Kantor Claude (native client of the office daemon) — online-only.
+      GoRoute(
+        path: '/kantor',
+        builder: (_, _) => const KantorComplexPage(),
+        routes: [
+          GoRoute(
+            path: 'settings',
+            builder: (_, _) => const KantorSettingsPage(),
+          ),
+          GoRoute(path: 'new', builder: (_, _) => const KantorWizardPage()),
+          GoRoute(path: 'pc', builder: (_, _) => const KantorSysmonPage()),
+          GoRoute(
+            path: 'o/:office',
+            builder: (_, s) => KantorShellPage(
+              officeId: s.pathParameters['office']!,
+              tab: s.uri.queryParameters['tab'],
+            ),
+            routes: [
+              GoRoute(
+                path: 's/:sid',
+                builder: (_, s) => KantorSessionPage(
+                  officeId: s.pathParameters['office']!,
+                  sid: s.pathParameters['sid']!,
+                  tab: s.uri.queryParameters['tab'],
+                ),
+              ),
+              GoRoute(
+                path: 'pratinjau',
+                builder: (_, s) => KantorPratinjauPage(
+                  officeId: s.pathParameters['office']!,
+                ),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    builder: (_, s) => KantorPratinjauDetailPage(
+                      officeId: s.pathParameters['office']!,
+                      itemId: s.pathParameters['id']!,
+                      fileId: s.uri.queryParameters['f'],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
       GoRoute(path: '/prayers', builder: (_, _) => const PrayersPage()),
       GoRoute(
         path: '/prayers/report',
@@ -434,6 +489,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const AppearancePage(),
       ),
       GoRoute(path: '/sync', builder: (_, _) => const SyncPage()),
+      GoRoute(
+        path: '/settings/errors',
+        builder: (_, _) => const ErrorLogPage(),
+      ),
     ],
   );
 });

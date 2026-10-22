@@ -56,22 +56,19 @@ Stream<Map<String, List<T>>> _watchPerDream<T>(
   Stream<List<T>> Function(String dreamId) watchFor,
 ) => Stream.multi((out) {
   StreamSubscription<Object?>? inner;
-  final outer = dreams.listen(
-    (list) {
-      inner?.cancel();
-      inner = null;
-      final ids = [for (final d in list) d.id];
-      if (ids.isEmpty) {
-        out.add(const {});
-        return;
-      }
-      inner = combineLatestList<Map<String, List<T>>>(
-        [for (final id in ids) watchFor(id)],
-        (v) => {for (final (i, id) in ids.indexed) id: v[i] as List<T>},
-      ).listen(out.add, onError: out.addError);
-    },
-    onError: out.addError,
-  );
+  final outer = dreams.listen((list) {
+    inner?.cancel();
+    inner = null;
+    final ids = [for (final d in list) d.id];
+    if (ids.isEmpty) {
+      out.add(const {});
+      return;
+    }
+    inner = combineLatestList<Map<String, List<T>>>(
+      [for (final id in ids) watchFor(id)],
+      (v) => {for (final (i, id) in ids.indexed) id: v[i] as List<T>},
+    ).listen(out.add, onError: out.addError);
+  }, onError: out.addError);
   out.onCancel = () {
     inner?.cancel();
     outer.cancel();

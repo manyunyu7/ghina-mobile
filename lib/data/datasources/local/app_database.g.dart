@@ -4857,6 +4857,17 @@ class $FoodTable extends Food with TableInfo<$FoodTable, FoodRow> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _transactionIdMeta = const VerificationMeta(
+    'transactionId',
+  );
+  @override
+  late final GeneratedColumn<String> transactionId = GeneratedColumn<String>(
+    'transaction_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     createdAt,
@@ -4871,6 +4882,7 @@ class $FoodTable extends Food with TableInfo<$FoodTable, FoodRow> {
     photoUrl,
     localPhotoPath,
     note,
+    transactionId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4945,6 +4957,15 @@ class $FoodTable extends Food with TableInfo<$FoodTable, FoodRow> {
         note.isAcceptableOrUnknown(data['note']!, _noteMeta),
       );
     }
+    if (data.containsKey('transaction_id')) {
+      context.handle(
+        _transactionIdMeta,
+        transactionId.isAcceptableOrUnknown(
+          data['transaction_id']!,
+          _transactionIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -5008,6 +5029,10 @@ class $FoodTable extends Food with TableInfo<$FoodTable, FoodRow> {
         DriftSqlType.string,
         data['${effectivePrefix}note'],
       ),
+      transactionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transaction_id'],
+      ),
     );
   }
 
@@ -5040,6 +5065,10 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
   /// Device-only: photo waiting to be uploaded. Never sent on the wire.
   final String? localPhotoPath;
   final String? note;
+
+  /// v10: the expense this meal was paid with (`docs/food-transaction-link.md`).
+  /// Many food rows may share one transaction; deleting it nulls this.
+  final String? transactionId;
   const FoodRow({
     required this.createdAt,
     required this.updatedAt,
@@ -5053,6 +5082,7 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
     this.photoUrl,
     this.localPhotoPath,
     this.note,
+    this.transactionId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5091,6 +5121,9 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
+    if (!nullToAbsent || transactionId != null) {
+      map['transaction_id'] = Variable<String>(transactionId);
+    }
     return map;
   }
 
@@ -5116,6 +5149,9 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
           ? const Value.absent()
           : Value(localPhotoPath),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      transactionId: transactionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transactionId),
     );
   }
 
@@ -5137,6 +5173,7 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
       photoUrl: serializer.fromJson<String?>(json['photoUrl']),
       localPhotoPath: serializer.fromJson<String?>(json['localPhotoPath']),
       note: serializer.fromJson<String?>(json['note']),
+      transactionId: serializer.fromJson<String?>(json['transactionId']),
     );
   }
   @override
@@ -5155,6 +5192,7 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
       'photoUrl': serializer.toJson<String?>(photoUrl),
       'localPhotoPath': serializer.toJson<String?>(localPhotoPath),
       'note': serializer.toJson<String?>(note),
+      'transactionId': serializer.toJson<String?>(transactionId),
     };
   }
 
@@ -5171,6 +5209,7 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
     Value<String?> photoUrl = const Value.absent(),
     Value<String?> localPhotoPath = const Value.absent(),
     Value<String?> note = const Value.absent(),
+    Value<String?> transactionId = const Value.absent(),
   }) => FoodRow(
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -5186,6 +5225,9 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
         ? localPhotoPath.value
         : this.localPhotoPath,
     note: note.present ? note.value : this.note,
+    transactionId: transactionId.present
+        ? transactionId.value
+        : this.transactionId,
   );
   FoodRow copyWithCompanion(FoodCompanion data) {
     return FoodRow(
@@ -5205,6 +5247,9 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
           ? data.localPhotoPath.value
           : this.localPhotoPath,
       note: data.note.present ? data.note.value : this.note,
+      transactionId: data.transactionId.present
+          ? data.transactionId.value
+          : this.transactionId,
     );
   }
 
@@ -5222,7 +5267,8 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
           ..write('tags: $tags, ')
           ..write('photoUrl: $photoUrl, ')
           ..write('localPhotoPath: $localPhotoPath, ')
-          ..write('note: $note')
+          ..write('note: $note, ')
+          ..write('transactionId: $transactionId')
           ..write(')'))
         .toString();
   }
@@ -5241,6 +5287,7 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
     photoUrl,
     localPhotoPath,
     note,
+    transactionId,
   );
   @override
   bool operator ==(Object other) =>
@@ -5257,7 +5304,8 @@ class FoodRow extends DataClass implements Insertable<FoodRow> {
           other.tags == this.tags &&
           other.photoUrl == this.photoUrl &&
           other.localPhotoPath == this.localPhotoPath &&
-          other.note == this.note);
+          other.note == this.note &&
+          other.transactionId == this.transactionId);
 }
 
 class FoodCompanion extends UpdateCompanion<FoodRow> {
@@ -5273,6 +5321,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
   final Value<String?> photoUrl;
   final Value<String?> localPhotoPath;
   final Value<String?> note;
+  final Value<String?> transactionId;
   final Value<int> rowid;
   const FoodCompanion({
     this.createdAt = const Value.absent(),
@@ -5287,6 +5336,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
     this.photoUrl = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     this.note = const Value.absent(),
+    this.transactionId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FoodCompanion.insert({
@@ -5302,6 +5352,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
     this.photoUrl = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     this.note = const Value.absent(),
+    this.transactionId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : createdAt = Value(createdAt),
        updatedAt = Value(updatedAt),
@@ -5321,6 +5372,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
     Expression<String>? photoUrl,
     Expression<String>? localPhotoPath,
     Expression<String>? note,
+    Expression<String>? transactionId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5336,6 +5388,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
       if (photoUrl != null) 'photo_url': photoUrl,
       if (localPhotoPath != null) 'local_photo_path': localPhotoPath,
       if (note != null) 'note': note,
+      if (transactionId != null) 'transaction_id': transactionId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5353,6 +5406,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
     Value<String?>? photoUrl,
     Value<String?>? localPhotoPath,
     Value<String?>? note,
+    Value<String?>? transactionId,
     Value<int>? rowid,
   }) {
     return FoodCompanion(
@@ -5368,6 +5422,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
       photoUrl: photoUrl ?? this.photoUrl,
       localPhotoPath: localPhotoPath ?? this.localPhotoPath,
       note: note ?? this.note,
+      transactionId: transactionId ?? this.transactionId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5415,6 +5470,9 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
+    if (transactionId.present) {
+      map['transaction_id'] = Variable<String>(transactionId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5436,6 +5494,7 @@ class FoodCompanion extends UpdateCompanion<FoodRow> {
           ..write('photoUrl: $photoUrl, ')
           ..write('localPhotoPath: $localPhotoPath, ')
           ..write('note: $note, ')
+          ..write('transactionId: $transactionId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -27468,6 +27527,21 @@ class $SyncMetaTable extends SyncMeta
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _foodLinksSeenMeta = const VerificationMeta(
+    'foodLinksSeen',
+  );
+  @override
+  late final GeneratedColumn<bool> foodLinksSeen = GeneratedColumn<bool>(
+    'food_links_seen',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("food_links_seen" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -27481,6 +27555,7 @@ class $SyncMetaTable extends SyncMeta
     notesSeeded,
     contentSeeded,
     enrichmentSeen,
+    foodLinksSeen,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -27575,6 +27650,15 @@ class $SyncMetaTable extends SyncMeta
         ),
       );
     }
+    if (data.containsKey('food_links_seen')) {
+      context.handle(
+        _foodLinksSeenMeta,
+        foodLinksSeen.isAcceptableOrUnknown(
+          data['food_links_seen']!,
+          _foodLinksSeenMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -27628,6 +27712,10 @@ class $SyncMetaTable extends SyncMeta
         DriftSqlType.bool,
         data['${effectivePrefix}enrichment_seen'],
       )!,
+      foodLinksSeen: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}food_links_seen'],
+      )!,
     );
   }
 
@@ -27669,6 +27757,11 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
   /// `habits.tools`, `habitLogs.extra`, `food.tags/caloriesMax`, so pushes
   /// leave those keys out ("absent = unchanged") rather than wipe the server's.
   final bool enrichmentSeen;
+
+  /// v10: a pull delivered a food row carrying `transactionId` (the server
+  /// knows food ⇄ transaction links). Until then a `null` link is left out of
+  /// pushes ("absent = unchanged") so it can't wipe a link made on the web.
+  final bool foodLinksSeen;
   const SyncMetaRow({
     required this.id,
     required this.cursor,
@@ -27681,6 +27774,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
     required this.notesSeeded,
     required this.contentSeeded,
     required this.enrichmentSeen,
+    required this.foodLinksSeen,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -27704,6 +27798,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
     map['notes_seeded'] = Variable<bool>(notesSeeded);
     map['content_seeded'] = Variable<bool>(contentSeeded);
     map['enrichment_seen'] = Variable<bool>(enrichmentSeen);
+    map['food_links_seen'] = Variable<bool>(foodLinksSeen);
     return map;
   }
 
@@ -27728,6 +27823,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
       notesSeeded: Value(notesSeeded),
       contentSeeded: Value(contentSeeded),
       enrichmentSeen: Value(enrichmentSeen),
+      foodLinksSeen: Value(foodLinksSeen),
     );
   }
 
@@ -27748,6 +27844,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
       notesSeeded: serializer.fromJson<bool>(json['notesSeeded']),
       contentSeeded: serializer.fromJson<bool>(json['contentSeeded']),
       enrichmentSeen: serializer.fromJson<bool>(json['enrichmentSeen']),
+      foodLinksSeen: serializer.fromJson<bool>(json['foodLinksSeen']),
     );
   }
   @override
@@ -27765,6 +27862,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
       'notesSeeded': serializer.toJson<bool>(notesSeeded),
       'contentSeeded': serializer.toJson<bool>(contentSeeded),
       'enrichmentSeen': serializer.toJson<bool>(enrichmentSeen),
+      'foodLinksSeen': serializer.toJson<bool>(foodLinksSeen),
     };
   }
 
@@ -27780,6 +27878,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
     bool? notesSeeded,
     bool? contentSeeded,
     bool? enrichmentSeen,
+    bool? foodLinksSeen,
   }) => SyncMetaRow(
     id: id ?? this.id,
     cursor: cursor ?? this.cursor,
@@ -27792,6 +27891,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
     notesSeeded: notesSeeded ?? this.notesSeeded,
     contentSeeded: contentSeeded ?? this.contentSeeded,
     enrichmentSeen: enrichmentSeen ?? this.enrichmentSeen,
+    foodLinksSeen: foodLinksSeen ?? this.foodLinksSeen,
   );
   SyncMetaRow copyWithCompanion(SyncMetaCompanion data) {
     return SyncMetaRow(
@@ -27818,6 +27918,9 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
       enrichmentSeen: data.enrichmentSeen.present
           ? data.enrichmentSeen.value
           : this.enrichmentSeen,
+      foodLinksSeen: data.foodLinksSeen.present
+          ? data.foodLinksSeen.value
+          : this.foodLinksSeen,
     );
   }
 
@@ -27834,7 +27937,8 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
           ..write('tasksSeeded: $tasksSeeded, ')
           ..write('notesSeeded: $notesSeeded, ')
           ..write('contentSeeded: $contentSeeded, ')
-          ..write('enrichmentSeen: $enrichmentSeen')
+          ..write('enrichmentSeen: $enrichmentSeen, ')
+          ..write('foodLinksSeen: $foodLinksSeen')
           ..write(')'))
         .toString();
   }
@@ -27852,6 +27956,7 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
     notesSeeded,
     contentSeeded,
     enrichmentSeen,
+    foodLinksSeen,
   );
   @override
   bool operator ==(Object other) =>
@@ -27867,7 +27972,8 @@ class SyncMetaRow extends DataClass implements Insertable<SyncMetaRow> {
           other.tasksSeeded == this.tasksSeeded &&
           other.notesSeeded == this.notesSeeded &&
           other.contentSeeded == this.contentSeeded &&
-          other.enrichmentSeen == this.enrichmentSeen);
+          other.enrichmentSeen == this.enrichmentSeen &&
+          other.foodLinksSeen == this.foodLinksSeen);
 }
 
 class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
@@ -27882,6 +27988,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
   final Value<bool> notesSeeded;
   final Value<bool> contentSeeded;
   final Value<bool> enrichmentSeen;
+  final Value<bool> foodLinksSeen;
   const SyncMetaCompanion({
     this.id = const Value.absent(),
     this.cursor = const Value.absent(),
@@ -27894,6 +28001,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
     this.notesSeeded = const Value.absent(),
     this.contentSeeded = const Value.absent(),
     this.enrichmentSeen = const Value.absent(),
+    this.foodLinksSeen = const Value.absent(),
   });
   SyncMetaCompanion.insert({
     this.id = const Value.absent(),
@@ -27907,6 +28015,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
     this.notesSeeded = const Value.absent(),
     this.contentSeeded = const Value.absent(),
     this.enrichmentSeen = const Value.absent(),
+    this.foodLinksSeen = const Value.absent(),
   });
   static Insertable<SyncMetaRow> custom({
     Expression<int>? id,
@@ -27920,6 +28029,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
     Expression<bool>? notesSeeded,
     Expression<bool>? contentSeeded,
     Expression<bool>? enrichmentSeen,
+    Expression<bool>? foodLinksSeen,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -27933,6 +28043,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
       if (notesSeeded != null) 'notes_seeded': notesSeeded,
       if (contentSeeded != null) 'content_seeded': contentSeeded,
       if (enrichmentSeen != null) 'enrichment_seen': enrichmentSeen,
+      if (foodLinksSeen != null) 'food_links_seen': foodLinksSeen,
     });
   }
 
@@ -27948,6 +28059,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
     Value<bool>? notesSeeded,
     Value<bool>? contentSeeded,
     Value<bool>? enrichmentSeen,
+    Value<bool>? foodLinksSeen,
   }) {
     return SyncMetaCompanion(
       id: id ?? this.id,
@@ -27961,6 +28073,7 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
       notesSeeded: notesSeeded ?? this.notesSeeded,
       contentSeeded: contentSeeded ?? this.contentSeeded,
       enrichmentSeen: enrichmentSeen ?? this.enrichmentSeen,
+      foodLinksSeen: foodLinksSeen ?? this.foodLinksSeen,
     );
   }
 
@@ -28000,6 +28113,9 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
     if (enrichmentSeen.present) {
       map['enrichment_seen'] = Variable<bool>(enrichmentSeen.value);
     }
+    if (foodLinksSeen.present) {
+      map['food_links_seen'] = Variable<bool>(foodLinksSeen.value);
+    }
     return map;
   }
 
@@ -28016,7 +28132,8 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaRow> {
           ..write('tasksSeeded: $tasksSeeded, ')
           ..write('notesSeeded: $notesSeeded, ')
           ..write('contentSeeded: $contentSeeded, ')
-          ..write('enrichmentSeen: $enrichmentSeen')
+          ..write('enrichmentSeen: $enrichmentSeen, ')
+          ..write('foodLinksSeen: $foodLinksSeen')
           ..write(')'))
         .toString();
   }
@@ -28103,6 +28220,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxFoodDate = Index(
     'idx_food_date',
     'CREATE INDEX idx_food_date ON food (date)',
+  );
+  late final Index idxFoodTx = Index(
+    'idx_food_tx',
+    'CREATE INDEX idx_food_tx ON food (transaction_id)',
   );
   late final Index idxTaskArea = Index(
     'idx_task_area',
@@ -28249,6 +28370,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxPlannedDate,
     idxHealthDate,
     idxFoodDate,
+    idxFoodTx,
     idxTaskArea,
     idxTaskDue,
     idxNoteUpdated,
@@ -30709,6 +30831,7 @@ typedef $$FoodTableCreateCompanionBuilder =
       Value<String?> photoUrl,
       Value<String?> localPhotoPath,
       Value<String?> note,
+      Value<String?> transactionId,
       Value<int> rowid,
     });
 typedef $$FoodTableUpdateCompanionBuilder =
@@ -30725,6 +30848,7 @@ typedef $$FoodTableUpdateCompanionBuilder =
       Value<String?> photoUrl,
       Value<String?> localPhotoPath,
       Value<String?> note,
+      Value<String?> transactionId,
       Value<int> rowid,
     });
 
@@ -30798,6 +30922,11 @@ class $$FoodTableFilterComposer extends Composer<_$AppDatabase, $FoodTable> {
     column: $table.note,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$FoodTableOrderingComposer extends Composer<_$AppDatabase, $FoodTable> {
@@ -30867,6 +30996,11 @@ class $$FoodTableOrderingComposer extends Composer<_$AppDatabase, $FoodTable> {
     column: $table.note,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FoodTableAnnotationComposer
@@ -30917,6 +31051,11 @@ class $$FoodTableAnnotationComposer
 
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get transactionId => $composableBuilder(
+    column: $table.transactionId,
+    builder: (column) => column,
+  );
 }
 
 class $$FoodTableTableManager
@@ -30959,6 +31098,7 @@ class $$FoodTableTableManager
                 Value<String?> photoUrl = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> transactionId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FoodCompanion(
                 createdAt: createdAt,
@@ -30973,6 +31113,7 @@ class $$FoodTableTableManager
                 photoUrl: photoUrl,
                 localPhotoPath: localPhotoPath,
                 note: note,
+                transactionId: transactionId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -30989,6 +31130,7 @@ class $$FoodTableTableManager
                 Value<String?> photoUrl = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> transactionId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FoodCompanion.insert(
                 createdAt: createdAt,
@@ -31003,6 +31145,7 @@ class $$FoodTableTableManager
                 photoUrl: photoUrl,
                 localPhotoPath: localPhotoPath,
                 note: note,
+                transactionId: transactionId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -41785,6 +41928,7 @@ typedef $$SyncMetaTableCreateCompanionBuilder =
       Value<bool> notesSeeded,
       Value<bool> contentSeeded,
       Value<bool> enrichmentSeen,
+      Value<bool> foodLinksSeen,
     });
 typedef $$SyncMetaTableUpdateCompanionBuilder =
     SyncMetaCompanion Function({
@@ -41799,6 +41943,7 @@ typedef $$SyncMetaTableUpdateCompanionBuilder =
       Value<bool> notesSeeded,
       Value<bool> contentSeeded,
       Value<bool> enrichmentSeen,
+      Value<bool> foodLinksSeen,
     });
 
 class $$SyncMetaTableFilterComposer
@@ -41862,6 +42007,11 @@ class $$SyncMetaTableFilterComposer
 
   ColumnFilters<bool> get enrichmentSeen => $composableBuilder(
     column: $table.enrichmentSeen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get foodLinksSeen => $composableBuilder(
+    column: $table.foodLinksSeen,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -41929,6 +42079,11 @@ class $$SyncMetaTableOrderingComposer
     column: $table.enrichmentSeen,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get foodLinksSeen => $composableBuilder(
+    column: $table.foodLinksSeen,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncMetaTableAnnotationComposer
@@ -41984,6 +42139,11 @@ class $$SyncMetaTableAnnotationComposer
     column: $table.enrichmentSeen,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get foodLinksSeen => $composableBuilder(
+    column: $table.foodLinksSeen,
+    builder: (column) => column,
+  );
 }
 
 class $$SyncMetaTableTableManager
@@ -42028,6 +42188,7 @@ class $$SyncMetaTableTableManager
                 Value<bool> notesSeeded = const Value.absent(),
                 Value<bool> contentSeeded = const Value.absent(),
                 Value<bool> enrichmentSeen = const Value.absent(),
+                Value<bool> foodLinksSeen = const Value.absent(),
               }) => SyncMetaCompanion(
                 id: id,
                 cursor: cursor,
@@ -42040,6 +42201,7 @@ class $$SyncMetaTableTableManager
                 notesSeeded: notesSeeded,
                 contentSeeded: contentSeeded,
                 enrichmentSeen: enrichmentSeen,
+                foodLinksSeen: foodLinksSeen,
               ),
           createCompanionCallback:
               ({
@@ -42054,6 +42216,7 @@ class $$SyncMetaTableTableManager
                 Value<bool> notesSeeded = const Value.absent(),
                 Value<bool> contentSeeded = const Value.absent(),
                 Value<bool> enrichmentSeen = const Value.absent(),
+                Value<bool> foodLinksSeen = const Value.absent(),
               }) => SyncMetaCompanion.insert(
                 id: id,
                 cursor: cursor,
@@ -42066,6 +42229,7 @@ class $$SyncMetaTableTableManager
                 notesSeeded: notesSeeded,
                 contentSeeded: contentSeeded,
                 enrichmentSeen: enrichmentSeen,
+                foodLinksSeen: foodLinksSeen,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -127,6 +127,10 @@ abstract interface class FoodRepository {
   Stream<FoodLog?> watchById(String id);
   Future<FoodLog?> getById(String id);
 
+  /// The food logs linked to a transaction (`docs/food-transaction-link.md`),
+  /// oldest first.
+  Stream<List<FoodLog>> watchByTransaction(String transactionId);
+
   /// Saves the log. When [newPhotoPath] is given, the file is copied into app
   /// storage, stored as `localPhotoPath`, and uploaded before the row is synced.
   Future<void> save(FoodLog log, {String? newPhotoPath});
@@ -402,6 +406,9 @@ abstract interface class AuthRepository {
   /// `GET /me`; refreshes the cached user.
   Future<AppUser> refreshProfile();
   Future<AppUser> updateProfile({String? name, String? currency});
+
+  /// "Kategori makanan": [ids] picked by hand, null = automatic. Online only.
+  Future<AppUser> setFoodCategories(List<String>? ids);
 
   /// Clears the token and wipes all local data.
   Future<void> signOut();

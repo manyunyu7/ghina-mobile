@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Kantor widget; same neutrals as the app's light tokens (ghina_tokens.dart). -->
+    <color name="kantor_widget_bg">#FFFFFFFF</color>
+    <color name="kantor_widget_row">#FFF5F5F7</color>
+    <color name="kantor_widget_text">#FF171717</color>
+    <color name="kantor_widget_text_secondary">#FF6B6B70</color>
+    <color name="kantor_widget_accent">#FFFF8A1F</color>
+</resources>

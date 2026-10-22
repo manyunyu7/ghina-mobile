@@ -11,6 +11,13 @@ AppUser appUserFromJson(Json j) => AppUser(
   image: j['image'] as String?,
   currency: (j['currency'] as String?) ?? 'IDR',
   syncEpoch: (j['syncEpoch'] as String?) ?? '',
+  foodCategoryIds: switch (j['foodCategoryIds']) {
+    final List<dynamic> l => [
+      for (final x in l)
+        if (x is String) x,
+    ],
+    _ => null,
+  },
 );
 
 Json appUserToJson(AppUser u) => {
@@ -20,6 +27,7 @@ Json appUserToJson(AppUser u) => {
   'image': u.image,
   'currency': u.currency,
   'syncEpoch': u.syncEpoch,
+  'foodCategoryIds': u.foodCategoryIds,
 };
 
 final class AuthResponse {

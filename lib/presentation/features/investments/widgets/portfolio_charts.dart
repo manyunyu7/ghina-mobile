@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/dates.dart';
 import '../../../../core/formatters.dart';
+import '../../../../core/num_safe.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
+import '../../../shared/widgets/chart_empty.dart';
 import '../investment_format.dart';
 
 enum AllocationMode { asset, kind }
@@ -58,7 +60,7 @@ class _AllocationCardState extends State<AllocationCard> {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final slices = _slices;
-    final total = slices.fold(0.0, (s, x) => s + x.value);
+    final total = slices.fold(0.0, (s, x) => s + nonNegative(x.value));
     final t = _touched != null && _touched! < slices.length ? _touched : null;
     final focus = t == null ? null : slices[t];
     return ChunkyCard(
@@ -119,7 +121,7 @@ class _AllocationCardState extends State<AllocationCard> {
                       sections: [
                         for (var i = 0; i < slices.length; i++)
                           PieChartSectionData(
-                            value: slices[i].value,
+                            value: nonNegative(slices[i].value),
                             color: slices[i].color,
                             radius: i == t ? 40 : 32,
                             showTitle: false,
@@ -259,15 +261,16 @@ class ValueHistoryChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    if (points.isEmpty) return const ChartEmpty();
     final hidden = context.moneyHidden;
     final values = [
-      for (final p in points) ...[p.value, p.cost],
+      for (final p in points) ...[finite(p.value), finite(p.cost)],
     ];
     final minV = values.reduce(math.min);
     final maxV = values.reduce(math.max);
     final span = maxV - minV;
     final pad = span == 0 ? (maxV.abs() * 0.1 + 1000) : span * 0.15;
-    final up = points.last.value >= points.last.cost;
+    final up = finite(points.last.value) >= finite(points.last.cost);
     final sw = up ? GhinaColors.green : GhinaColors.red;
     final labelStyle = GhinaType.caption.copyWith(
       color: g.textSecondary,
@@ -283,7 +286,8 @@ class ValueHistoryChart extends StatelessWidget {
       duration: GhinaMotion.slow,
       LineChartData(
         minX: 0,
-        maxX: (n - 1).toDouble(),
+        // One snapshot would give minX == maxX: widen to one step.
+        maxX: math.max(1, n - 1).toDouble(),
         minY: minV - pad,
         maxY: maxV + pad,
         clipData: const FlClipData.all(),
@@ -358,7 +362,8 @@ class ValueHistoryChart extends StatelessWidget {
         lineBarsData: [
           LineChartBarData(
             spots: [
-              for (var i = 0; i < n; i++) FlSpot(i.toDouble(), points[i].value),
+              for (var i = 0; i < n; i++)
+                FlSpot(i.toDouble(), finite(points[i].value)),
             ],
             isCurved: true,
             preventCurveOverShooting: true,
@@ -373,7 +378,8 @@ class ValueHistoryChart extends StatelessWidget {
           ),
           LineChartBarData(
             spots: [
-              for (var i = 0; i < n; i++) FlSpot(i.toDouble(), points[i].cost),
+              for (var i = 0; i < n; i++)
+                FlSpot(i.toDouble(), finite(points[i].cost)),
             ],
             color: g.textMuted,
             barWidth: 2,

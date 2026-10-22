@@ -281,6 +281,7 @@ extension FoodRowX on FoodRow {
     photoUrl: photoUrl,
     localPhotoPath: localPhotoPath,
     note: note,
+    transactionId: transactionId,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
@@ -298,6 +299,7 @@ extension FoodX on FoodLog {
     photoUrl: Value(photoUrl),
     localPhotoPath: Value(localPhotoPath),
     note: Value(note),
+    transactionId: Value(transactionId),
     createdAt: createdAt,
     updatedAt: updatedAt,
   );

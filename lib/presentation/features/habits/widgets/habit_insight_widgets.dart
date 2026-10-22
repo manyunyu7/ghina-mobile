@@ -414,7 +414,7 @@ class MiniBars extends StatelessWidget {
                     SizedBox(
                       height: 16,
                       child: Text(
-                        labels[i],
+                        i < labels.length ? labels[i] : '',
                         maxLines: 1,
                         overflow: TextOverflow.visible,
                         softWrap: false,

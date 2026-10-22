@@ -4,11 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../content/widgets/today_posts_card.dart';
-import '../../../../core/dates.dart';
 import '../../../../core/formatters.dart';
 import '../../../../di/di.dart';
-import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/game/game_providers.dart';
 import '../../../state/game/task_game_providers.dart';
@@ -16,10 +13,11 @@ import '../../../state/killa_access_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../shared/rewards/rewards.dart';
 import '../../../shared/widgets/widgets.dart';
-import '../widgets/balance_card.dart';
-import '../widgets/home_habits.dart';
+import '../layout/home_card_builder.dart';
+import '../layout/home_layout.dart';
+import '../layout/home_layout_store.dart';
 import '../widgets/home_sections.dart';
-import '../widgets/home_tasks.dart';
+import 'home_layout_editor.dart';
 
 /// Beranda: game stats, mascot, daily goal, money overview, shortcuts, and what's
 /// coming up. Also presents pending reward celebrations whenever it's on screen.
@@ -59,9 +57,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final g = context.ghina;
     final now = ref.watch(clockProvider).now();
     final user = ref.watch(currentUserProvider);
-    final currency = ref.watch(currencyProvider);
     final game = ref.watch(gameSummaryProvider);
-    final dash = ref.watch(watchDashboardProvider);
     final summary = game.value;
     // Records yesterday's "FIRE kosong" snapshot on the first open of a day.
     ref.listen(fireClearRecorderProvider, (_, _) {});
@@ -115,18 +111,31 @@ class _HomePageState extends ConsumerState<HomePage> {
                     killaLocked ? GhinaSpace.xxl : GhinaSpace.xxl + 64,
                   ),
                   children: [
-                    Text(
-                      '$greeting, ${user?.displayName ?? 'kamu'}!',
-                      style: GhinaType.h1.copyWith(color: g.textPrimary),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '$greeting, ${user?.displayName ?? 'kamu'}!',
+                            style: GhinaType.h1.copyWith(color: g.textPrimary),
+                          ),
+                        ),
+                        IconButton(
+                          key: const ValueKey('home-customize'),
+                          tooltip: 'Atur beranda',
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            color: g.textSecondary,
+                          ),
+                          onPressed: _openEditor,
+                        ),
+                      ],
                     ),
                     Text(
                       Fmt.dateFull(now),
                       style: GhinaType.bodyS.copyWith(color: g.textSecondary),
                     ),
                     GhinaSpace.gapLg,
-                    ..._gameSection(game),
-                    GhinaSpace.gapLg,
-                    ..._moneySection(dash, currency, now),
+                    ..._cards(),
                   ],
                 ),
               ),
@@ -137,153 +146,70 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  List<Widget> _gameSection(AsyncValue game) {
-    if (game.hasError && game.value == null) {
-      return [
-        MascotSpeech(
-          mood: MascotMood.sad,
-          mascotSize: 84,
-          message:
-              'Ups, progresmu belum kebaca. Tarik ke bawah buat coba lagi, ya.',
-        ),
-      ];
+  /// The cards of the saved layout. Consecutive small cards pair up in a row.
+  List<Widget> _cards() {
+    final layout = ref.watch(homeLayoutProvider);
+    final builder = HomeCardBuilder(
+      context: context,
+      ref: ref,
+      now: ref.watch(clockProvider).now(),
+      currency: ref.watch(currencyProvider),
+    );
+    final built = <(HomeEntry, Widget)>[];
+    for (final e in layout.entries) {
+      final w = builder.build(e, first: built.isEmpty);
+      if (w != null) built.add((e, w));
     }
-    final s = ref.watch(gameSummaryProvider).value;
-    if (s == null) {
-      return const [
-        Row(
-          children: [
-            Skeleton.circle(size: 84),
-            SizedBox(width: 12),
-            Expanded(child: Skeleton(height: 64, radius: 16)),
-          ],
-        ),
-        SizedBox(height: 16),
-        Skeleton(height: 108, radius: 20),
-      ];
-    }
-    final line = ref.watch(homeMascotProvider);
-    return [
-      HomeMascot(
-        mood: line?.mood ?? s.mood,
-        message: line?.message ?? s.message,
-      ),
-      GhinaSpace.gapLg,
-      DailyGoalCard(summary: s),
-    ];
-  }
-
-  List<Widget> _moneySection(
-    AsyncValue<DashboardSummary> dash,
-    String currency,
-    DateTime now,
-  ) {
-    final d = dash.value;
-    if (d == null && dash.hasError) {
+    if (built.isEmpty) {
       return [
         EmptyState(
           compact: true,
-          mood: MascotMood.sad,
-          title: 'Ups, ada yang salah',
-          message: 'Data keuanganmu gagal dimuat. Coba lagi, yuk.',
-          actionLabel: 'Coba lagi',
-          onAction: () => ref.invalidate(watchDashboardProvider),
+          title: 'Berandamu kosong',
+          message: 'Pilih kartu atau preset lewat tombol Atur beranda.',
+          actionLabel: 'Atur beranda',
+          onAction: _openEditor,
         ),
-        GhinaSpace.gapXl,
-        const HomeTasksSection(),
       ];
     }
-    if (d == null) {
-      return const [
-        Skeleton(height: 104, radius: 20),
-        SizedBox(height: 12),
-        Skeleton(height: 120, radius: 20),
-        SizedBox(height: 24),
-        HomeTasksSection(),
-        SizedBox(height: 24),
-        SkeletonList(count: 3),
-      ];
-    }
-
-    final path = ref.watch(learnPathProvider).value;
-    final hearts = ref.watch(gameSummaryProvider).value?.hearts;
-    final budgets = ref
-        .watch(watchBudgetMonthProvider(YearMonth.of(now)))
-        .value;
-    final subs = ref.watch(watchSubscriptionsProvider).value;
-    final dueSoon = [
-      for (final s in subs?.active ?? const <Subscription>[])
-        if (s.daysUntilNext(now) <= 7) s,
-    ]..sort((a, b) => a.daysUntilNext(now).compareTo(b.daysUntilNext(now)));
-
-    return [
-      BalanceCard(dash: d, currency: currency),
-      GhinaSpace.gapMd,
-      MonthFlowCard(dash: d, currency: currency),
-      GhinaSpace.gapXl,
-      const HomeTasksSection(),
-      const HomeHabitsCard(padding: EdgeInsets.only(top: 16)),
-      const TodayPostsCard(padding: EdgeInsets.only(top: 16)),
-      if (path != null) ...[GhinaSpace.gapLg, ContinueLearningCard(path: path)],
-      GhinaSpace.gapXl,
-      const SectionHeader(title: 'Menu'),
-      const QuickActionsGrid(),
-      if (d.spendingByCategory.isNotEmpty) ...[
-        GhinaSpace.gapXl,
-        SectionHeader(
-          title: 'Pengeluaran bulan ini',
-          actionLabel: 'Analitik',
-          onAction: () => context.push('/analytics'),
-        ),
-        SpendingCard(items: d.spendingByCategory, currency: currency),
-      ],
-      if (budgets != null) ...[
-        GhinaSpace.gapXl,
-        SectionHeader(
-          title: 'Anggaran',
-          actionLabel: budgets.items.isEmpty ? null : 'Lihat semua',
-          onAction: budgets.items.isEmpty
-              ? null
-              : () => context.push('/budgets'),
-        ),
-        BudgetSnapshotCard(month: budgets, hearts: hearts, currency: currency),
-      ],
-      if (dueSoon.isNotEmpty) ...[
-        GhinaSpace.gapXl,
-        SectionHeader(
-          title: 'Tagihan sebentar lagi',
-          actionLabel: 'Langganan',
-          onAction: () => context.push('/subscriptions'),
-        ),
-        UpcomingSubscriptionsCard(
-          items: dueSoon.take(3).toList(),
-          now: now,
-          currency: currency,
-        ),
-      ],
-      GhinaSpace.gapXl,
-      SectionHeader(
-        title: 'Transaksi terakhir',
-        actionLabel: d.recent.isEmpty ? null : 'Lihat semua',
-        onAction: d.recent.isEmpty ? null : () => context.go('/transactions'),
-      ),
-      if (d.recent.isEmpty)
-        ChunkyCard(
-          child: EmptyState(
-            compact: true,
-            mascotSize: 96,
-            title: 'Belum ada transaksi',
-            message: 'Catat yang pertama, yuk! Cuma 10 detik kok.',
-            actionLabel: 'Catat sekarang',
-            onAction: () => context.push('/transactions/new'),
+    final out = <Widget>[];
+    var prevSmall = false;
+    for (var i = 0; i < built.length; i++) {
+      final (e, w) = built[i];
+      final small = e.size == HomeCardSize.small;
+      if (small) {
+        final next =
+            i + 1 < built.length && built[i + 1].$1.size == HomeCardSize.small
+            ? built[i + 1].$2
+            : null;
+        if (out.isNotEmpty) {
+          out.add(prevSmall ? GhinaSpace.gapMd : GhinaSpace.gapXl);
+        }
+        out.add(
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: w),
+                GhinaSpace.gapMd,
+                Expanded(child: next ?? const SizedBox.shrink()),
+              ],
+            ),
           ),
-        )
-      else
-        RecentTransactionsCard(
-          items: d.recent.take(5).toList(),
-          currency: currency,
-          now: now,
-        ),
-    ];
+        );
+        if (next != null) i++;
+        prevSmall = true;
+        continue;
+      }
+      if (out.isNotEmpty && !HomeCardBuilder.selfSpaced(e)) {
+        out.add(GhinaSpace.gapXl);
+      }
+      out.add(w);
+      prevSmall = false;
+    }
+    return out;
   }
+
+  void _openEditor() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const HomeLayoutEditorPage()));
 }

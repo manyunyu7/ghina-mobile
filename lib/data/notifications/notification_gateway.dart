@@ -13,6 +13,9 @@ enum NotificationChannelKind {
 
   /// "Reminder Sholat (senyap)".
   prayerSilent,
+
+  /// "Kantor Claude" (permission requests, agent questions, finished meetings).
+  kantor,
 }
 
 /// A button on the notification (Android). Runs in the background without

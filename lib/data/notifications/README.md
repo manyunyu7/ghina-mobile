@@ -9,6 +9,7 @@ Implements `ReminderScheduler` (`lib/domain/entities/reminder.dart`) on top of
 | `flutter_notification_gateway.dart` | The only file that talks to the plugin: tz setup, channel, `zonedSchedule`, permissions |
 | `reminder_codec.dart` | Stable ids (FNV-1a → 31 bit, linear probing on collision) + JSON payload |
 | `notification_settings_store.dart` | `NotificationSettings` (on/off, default remindBefore 0/10/30/60, precise) in shared_preferences |
+| `kantor_notice_poller.dart` | Kantor Claude notices: polls `GET /api/mobile/kantor/notices` (foreground + resume, `kantor_notice_controller.dart`), shows them on the "Kantor Claude" channel; tap → `/kantor/o/<office>/s/<sid>` (`?tab=rapat` for meetings) (server side: `docs/kantor-notify.md`). No background push (no FCM) |
 | `notifications.dart` | Barrel + `createDeviceReminderScheduler()` (no-op off Android/iOS and under `flutter test`) |
 
 State lives in `lib/presentation/state/notifications/`.

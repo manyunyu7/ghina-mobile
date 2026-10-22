@@ -86,13 +86,15 @@ class AppDatabase extends _$AppDatabase {
   /// `food.caloriesMax/tags`, `sync_meta.enrichment_seen`).
   /// v9: dreams ("Mimpi", `docs/dreams.md`): `dreams`, `dream_steps`,
   /// `dream_metrics`, `dream_categories`, `dream_fields` (all synced).
+  /// v10: food ⇄ transaction links (`docs/food-transaction-link.md`):
+  /// `food.transaction_id` + `idx_food_tx`, `sync_meta.food_links_seen`.
   ///
   /// Bumping? Add a step below, run
   /// `dart run drift_dev schema dump lib/data/datasources/local/app_database.dart drift_schemas/`
   /// and `dart run drift_dev schema generate drift_schemas/ test/data/local/generated_migrations/`,
   /// then extend `test/data/local/migration_test.dart`.
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -217,6 +219,16 @@ class AppDatabase extends _$AppDatabase {
         await m.createIndex(idxDreamCategory);
         await m.createIndex(idxDreamStepDream);
         await m.createIndex(idxDreamMetricDream);
+        await customStatement('UPDATE sync_meta SET full_pull_required = 1');
+      }
+      if (from < 10 && to >= 10) {
+        // Additive only: one nullable column + index and a meta flag. The v9
+        // app pulled past links made on the web without storing them:
+        // re-download everything once (pending outbox rows still win), like
+        // v7–v9. The full pull also flips `food_links_seen`.
+        await m.addColumn(food, food.transactionId);
+        await m.createIndex(idxFoodTx);
+        await m.addColumn(syncMeta, syncMeta.foodLinksSeen);
         await customStatement('UPDATE sync_meta SET full_pull_required = 1');
       }
     },

@@ -4,8 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/formatters.dart';
+import '../../../../core/num_safe.dart';
 import '../../../../domain/entities/entities.dart';
 import '../../../design_system/design_system.dart';
+import '../../../shared/widgets/chart_empty.dart';
 
 TextStyle _axis(GhinaTokens g) =>
     GhinaType.caption.copyWith(color: g.textSecondary, fontSize: 11);
@@ -14,7 +16,7 @@ Color _tooltipBg(GhinaTokens g) =>
     g.isDark ? GhinaColors.darkSurfaceAlt : GhinaColors.ink;
 
 double niceStep(double raw) {
-  if (raw <= 0 || raw.isNaN) return 1;
+  if (raw <= 0 || raw.isNaN || raw.isInfinite) return 1;
   final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
   final f = raw / exp;
   final n = f <= 1 ? 1 : (f <= 2 ? 2 : (f <= 2.5 ? 2.5 : (f <= 5 ? 5 : 10)));
@@ -90,9 +92,10 @@ class IncomeExpenseChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    if (months.isEmpty) return const ChartEmpty();
     final maxV = months.fold<double>(
       0,
-      (m, x) => math.max(m, math.max(x.income, x.expense)),
+      (m, x) => math.max(m, math.max(finite(x.income), finite(x.expense))),
     );
     final interval = niceStep((maxV == 0 ? 1 : maxV) / 3);
     final maxY =
@@ -144,8 +147,8 @@ class IncomeExpenseChart extends StatelessWidget {
               x: i,
               barsSpace: n <= 6 ? 4 : 2,
               barRods: [
-                rod(months[i].income, GhinaColors.green),
-                rod(months[i].expense, GhinaColors.red),
+                rod(finite(months[i].income), GhinaColors.green),
+                rod(finite(months[i].expense), GhinaColors.red),
               ],
             ),
         ],
@@ -168,8 +171,9 @@ class CashflowChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final maxV = months.fold<double>(0, (m, x) => math.max(m, x.net));
-    final minV = months.fold<double>(0, (m, x) => math.min(m, x.net));
+    if (months.isEmpty) return const ChartEmpty();
+    final maxV = months.fold<double>(0, (m, x) => math.max(m, finite(x.net)));
+    final minV = months.fold<double>(0, (m, x) => math.min(m, finite(x.net)));
     final interval = niceStep(math.max(1, maxV - minV) / 3);
     final maxY = maxV <= 0 ? interval : (maxV / interval).ceil() * interval;
     final minY = minV >= 0 ? 0.0 : (minV / interval).floor() * interval;
@@ -217,7 +221,7 @@ class CashflowChart extends StatelessWidget {
               x: i,
               barRods: [
                 BarChartRodData(
-                  toY: months[i].net,
+                  toY: finite(months[i].net),
                   width: rodW,
                   color: months[i].net >= 0
                       ? GhinaColors.green.base
@@ -263,7 +267,9 @@ class _CategoryDonutState extends State<CategoryDonut> {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final rows = widget.rows.where((r) => r.total > 0).toList();
+    final rows = widget.rows
+        .where((r) => r.total.isFinite && r.total > 0)
+        .toList();
     final total = rows.fold<double>(0, (s, r) => s + r.total);
     final slices = <({String name, Color color, double value})>[
       for (final r in rows.take(widget.maxSlices))

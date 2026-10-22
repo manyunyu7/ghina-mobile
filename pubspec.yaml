@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.6.1+22
+version: 1.9.4+38
 
 environment:
   sdk: ^3.12.0
@@ -59,6 +59,7 @@ dependencies:
   just_audio: ^0.10.6
   speech_to_text: ^7.5.0
   url_launcher: ^6.3.2
+  xterm: ^4.0.0
   flutter_markdown_plus: ^1.0.12
   local_auth: ^3.0.2
   quick_actions: ^1.1.1
@@ -70,6 +71,16 @@ dependencies:
   package_info_plus: ^10.2.1
   file_picker: ^13.1.0
   flutter_image_compress: ^2.5.1
+  video_player: ^2.14.1
+  share_plus: ^13.3.1
+  gal: ^2.3.3
+  mime: ^2.1.0
+  # Android home-screen widget "Kantor" (lib/data/widgets/): data bridge + the
+  # periodic background refresh.
+  home_widget: ^0.10.0
+  workmanager: ^0.10.10
+  pdfrx: ^2.4.8
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:

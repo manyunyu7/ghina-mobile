@@ -45,6 +45,7 @@ runApp(ProviderScope(
 | `watchHealthEntriesProvider` / `watchHealthEntryProvider(id)` | newest first. `entry.bpCategory` gives the AHA level, Indonesian label and color. |
 | Tasks | see "Tasks & photos API" below |
 | `watchFoodLogsProvider` / `watchFoodLogProvider(id)` | newest first. For the photo, use `localPhotoPath` (a `File`) if set, else `AppConfig.resolveUrl(photoUrl)`. |
+| Food ⇄ transaction (`docs/food-transaction-link.md`) | `watchFoodForTransactionProvider(txId)` (its food logs), `foodCategoryIdsProvider` (`Set<String>`: account setting, else by name), `foodLinkSuggestionsProvider` (`AsyncValue<List<FoodLinkSuggestion>>`, last 7 days, minus `foodLinkDismissedProvider`), `foodLinkSuggestionForTransactionProvider(id)` / `…ForFoodProvider(id)`, `foodLinkCandidatesProvider(at)` (same-day expenses, food first), `foodMonthStatsProvider` (`FoodSpendStats`). |
 | `syncStatusProvider` | `SyncStatus`: `phase` (idle, syncing, offline, error), `lastSyncAt`, `pendingCount`, `lastError` |
 | `currentUserProvider` / `currencyProvider` | `AppUser?` / `'IDR'` … |
 
@@ -67,7 +68,8 @@ Mutations never throw. `switch (r) { case Ok(:final value): …; case Err(:final
 | Forecast | `create/updatePlannedProvider(PlannedInput(type, amount, note, date, categoryId, walletId))`, `deletePlannedProvider(id)`, `togglePlannedDoneProvider(id)`, `convertPlannedProvider(id)` → the new `Transaction` |
 | Prayers | `setPrayerStatusProvider(day, Prayer.subuh, PrayerStatus.quick)` (tap = jamaah; clears rawatib on missed/excused), `savePrayerDetailsProvider(day, prayer, PrayerDetailsInput(status, qobliyah, badiyah, prayedAt, note))`, `toggleRawatibProvider(day, prayer, RawatibSlot.qobliyah)`, `setSunnahProvider(day, Prayer.witir, done:, rakaat:)`, `clearPrayerProvider(day, prayer)`, `togglePrayerProvider(day, prayer)` (quick toggle) |
 | Health | `create/updateHealthEntryProvider(HealthInput(date, weight, systolic, diastolic, pulse, note))`, `deleteHealthEntryProvider(id)` |
-| Food | `createFoodLogProvider(FoodInput(date, name, meal, calories, note), photoPath: picked.path)`, `updateFoodLogProvider(id, input, photoPath:, removePhoto:)`, `deleteFoodLogProvider(id)`. Compress in `image_picker` (`maxWidth: 1600, imageQuality: 80`), because the server limit is 5 MB. The photo uploads on the next sync. |
+| Food | `createFoodLogProvider(FoodInput(date, name, meal, calories, note), photoPath: picked.path, transactionId:)`, `updateFoodLogProvider(id, input, photoPath:, removePhoto:)`, `deleteFoodLogProvider(id)`. Compress in `image_picker` (`maxWidth: 1600, imageQuality: 80`), because the server limit is 5 MB. The photo uploads on the next sync. |
+| Food links | `linkFoodToTransactionProvider(foodId, txId \| null)` (expenses only), `createFoodWithExpenseProvider(FoodInput, FoodExpenseInput(amount, walletId, categoryId, note), photoPath:)` → `(food, transaction)`, `logFoodForTransactionProvider(tx, name:, meal:, calories:)`, `ref.read(foodLinkDismissedProvider.notifier).dismiss(key)`; setting: `sessionControllerProvider.notifier.setFoodCategories(ids \| null)` (online). |
 | Sync | `syncNowProvider()` (pull-to-refresh), `resetLocalDataProvider()` (Settings → reset: wipes local data, including unsynced changes, and downloads again) |
 
 Account actions go through `ref.read(sessionControllerProvider.notifier)`:

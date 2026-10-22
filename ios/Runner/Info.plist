@@ -4,6 +4,8 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Ghina memakai kamera untuk memotret makananmu di Food Log.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Ghina menyimpan foto atau video dari agen ke galeri atas permintaanmu.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ghina membuka galeri untuk memilih foto makanan di Food Log.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

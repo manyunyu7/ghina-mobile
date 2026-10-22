@@ -36,6 +36,11 @@ class FlutterNotificationGateway implements NotificationGateway {
   static const prayerSilentChannelId = 'prayer_reminders_silent';
   static const prayerSilentChannelName = 'Reminder Sholat (senyap)';
 
+  static const kantorChannelId = 'kantor_claude';
+  static const kantorChannelName = 'Kantor Claude';
+  static const kantorChannelDescription =
+      'Izin agen, pertanyaan agen, dan rapat yang selesai.';
+
   static const smallIcon = 'ic_stat_ghina';
 
   /// Mascots with their own small icon (`ic_stat_<id>`, white silhouettes made
@@ -164,6 +169,14 @@ class FlutterNotificationGateway implements NotificationGateway {
         enableVibration: false,
       ),
     );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        kantorChannelId,
+        kantorChannelName,
+        description: kantorChannelDescription,
+        importance: Importance.high,
+      ),
+    );
   }
 
   Future<void> _initTimeZone() async {
@@ -270,6 +283,11 @@ class FlutterNotificationGateway implements NotificationGateway {
         prayerSilentChannelId,
         prayerSilentChannelName,
         prayerChannelDescription,
+      ),
+      NotificationChannelKind.kantor => (
+        kantorChannelId,
+        kantorChannelName,
+        kantorChannelDescription,
       ),
     };
     final silent = r.channel == NotificationChannelKind.prayerSilent;

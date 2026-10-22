@@ -69,8 +69,18 @@ class LocalCascades {
 
   /// Transaction deleted → tasks get `transactionId = null`, notes
   /// `linkedTransactionId = null`, sponsors `transactionId = null`, asset
-  /// trades `cashTransactionId = null`.
+  /// trades `cashTransactionId = null`, food logs `transactionId = null`
+  /// (the meal stays; `docs/food-transaction-link.md`).
   Future<void> transactionDeleted(String transactionId) async {
+    final meals = await (_db.select(
+      _db.food,
+    )..where((f) => f.transactionId.equals(transactionId))).get();
+    for (final f in meals) {
+      await (_db.update(_db.food)..where((x) => x.id.equals(f.id))).write(
+        const FoodCompanion(transactionId: Value(null)),
+      );
+      await _outbox.patchQueued(SyncEntity.food, f.id, {'transactionId': null});
+    }
     final trades = await (_db.select(
       _db.assetTrades,
     )..where((t) => t.cashTransactionId.equals(transactionId))).get();

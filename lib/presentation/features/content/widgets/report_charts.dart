@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/num_safe.dart';
 import '../../../design_system/design_system.dart';
+import '../../../shared/widgets/chart_empty.dart';
 
 double _niceStep(double raw) {
-  if (raw <= 0 || raw.isNaN) return 1;
+  if (raw <= 0 || raw.isNaN || raw.isInfinite) return 1;
   final exp = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
   final f = raw / exp;
   final n = f <= 1 ? 1 : (f <= 2 ? 2 : (f <= 2.5 ? 2.5 : (f <= 5 ? 5 : 10)));
@@ -35,7 +37,10 @@ class SimpleBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final maxV = data.fold<double>(0, (m, d) => math.max(m, d.value));
+    if (data.isEmpty) {
+      return SizedBox(height: height, child: const ChartEmpty());
+    }
+    final maxV = data.fold<double>(0, (m, d) => math.max(m, finite(d.value)));
     final interval = _niceStep((maxV == 0 ? 1 : maxV) / 3);
     final maxY =
         (maxV / interval).ceil() * interval + (maxV == 0 ? interval : 0);
@@ -119,7 +124,7 @@ class SimpleBarChart extends StatelessWidget {
                 x: i,
                 barRods: [
                   BarChartRodData(
-                    toY: data[i].value,
+                    toY: finite(data[i].value),
                     width: rodW,
                     color: color.base,
                     borderRadius: const BorderRadius.vertical(
@@ -145,7 +150,7 @@ class HBarList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final maxV = rows.fold<double>(0, (m, r) => math.max(m, r.value));
+    final maxV = rows.fold<double>(0, (m, r) => math.max(m, finite(r.value)));
     return Column(
       children: [
         for (final r in rows)
@@ -192,7 +197,10 @@ class HBarList extends StatelessWidget {
                         height: 12,
                         width: maxV <= 0
                             ? 0
-                            : math.max(4, c.maxWidth * r.value / maxV),
+                            : math.max(
+                                4,
+                                c.maxWidth * nonNegative(r.value) / maxV,
+                              ),
                         decoration: BoxDecoration(
                           color: color.base,
                           borderRadius: const BorderRadius.horizontal(
@@ -247,7 +255,7 @@ class ShareBar extends StatelessWidget {
                 for (var i = 0; i < parts.length; i++) ...[
                   if (i > 0) Container(width: 2, color: g.surface),
                   Expanded(
-                    flex: math.max(1, (parts[i].share * 1000).round()),
+                    flex: math.max(1, (finite(parts[i].share) * 1000).round()),
                     child: Container(color: parts[i].color),
                   ),
                 ],
@@ -274,7 +282,7 @@ class ShareBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    '${p.label} ${(p.share * 100).round()}%',
+                    '${p.label} ${(finite(p.share) * 100).round()}%',
                     style: GhinaType.bodyS
                         .w(700)
                         .copyWith(color: g.textPrimary),

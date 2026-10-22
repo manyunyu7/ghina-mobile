@@ -403,6 +403,9 @@ final refreshProfileProvider = Provider<RefreshProfile>(
 final updateProfileProvider = Provider<UpdateProfile>(
   (ref) => UpdateProfile(ref.watch(authRepositoryProvider)),
 );
+final setFoodCategoriesProvider = Provider<SetFoodCategories>(
+  (ref) => SetFoodCategories(ref.watch(authRepositoryProvider)),
+);
 final watchSessionExpiredProvider = Provider<WatchSessionExpired>(
   (ref) => WatchSessionExpired(ref.watch(authRepositoryProvider)),
 );

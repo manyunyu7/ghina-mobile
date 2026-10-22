@@ -17,6 +17,7 @@ import '../../../state/appearance_provider.dart';
 import '../../../state/mascot_kind_provider.dart';
 import '../../../state/session_controller.dart';
 import '../../../state/sync_status_provider.dart';
+import '../../food/widgets/food_link_widgets.dart' show showFoodCategorySheet;
 import '../../habits/lock/habit_lock_gate.dart' show HabitLockSettingTile;
 import '../../shell/sync_indicator.dart';
 import '../widgets/daily_goal_picker.dart';
@@ -289,6 +290,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
             GhinaSpace.gapXl,
+            const SectionHeader(title: 'Catatan makan'),
+            ChunkyCard(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: ChunkyTile(
+                key: const ValueKey('settings-food-categories'),
+                framed: false,
+                title: 'Kategori makanan',
+                subtitle: switch (ref
+                    .watch(currentUserProvider)
+                    ?.foodCategoryIds) {
+                  null => 'Otomatis (Makanan, Makan, Kuliner, Food)',
+                  final ids => '${ids.length} kategori dipilih',
+                },
+                leading: CategoryAvatar(
+                  icon: Icons.restaurant_rounded,
+                  color: GhinaColors.orange.base,
+                  size: 40,
+                ),
+                showChevron: true,
+                onTap: () => showFoodCategorySheet(context),
+              ),
+            ),
+            GhinaSpace.gapXl,
             const SectionHeader(title: 'Privasi'),
             const _BalancePrivacyCard(),
             GhinaSpace.gapMd,
@@ -379,6 +403,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       size: 40,
                     ),
                     onTap: _resetGame,
+                  ),
+                  ChunkyTile(
+                    key: const ValueKey('settings-error-log'),
+                    framed: false,
+                    title: 'Diagnostik › Log error',
+                    subtitle: 'Error yang tertangkap di app, bisa dibagikan',
+                    leading: CategoryAvatar(
+                      icon: Icons.bug_report_rounded,
+                      color: GhinaColors.red.base,
+                      size: 40,
+                    ),
+                    showChevron: true,
+                    onTap: () => context.push('/settings/errors'),
                   ),
                   if (kDebugMode)
                     ChunkyTile(

@@ -296,12 +296,16 @@ class SyncEngine implements SyncService {
               // Until a pull from an enrichment-aware server refreshed the
               // rows, the new keys (tools / extra / tags / caloriesMax) are
               // left out: "absent = unchanged" on the server.
-              data: meta.enrichmentSeen
-                  ? Outbox.decode(e.data)
-                  : PeopleSync.withoutEnrichment(
-                      e.entity,
-                      Outbox.decode(e.data),
-                    ),
+              data: _withoutUnseenFoodLink(
+                meta.foodLinksSeen,
+                e.entity,
+                meta.enrichmentSeen
+                    ? Outbox.decode(e.data)
+                    : PeopleSync.withoutEnrichment(
+                        e.entity,
+                        Outbox.decode(e.data),
+                      ),
+              ),
               clientUpdatedAt: DateTime.fromMillisecondsSinceEpoch(
                 e.clientUpdatedAt,
               ),
@@ -315,6 +319,18 @@ class SyncEngine implements SyncService {
       await _requeueForwardRefs(batch, res);
       if (batch.length < batchSize) return;
     }
+  }
+
+  /// `food.transactionId` (`docs/food-transaction-link.md`): until a pull
+  /// showed the server stores links, a `null` link is left out ("absent =
+  /// unchanged") — this device may not have pulled a link made on the web
+  /// yet. A set link is always sent; an old server just ignores the key.
+  static Json? _withoutUnseenFoodLink(bool seen, String entity, Json? data) {
+    if (seen || entity != SyncEntity.food || data == null) return data;
+    if (!data.containsKey('transactionId') || data['transactionId'] != null) {
+      return data;
+    }
+    return {...data}..remove('transactionId');
   }
 
   Future<void> _applyPushResults(
@@ -1033,6 +1049,14 @@ class SyncEngine implements SyncService {
       await _db.updateMeta(
         const SyncMetaCompanion(enrichmentSeen: Value(true)),
       );
+    }
+    // A food row carrying `transactionId` means the server stores links: from
+    // now on an unlink (`null`) may be pushed (see _withoutUnseenFoodLink).
+    if (res.changes[SyncEntity.food]?.any(
+          (j) => j.containsKey('transactionId'),
+        ) ??
+        false) {
+      await _db.updateMeta(const SyncMetaCompanion(foodLinksSeen: Value(true)));
     }
     final notesAware = res.changes.containsKey(SyncEntity.noteLabels);
     final contentAware = res.changes.containsKey(SyncEntity.contentPillars);

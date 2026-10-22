@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config.dart';
+import '../../../../di/di.dart';
 import '../../../../domain/entities/entities.dart';
+import '../../../../domain/usecases/usecases.dart' show sharedFoodPhoto;
 import '../../../design_system/design_system.dart';
 
 /// Swatch per meal type (chips, avatars).
@@ -16,8 +19,10 @@ ChunkySwatch mealSwatch(MealType? m) => switch (m) {
 };
 
 /// Photo of a food log: the local (not yet uploaded) file first, else the
-/// server URL; falls back to a colourful meal-emoji tile.
-class FoodPhoto extends StatelessWidget {
+/// server URL, else the first photo of its linked transaction (shared, not
+/// copied — `docs/food-transaction-link.md`); falls back to a colourful
+/// meal-emoji tile.
+class FoodPhoto extends ConsumerWidget {
   const FoodPhoto({
     super.key,
     required this.log,
@@ -34,9 +39,16 @@ class FoodPhoto extends StatelessWidget {
   final BorderRadius radius;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final w = width ?? size;
     final h = height ?? size;
+    final txId = log.hasPhoto ? null : log.transactionId;
+    final shared = txId == null
+        ? null
+        : sharedFoodPhoto(
+            log,
+            ref.watch(watchTransactionProvider(txId)).value?.transaction,
+          );
     final fallback = MealEmojiTile(
       meal: log.meal,
       width: w,
@@ -44,7 +56,7 @@ class FoodPhoto extends StatelessWidget {
       radius: radius,
     );
     Widget? img;
-    final local = log.localPhotoPath;
+    final local = log.localPhotoPath ?? shared?.localPath;
     if (local != null && local.isNotEmpty) {
       img = Image.file(
         File(local),
@@ -54,7 +66,8 @@ class FoodPhoto extends StatelessWidget {
         cacheWidth: w.isFinite ? (w * 3).round() : null,
         errorBuilder: (_, _, _) => fallback,
       );
-    } else if (AppConfig.resolveUrl(log.photoUrl) case final url?) {
+    } else if (AppConfig.resolveUrl(log.photoUrl ?? shared?.url)
+        case final url?) {
       img = Image.network(
         url,
         width: w,

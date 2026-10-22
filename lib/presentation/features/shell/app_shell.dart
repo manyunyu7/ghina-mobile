@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../domain/entities/entities.dart';
 import '../../design_system/design_system.dart';
+import '../../state/notifications/kantor_notice_controller.dart';
 import '../../state/notifications/notification_providers.dart';
 import '../../state/notifications/reminder_sync_controller.dart';
 import '../../state/prayer_reminders/prayer_reminder_providers.dart';
@@ -65,6 +66,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   Widget build(BuildContext context) {
     ref.watch(reminderSyncControllerProvider);
     ref.watch(prayerReminderSyncControllerProvider);
+    ref.watch(kantorNoticeControllerProvider);
     final shell = widget.navigationShell;
     final location =
         shell.route.branches[shell.currentIndex].defaultRoute?.path ?? '';

@@ -50,4 +50,14 @@ class AuthApi {
         );
         return appUserFromJson(r.data!['user'] as Json);
       });
+
+  /// `PATCH /me {foodCategoryIds}` — null = automatic
+  /// (`docs/food-transaction-link.md`).
+  Future<AppUser> setFoodCategories(List<String>? ids) => apiCall(() async {
+    final r = await _client.dio.patch<Json>(
+      '/api/mobile/me',
+      data: {'foodCategoryIds': ids},
+    );
+    return appUserFromJson(r.data!['user'] as Json);
+  });
 }

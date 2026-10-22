@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +14,8 @@ import '../../../design_system/design_system.dart';
 import '../../../state/game/game_providers.dart';
 import '../../../state/session_controller.dart';
 import '../../categories/widgets/category_presets.dart';
+import '../../food/widgets/food_link_widgets.dart';
+import '../../food/widgets/food_photo.dart' show mealSwatch;
 import '../../../shared/widgets/widgets.dart';
 import '../../../shared/rewards/rewards.dart';
 import '../widgets/tx_visuals.dart';
@@ -22,7 +25,9 @@ import '../widgets/tx_visuals.dart';
 /// Big amount + keypad first; type segmented; category grid (recently used first);
 /// wallet / date / photo chips and an always-visible, optional note field (Enter
 /// saves). After saving a new transaction the user gets an XP
-/// toast or a full celebration.
+/// toast or a full celebration. A new expense in a food category can also be
+/// logged in Food; an existing one shows its linked food logs
+/// (`docs/food-transaction-link.md`).
 class TransactionFormPage extends ConsumerStatefulWidget {
   const TransactionFormPage({super.key, this.id});
 
@@ -59,6 +64,17 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
   int _adjSign = 1;
   bool get _isAdjustment => _type == TxType.adjustment;
 
+  /// "Catat juga di Food log" (new expense in a food category).
+  bool _alsoFood = false;
+  final _foodName = TextEditingController();
+  final _foodNameFocus = FocusNode();
+  final _foodKcal = TextEditingController();
+  final _foodKcalFocus = FocusNode();
+  MealType? _foodMeal;
+
+  bool get _typingText =>
+      _noteFocus.hasFocus || _foodNameFocus.hasFocus || _foodKcalFocus.hasFocus;
+
   bool _loaded = false;
   bool _saving = false;
   bool _deleted = false;
@@ -69,9 +85,11 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
   void initState() {
     super.initState();
     _amount = AmountController(currency: ref.read(currencyProvider));
-    _noteFocus.addListener(() {
-      if (mounted) setState(() {}); // swap the keypad for a slim save bar
-    });
+    for (final f in [_noteFocus, _foodNameFocus, _foodKcalFocus]) {
+      f.addListener(() {
+        if (mounted) setState(() {}); // swap the keypad for a slim save bar
+      });
+    }
     _date = ref.read(clockProvider).now();
     if (!_isEdit) {
       _loaded = true;
@@ -92,6 +110,10 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
     _amount.dispose();
     _noteCtrl.dispose();
     _noteFocus.dispose();
+    _foodName.dispose();
+    _foodNameFocus.dispose();
+    _foodKcal.dispose();
+    _foodKcalFocus.dispose();
     super.dispose();
   }
 
@@ -297,6 +319,14 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
         return;
       }
     }
+    final logFood = _alsoFood && _foodToggleVisible;
+    final foodName = _foodName.text.trim().isNotEmpty
+        ? _foodName.text.trim()
+        : _noteCtrl.text.trim();
+    if (logFood && foodName.isEmpty) {
+      showErrorToast(context, 'Isi nama menunya dulu buat Food log');
+      return;
+    }
     final input = TransactionInput(
       type: _type,
       amount: _isAdjustment
@@ -317,12 +347,29 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
         ? await ref.read(updateTransactionProvider)(widget.id!, input)
         : await ref.read(createTransactionProvider)(input);
     if (!mounted) return;
+    final Transaction saved;
     switch (r) {
       case Err(:final failure):
         setState(() => _saving = false);
         showFailureToast(context, failure);
         return;
-      case Ok():
+      case Ok(:final value):
+        saved = value;
+    }
+    if (logFood) {
+      final food = await ref.read(logFoodForTransactionProvider)(
+        saved,
+        name: foodName,
+        meal: _foodMeal,
+        calories: int.tryParse(_foodKcal.text.trim()),
+      );
+      if (!mounted) return;
+      if (food case Err(:final failure)) {
+        showErrorToast(
+          context,
+          'Transaksi tersimpan, tapi Food log gagal: ${failure.message}',
+        );
+      }
     }
     ref.read(lastUsedWalletProvider.notifier).set(walletId);
     if (_isEdit) {
@@ -362,6 +409,161 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
 
   /// An `investment` row was opened: on its way to the linked trade.
   bool _redirecting = false;
+
+  /// "Catat juga di Food log" is offered for a new expense in a food category.
+  bool get _foodToggleVisible =>
+      !_isEdit &&
+      _type == TxType.expense &&
+      _categoryId != null &&
+      ref.read(foodCategoryIdsProvider).contains(_categoryId);
+
+  Widget _foodSection() {
+    final g = context.ghina;
+    return ChunkyCard(
+      key: const ValueKey('tx-food-section'),
+      tinted: GhinaColors.orange,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Own Material: the tinted card would hide the tile's ink.
+          Material(
+            type: MaterialType.transparency,
+            child: SwitchListTile(
+              key: const ValueKey('tx-also-food'),
+              value: _alsoFood,
+              onChanged: (v) => setState(() => _alsoFood = v),
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Catat juga di Food log',
+                style: GhinaType.body.w(800),
+              ),
+              subtitle: Text(
+                'Foto struk ikut tampil di catatan makannya',
+                style: GhinaType.caption.copyWith(color: g.textMuted),
+              ),
+            ),
+          ),
+          if (_alsoFood) ...[
+            ChunkyTextField(
+              key: const ValueKey('tx-food-name'),
+              controller: _foodName,
+              focusNode: _foodNameFocus,
+              hint: _noteCtrl.text.trim().isEmpty
+                  ? 'Nama menu, mis. Nasi goreng'
+                  : _noteCtrl.text.trim(),
+              prefixIcon: Icons.restaurant_rounded,
+              maxLength: 120,
+              textInputAction: TextInputAction.next,
+              onTapOutside: (_) => _foodNameFocus.unfocus(),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final m in MealType.values)
+                  ChunkyChip(
+                    key: ValueKey('tx-food-meal-${m.wire}'),
+                    label: '${m.emoji} ${m.label}',
+                    selected: _foodMeal == m,
+                    color: mealSwatch(m),
+                    onTap: () =>
+                        setState(() => _foodMeal = _foodMeal == m ? null : m),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ChunkyTextField(
+              key: const ValueKey('tx-food-kcal'),
+              controller: _foodKcal,
+              focusNode: _foodKcalFocus,
+              hint: 'Kalori (opsional)',
+              prefixIcon: Icons.local_fire_department_rounded,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: 5,
+              textInputAction: TextInputAction.done,
+              onTapOutside: (_) => _foodKcalFocus.unfocus(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Existing expense: its "Food log" section — the menus it paid for
+  /// (photo, meal time, calories; tap → food detail, unlink), "Tambah food
+  /// log" (a new meal at the transaction's time, its photos shared),
+  /// "Tautkan food log yang ada" and a suggestion card when one fits
+  /// (`docs/food-transaction-link.md`).
+  Widget _linkedFood() {
+    final id = widget.id!;
+    final tx = ref.watch(watchTransactionProvider(id)).value?.transaction;
+    final foods =
+        ref.watch(watchFoodForTransactionProvider(id)).value ??
+        const <FoodLog>[];
+    final suggestion = ref.watch(foodLinkSuggestionForTransactionProvider(id));
+    if (tx == null) return const SizedBox.shrink();
+    return Padding(
+      key: const ValueKey('tx-food-log-section'),
+      padding: const EdgeInsets.only(top: GhinaSpace.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              foods.isEmpty ? 'FOOD LOG' : 'FOOD LOG · ${foods.length}',
+              style: GhinaType.overline.copyWith(
+                color: context.ghina.textSecondary,
+              ),
+            ),
+          ),
+          for (final f in foods) ...[
+            LinkedFoodCard(
+              log: f,
+              onUnlink: () => setFoodLink(context, ref, f.id, null),
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (suggestion != null) ...[
+            FoodLinkSuggestionCard(suggestion: suggestion),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: ChunkyButton(
+                  key: const ValueKey('tx-food-add'),
+                  label: 'Tambah food log',
+                  icon: Icons.restaurant_rounded,
+                  size: ChunkyButtonSize.small,
+                  color: GhinaColors.orange,
+                  onPressed: () => showAddFoodForTransactionSheet(context, tx),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ChunkyButton(
+                  key: const ValueKey('tx-food-link-existing'),
+                  label: 'Tautkan yang ada',
+                  icon: Icons.link_rounded,
+                  size: ChunkyButtonSize.small,
+                  variant: ChunkyButtonVariant.outline,
+                  onPressed: () async {
+                    final foodId = await showLinkFoodSheet(context, tx);
+                    if (foodId == null || !mounted) return;
+                    await setFoodLink(context, ref, foodId, tx.id);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   // ------------------------------------------------------------------ build
 
@@ -418,6 +620,8 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
 
     final walletsAsync = ref.watch(watchAllWalletsProvider);
     final catsAsync = ref.watch(watchCategoriesProvider(null));
+    // Keeps the food-category set alive for _foodToggleVisible.
+    ref.watch(foodCategoryIdsProvider);
     final recent =
         ref
             .watch(
@@ -608,6 +812,7 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
                       onAdd: _addPhotos,
                     ),
                   ],
+                  if (_isEdit && _type == TxType.expense) _linkedFood(),
                   SizedBox(height: small ? GhinaSpace.md : GhinaSpace.lg),
                   if (_isAdjustment)
                     ChunkyCard(
@@ -661,6 +866,10 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
                         () => _categoryId = _categoryId == id ? null : id,
                       ),
                     ),
+                  if (_foodToggleVisible) ...[
+                    const SizedBox(height: GhinaSpace.md),
+                    _foodSection(),
+                  ],
                 ],
               ),
             ),
@@ -679,7 +888,7 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
               top: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(15, 8, 15, 10),
-                child: _noteFocus.hasFocus
+                child: _typingText
                     // Typing the note: the system keyboard is up, so a slim save
                     // bar replaces the keypad (Enter saves too).
                     ? ChunkyButton(
@@ -693,7 +902,7 @@ class _TransactionFormPageState extends ConsumerState<TransactionFormPage> {
                             : () {
                                 // Back to the keypad, so a refused save (e.g.
                                 // no amount yet) can be fixed right away.
-                                _noteFocus.unfocus();
+                                FocusScope.of(context).unfocus();
                                 _save(walletId);
                               },
                       )

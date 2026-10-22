@@ -299,6 +299,21 @@ const kAppMenu = <AppMenuItem>[
     group: AppMenuGroup.productive,
     synonyms: ['ai', 'asisten', 'claude', 'chat', 'agen', 'bot'],
   ),
+  AppMenuItem(
+    label: 'Kantor',
+    icon: Icons.apartment_rounded,
+    color: GhinaColors.blue,
+    path: '/kantor',
+    group: AppMenuGroup.productive,
+    synonyms: [
+      'office',
+      'agen',
+      'claude code',
+      'sesi',
+      'board',
+      'kantor claude',
+    ],
+  ),
   // ---- LAINNYA
   AppMenuItem(
     label: 'Belajar',

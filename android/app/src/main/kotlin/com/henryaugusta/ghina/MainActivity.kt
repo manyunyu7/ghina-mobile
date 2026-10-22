@@ -58,13 +58,22 @@ class MainActivity : FlutterFragmentActivity() {
     private var fileSeq = 0
     private var uiEngine: FlutterEngine? = null
 
+    // Kantor widget taps (KantorWidgetProvider): the route waits here until Dart asks
+    // (cold start: "takeRoute"); once it has, later taps are pushed ("route").
+    private var kantorRoute: String? = null
+    private var kantorChannel: MethodChannel? = null
+    private var kantorDartReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Restored (rotation / process death) or reopened from Recents: the share /
         // shortcut was already handled — don't import or open it twice.
         val fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
         if (savedInstanceState != null || fromHistory) intent.removeExtra(QUICK_ACTION_EXTRA)
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null && !fromHistory) handleShareIntent(intent)
+        if (savedInstanceState == null && !fromHistory) {
+            handleShareIntent(intent)
+            handleKantorIntent(intent)
+        }
         ListenerWatchdogJob.schedule(this)
     }
 
@@ -87,6 +96,23 @@ class MainActivity : FlutterFragmentActivity() {
         intent.removeExtra(QUICK_ACTION_EXTRA)
         setIntent(intent)
         handleShareIntent(intent)
+        handleKantorIntent(intent)
+    }
+
+    /** A tap on the Kantor home-screen widget carries a /kantor… route. */
+    private fun handleKantorIntent(intent: Intent?) {
+        if (intent?.action != KantorWidgetProvider.ACTION_OPEN) return
+        val route = intent.getStringExtra(KantorWidgetProvider.EXTRA_ROUTE)
+        // Consumed: a recreate with the same intent must not re-open it.
+        intent.action = null
+        intent.removeExtra(KantorWidgetProvider.EXTRA_ROUTE)
+        if (route == null || !route.startsWith("/kantor")) return
+        val channel = kantorChannel
+        if (kantorDartReady && channel != null) {
+            channel.invokeMethod("route", route)
+        } else {
+            kantorRoute = route
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -106,6 +132,18 @@ class MainActivity : FlutterFragmentActivity() {
                 shareSink = null
             }
         })
+
+        kantorChannel = MethodChannel(messenger, KANTOR_WIDGET).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                if (call.method == "takeRoute") {
+                    kantorDartReady = true
+                    result.success(kantorRoute)
+                    kantorRoute = null
+                } else {
+                    result.notImplemented()
+                }
+            }
+        }
 
         MethodChannel(messenger, METHODS).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -468,6 +506,7 @@ class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val METHODS = "com.henryaugusta.ghina/platform"
         private const val SHARE_EVENTS = "com.henryaugusta.ghina/share"
+        private const val KANTOR_WIDGET = "com.henryaugusta.ghina/kantor_widget"
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
         private const val MAX_PDF_BYTES = 11L * 1024 * 1024

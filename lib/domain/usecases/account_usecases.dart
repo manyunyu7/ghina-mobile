@@ -108,6 +108,16 @@ final class UpdateProfile {
   );
 }
 
+/// "Kategori makanan" (`docs/food-transaction-link.md`): expense category
+/// ids, or null for automatic (by name). Requires connectivity.
+final class SetFoodCategories {
+  const SetFoodCategories(this._auth);
+  final AuthRepository _auth;
+
+  Future<Result<AppUser>> call(List<String>? ids) =>
+      guard(() => _auth.setFoodCategories(ids?.toSet().toList()));
+}
+
 final class WatchSessionExpired {
   const WatchSessionExpired(this._auth);
   final AuthRepository _auth;

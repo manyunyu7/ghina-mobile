@@ -145,6 +145,14 @@ class DriftFoodRepository implements FoodRepository {
   }
 
   @override
+  Stream<List<FoodLog>> watchByTransaction(String transactionId) =>
+      (_db.select(_db.food)
+            ..where((f) => f.transactionId.equals(transactionId))
+            ..orderBy([(f) => OrderingTerm.asc(f.date)]))
+          .watch()
+          .map((r) => [for (final x in r) x.toEntity()]);
+
+  @override
   Stream<FoodLog?> watchById(String id) =>
       (_db.select(_db.food)..where((f) => f.id.equals(id)))
           .watchSingleOrNull()
@@ -176,6 +184,7 @@ class DriftFoodRepository implements FoodRepository {
             photoUrl: null,
             localPhotoPath: stored,
             note: log.note,
+            transactionId: log.transactionId,
             createdAt: log.createdAt,
             updatedAt: log.updatedAt,
           );

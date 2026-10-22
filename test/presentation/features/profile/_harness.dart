@@ -147,6 +147,13 @@ class FakeFoodRepository implements FoodRepository {
   @override
   Future<FoodLog?> getById(String id) async => s.items[id];
   @override
+  Stream<List<FoodLog>> watchByTransaction(String transactionId) => s.watch(
+    () => [
+      for (final f in _sorted.reversed)
+        if (f.transactionId == transactionId) f,
+    ],
+  );
+  @override
   Future<void> save(FoodLog log, {String? newPhotoPath}) async {
     savedPhotos.add(newPhotoPath);
     s.put(log);

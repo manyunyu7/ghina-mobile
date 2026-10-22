@@ -44,12 +44,8 @@ void main() {
     updatedAt: now,
   );
 
-  Dream dream(String id, {String title = 'Mimpi contoh'}) => Dream(
-    id: id,
-    title: title,
-    createdAt: now,
-    updatedAt: now,
-  );
+  Dream dream(String id, {String title = 'Mimpi contoh'}) =>
+      Dream(id: id, title: title, createdAt: now, updatedAt: now);
 
   DreamStep step(String id, String dreamId) => DreamStep(
     id: id,
@@ -63,11 +59,11 @@ void main() {
     test('writes the index as sortOrder and skips unknown ids', () async {
       await categories.save(cat('travel', 0));
       await categories.save(cat('health', 1));
-      final r = await ReorderDreamCategories(
-        categories,
-        uow,
-        FixedClock(now),
-      )(['dc-health', 'missing', 'dc-travel']);
+      final r = await ReorderDreamCategories(categories, uow, FixedClock(now))([
+        'dc-health',
+        'missing',
+        'dc-travel',
+      ]);
       expect(r.isOk, isTrue);
       expect((await categories.getById('dc-health'))!.sortOrder, 0);
       expect((await categories.getById('dc-travel'))!.sortOrder, 2);

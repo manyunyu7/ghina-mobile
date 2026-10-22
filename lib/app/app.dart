@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/diagnostics/error_log.dart';
 import '../presentation/design_system/design_system.dart';
+import '../presentation/features/settings/widgets/error_card.dart';
 import '../presentation/features/shell/app_shortcut_listener.dart';
 import '../presentation/features/shell/notification_navigation.dart';
 import '../presentation/state/appearance_provider.dart';
 import '../presentation/state/balance_privacy_provider.dart';
 import '../presentation/state/mascot_kind_provider.dart';
 import '../presentation/state/session_controller.dart';
+import '../data/widgets/kantor_widget_sync.dart';
 import 'router.dart';
 
 /// Locations where a tapped reminder / launcher shortcut must wait (auth / splash / onboarding).
@@ -21,6 +24,10 @@ class GhinaApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final look = ref.watch(appearanceProvider);
+    // Error log: which screen was open, and where "Lihat detail" goes.
+    ErrorLog.instance.routeProbe = () =>
+        router.routerDelegate.currentConfiguration.uri.toString();
+    openErrorLog = () => router.push('/settings/errors');
     return MaterialApp.router(
       title: 'Ghina',
       debugShowCheckedModeBanner: false,
@@ -48,7 +55,10 @@ class GhinaApp extends ConsumerWidget {
                   ),
               // Launcher shortcuts (long-press the icon) use the same gate.
               child: AppShortcutListener(
-                child: child ?? const SizedBox.shrink(),
+                // Android "Kantor" home-screen widget: refresh + tap routes.
+                child: KantorWidgetSync(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

@@ -45,10 +45,13 @@ class TrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    // NaN / Infinity readings are treated as "no point".
     final all = [
       for (final s in series)
-        for (final v in s.values) ?v,
-      for (final (v, _) in guides) v,
+        for (final v in s.values)
+          if (v != null && v.isFinite) v,
+      for (final (v, _) in guides)
+        if (v.isFinite) v,
     ];
     if (all.isEmpty) return SizedBox(height: height);
     var minY = all.reduce((a, b) => a < b ? a : b);
@@ -86,12 +89,13 @@ class TrendChart extends StatelessWidget {
           extraLinesData: ExtraLinesData(
             horizontalLines: [
               for (final (v, c) in guides)
-                HorizontalLine(
-                  y: v,
-                  color: c.withValues(alpha: 0.6),
-                  strokeWidth: 1.5,
-                  dashArray: [6, 5],
-                ),
+                if (v.isFinite)
+                  HorizontalLine(
+                    y: v,
+                    color: c.withValues(alpha: 0.6),
+                    strokeWidth: 1.5,
+                    dashArray: [6, 5],
+                  ),
             ],
           ),
           titlesData: FlTitlesData(
@@ -142,7 +146,7 @@ class TrendChart extends StatelessWidget {
               getTooltipItems: (spots) => [
                 for (final s in spots)
                   LineTooltipItem(
-                    '${labels[s.x.round()]}: ${fmt(s.y)}$unit',
+                    '${s.x.round() < labels.length ? labels[s.x.round()] : ''}: ${fmt(s.y)}$unit',
                     GhinaType.caption
                         .w(800)
                         .copyWith(color: series[s.barIndex].color.base),
@@ -155,7 +159,8 @@ class TrendChart extends StatelessWidget {
               LineChartBarData(
                 spots: [
                   for (var i = 0; i < s.values.length; i++)
-                    if (s.values[i] != null) FlSpot(i.toDouble(), s.values[i]!),
+                    if (s.values[i] != null && s.values[i]!.isFinite)
+                      FlSpot(i.toDouble(), s.values[i]!),
                 ],
                 isCurved: true,
                 preventCurveOverShooting: true,
