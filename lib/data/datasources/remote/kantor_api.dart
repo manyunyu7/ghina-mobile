@@ -62,6 +62,7 @@ final class KantorConfigStore {
   static const _urlKey = 'kantor.url';
   static const _tokenKey = 'kantor.token';
   static const _profilesKey = 'kantor.complexes.v1';
+  static const _previousProfilesKey = 'kantor.profiles';
   final FlutterSecureStorage _storage;
   Future<void> _pending = Future.value();
 
@@ -89,6 +90,48 @@ final class KantorConfigStore {
             .toList(),
         activeId: json['activeId'] as String?,
       );
+    }
+    // The earlier multi-profile build removed the single URL/token keys.
+    // Import its secure record before attempting the oldest single connection.
+    final previous = await _storage.read(key: _previousProfilesKey);
+    if (previous != null) {
+      try {
+        final decoded = jsonDecode(previous);
+        if (decoded is Map && decoded['items'] is List) {
+          final profiles = <KantorComplexProfile>[];
+          for (final item in decoded['items'] as List) {
+            if (item is! Map || item['id'] is! String) continue;
+            final id = item['id'] as String;
+            if (id.isEmpty || profiles.any((p) => p.id == id)) continue;
+            String field(String key) =>
+                item[key] is String ? item[key] as String : '';
+            final name = field('name');
+            profiles.add(
+              KantorComplexProfile(
+                id: id,
+                name: name.isNotEmpty
+                    ? name
+                    : (id == 'default' ? 'Default' : id),
+                baseUrl: field('baseUrl'),
+                token: field('token'),
+              ),
+            );
+          }
+          if (profiles.isNotEmpty) {
+            final requested = decoded['active'];
+            final activeId =
+                requested is String && profiles.any((p) => p.id == requested)
+                ? requested
+                : profiles.where((p) => p.id == 'default').firstOrNull?.id ??
+                      profiles.first.id;
+            // Keep the previous record untouched so a failed write is retryable.
+            await _write(profiles, activeId);
+            return (profiles: profiles, activeId: activeId);
+          }
+        }
+      } on FormatException {
+        // A malformed previous envelope may still have a valid single config.
+      }
     }
     final url = await _storage.read(key: _urlKey) ?? KantorConfig.defaultUrl;
     final token = await _storage.read(key: _tokenKey) ?? '';
@@ -291,6 +334,10 @@ final class KantorApi {
       while (open) {
         try {
           socket = await connectWs('/ws');
+          if (!open) {
+            await socket!.close();
+            break;
+          }
           wait = const Duration(seconds: 1);
           await for (final raw in socket!) {
             if (raw is! String) continue;
