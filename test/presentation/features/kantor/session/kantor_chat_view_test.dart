@@ -54,7 +54,8 @@ void main() {
   }
 
   double hintSize(WidgetTester t) {
-    final ctx = t.element(find.byType(KantorChatTab));
+    // ChatScope supplies the scaled MediaQuery below KantorChatTab.
+    final ctx = t.element(find.byType(EditableText));
     return MediaQuery.of(ctx).textScaler.scale(10);
   }
 
@@ -90,7 +91,7 @@ void main() {
     final c2 = ProviderContainer();
     addTearDown(c2.dispose);
     c2.read(chatViewPrefsProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await t.pump(const Duration(milliseconds: 50));
     final p = c2.read(chatViewPrefsProvider);
     expect(p.scale, 1.3);
     expect(p.density, ChatDensity.loose);

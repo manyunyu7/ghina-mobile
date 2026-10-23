@@ -21,10 +21,21 @@ class ChatDictation {
 
   /// Length of the transcript already put into [text].
   int _inserted = 0;
+  bool _ownsDictation = false;
+  bool _disposed = false;
+  void Function()? _cancelOwned;
+
+  void dispose() {
+    _disposed = true;
+    _ownsDictation = false;
+    _cancelOwned?.call();
+    _cancelOwned = null;
+  }
 
   bool get active => ref.read(dictationControllerProvider).isActive;
 
   void onChange(DictationState? prev, DictationState next) {
+    if (_disposed || !_ownsDictation) return;
     final committed = next.committed;
     if (committed.length > _inserted) {
       final delta = committed.substring(_inserted);
@@ -60,13 +71,14 @@ class ChatDictation {
   Future<void> toggle() async => active ? stop() : start();
 
   Future<void> start() async {
-    if (active) return;
+    if (_disposed || active) return;
     final c = ref.read(dictationControllerProvider.notifier);
     final avail = await ref
         .read(speechTranscriberProvider)
         .availability(locale: ref.read(speechLocaleProvider));
+    if (_disposed) return;
     final ctx = context();
-    if (!ctx.mounted) return;
+    if (_disposed || !ctx.mounted) return;
     const fallback = 'Kamu tetap bisa mengetik pesannya, ya.';
     if (!avail.canDictate(
       allowNetwork: ref.read(dictationAllowsNetworkProvider),
@@ -75,11 +87,15 @@ class ChatDictation {
       return;
     }
     if (!await ensureMicReady(ctx, ref, MicPurpose.dictate)) return;
-    if (!ctx.mounted) return;
+    if (_disposed || !ctx.mounted) return;
     c.clear();
     _inserted = 0;
+    _ownsDictation = true;
+    _cancelOwned = () {
+      c.cancel();
+    };
     final ok = await c.start();
-    if (ok || !ctx.mounted) return;
+    if (_disposed || ok || !ctx.mounted) return;
     final s = ref.read(dictationControllerProvider);
     if (s.phase == DictationPhase.unavailable && s.availability != null) {
       await showDictationUnavailable(
@@ -105,6 +121,8 @@ class ChatDictation {
     await c.stop();
     c.clear();
     _inserted = 0;
+    _ownsDictation = false;
+    _cancelOwned = null;
   }
 
   Future<void> cancel() async {
@@ -112,5 +130,7 @@ class ChatDictation {
     await c.cancel();
     c.clear();
     _inserted = 0;
+    _ownsDictation = false;
+    _cancelOwned = null;
   }
 }

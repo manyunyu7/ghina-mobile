@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'kantor_complex_agent_switcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -97,6 +99,7 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
       appBar: AppBar(
         title: const Text('Kompleks'),
         actions: [
+          const KantorComplexSwitcherButton(),
           IconButton(
             tooltip: 'Cari',
             icon: const Icon(Icons.search_rounded),

@@ -9,13 +9,17 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/kantor_pratinjau.dart';
+import 'kantor_complex_providers.dart';
 
 import '../data/datasources/remote/kantor_api.dart';
+
+export 'kantor_complex_providers.dart';
 
 export '../data/datasources/remote/kantor_api.dart'
     show
         KantorApi,
         KantorConfig,
+        KantorComplexProfile,
         KantorException,
         KantorFailure,
         KantorPratinjauApi;
@@ -35,10 +39,35 @@ final class KantorConfigNotifier extends AsyncNotifier<KantorConfig> {
   @override
   Future<KantorConfig> build() => ref.read(kantorConfigStoreProvider).load();
 
-  Future<void> save({required String baseUrl, required String token}) async {
+  Future<void> save({
+    required String baseUrl,
+    required String token,
+    String? name,
+    String? profileId,
+  }) async {
     final next = KantorConfig(baseUrl: baseUrl.trim(), token: token.trim());
-    await ref.read(kantorConfigStoreProvider).save(next);
+    await ref
+        .read(kantorConfigStoreProvider)
+        .save(next, name: name, profileId: profileId);
+    ref.invalidate(kantorComplexProfilesProvider);
+    ref.invalidate(kantorActiveComplexIdProvider);
     state = AsyncData(next);
+  }
+
+  Future<void> activate(String profileId) async {
+    final profiles = await ref.read(kantorComplexProfilesProvider.future);
+    final profile = profiles.where((e) => e.id == profileId).firstOrNull;
+    if (profile == null) {
+      throw const KantorException(
+        KantorFailure.notFound,
+        'Kompleks tidak ditemukan.',
+      );
+    }
+    // A failed target must never replace the current connection.
+    await ref.read(kantorComplexApiProvider(profileId)).get('/api/state');
+    await ref.read(kantorConfigStoreProvider).activate(profileId);
+    state = AsyncData(profile.config);
+    ref.invalidate(kantorActiveComplexIdProvider);
   }
 }
 

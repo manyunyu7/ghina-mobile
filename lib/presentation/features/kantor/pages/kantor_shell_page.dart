@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+
+import 'kantor_complex_agent_switcher.dart';
+import '../session/chat_context.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_agents_tab.dart';
 import '../archive/kantor_archive_tab.dart';
@@ -54,17 +58,26 @@ const _complexTabs = {'notes', 'wiki', 'payroll', 'metrik', 'pemakaian'};
 
 /// One office: a swipeable tab bar over the per-feature tab bodies. Owns the
 /// Scaffold and AppBar; tabs only draw their body.
-class KantorShellPage extends StatelessWidget {
+class KantorShellPage extends ConsumerWidget {
   const KantorShellPage({super.key, required this.officeId, this.tab});
 
   final String officeId;
   final String? tab;
 
   @override
-  Widget build(BuildContext context) =>
+  Widget build(BuildContext context, WidgetRef ref) =>
       // Keyed so switching office rebuilds the tab controller and bodies even
       // when the router reuses this page's element.
-      _KantorShellBody(key: ValueKey(officeId), officeId: officeId, tab: tab);
+      _KantorShellBody(
+        key: ValueKey((
+          ref.watch(kantorApiProvider) == null
+              ? null
+              : kantorConnectionKey(ref.watch(kantorApiProvider)!.config),
+          officeId,
+        )),
+        officeId: officeId,
+        tab: tab,
+      );
 }
 
 class _KantorShellBody extends ConsumerStatefulWidget {
@@ -104,7 +117,8 @@ class _KantorShellPageState extends ConsumerState<_KantorShellBody>
     _onFloor = _isFloor(_controller.index);
     _controller.addListener(_syncSwipe);
     if (widget.officeId != '_kompleks') {
-      rememberKantorOffice(widget.officeId);
+      final baseUrl = ref.read(kantorConfigProvider).value?.baseUrl;
+      rememberKantorOffice(widget.officeId, baseUrl: baseUrl);
       ref.invalidate(kantorLastOfficeProvider);
     }
   }
@@ -184,6 +198,7 @@ class _KantorShellPageState extends ConsumerState<_KantorShellBody>
           ),
         ),
         actions: [
+          KantorComplexSwitcherButton(officeId: id),
           // Ponsel sempit: maksimal ~2 ikon tetap. "Dibuka untukmu" & izin
           // hanya muncul sebagai ikon saat ada yang menunggu; selebihnya di ⋮.
           const KantorShowsButton(hideWhenIdle: true),

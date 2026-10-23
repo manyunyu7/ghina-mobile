@@ -72,6 +72,7 @@ void main() {
     await t.tap(find.textContaining('Tono'));
     await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 600));
-    expect(router.state.uri.toString(), '/kantor/o/o/s/s2?tab=agen');
+    // Office-only tabs must not leak into a session's route.
+    expect(router.state.uri.toString(), '/kantor/o/o/s/s2');
   });
 }

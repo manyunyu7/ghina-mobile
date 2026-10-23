@@ -6,9 +6,11 @@ import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
 import '../codex/kantor_codex.dart';
 import '../pages/kantor_agent_switcher.dart';
+import '../pages/kantor_complex_agent_switcher.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
 import 'chat_tab.dart';
+import 'chat_context.dart';
 import 'kantor_adopt.dart';
 import 'chat_view_prefs.dart';
 import 'kantor_actions.dart';
@@ -38,16 +40,36 @@ class KantorSessionPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
+    final complex = ref.watch(kantorActiveComplexProvider);
     return ListenableBuilder(
       listenable: feed,
       builder: (context, _) {
         final s = feed.session(sid);
         if (feed.loading) {
-          return Scaffold(appBar: AppBar(), body: const KantorLoading());
+          return Scaffold(
+            appBar: AppBar(
+              actions: [
+                KantorComplexSwitcherButton(
+                  officeId: officeId,
+                  currentSid: sid,
+                  tab: tab,
+                ),
+              ],
+            ),
+            body: const KantorLoading(),
+          );
         }
         if (s == null) {
           return Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar(
+              actions: [
+                KantorComplexSwitcherButton(
+                  officeId: officeId,
+                  currentSid: sid,
+                  tab: tab,
+                ),
+              ],
+            ),
             body: feed.error != null
                 ? KantorErrorView(error: feed.error!, onRetry: feed.load)
                 : Center(
@@ -65,10 +87,20 @@ class KantorSessionPage extends ConsumerWidget {
           );
         }
         return _SessionScaffold(
+          key: ValueKey(
+            kantorComplexChatIdentity(
+              api == null ? '' : kantorConnectionKey(api.config),
+              officeId,
+              sid,
+            ),
+          ),
+          complexId: complex?.id,
           feed: feed,
           officeId: officeId,
           sid: sid,
-          initialTab: _tabNames.indexOf(tab ?? '').clamp(0, _tabNames.length - 1),
+          initialTab: _tabNames
+              .indexOf(tab ?? '')
+              .clamp(0, _tabNames.length - 1),
           actions: api == null ? null : KantorActions(api),
         );
       },
@@ -78,8 +110,10 @@ class KantorSessionPage extends ConsumerWidget {
 
 const _tabNames = ['chat', 'terminal', 'profil', 'subagent', 'pratinjau'];
 
-class _SessionScaffold extends StatefulWidget {
+class _SessionScaffold extends ConsumerStatefulWidget {
   const _SessionScaffold({
+    super.key,
+    this.complexId,
     required this.feed,
     required this.officeId,
     required this.sid,
@@ -87,6 +121,7 @@ class _SessionScaffold extends StatefulWidget {
     required this.actions,
   });
 
+  final String? complexId;
   final KantorOfficeFeed feed;
   final String officeId;
   final String sid;
@@ -94,10 +129,10 @@ class _SessionScaffold extends StatefulWidget {
   final KantorActions? actions;
 
   @override
-  State<_SessionScaffold> createState() => _SessionScaffoldState();
+  ConsumerState<_SessionScaffold> createState() => _SessionScaffoldState();
 }
 
-class _SessionScaffoldState extends State<_SessionScaffold>
+class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     with SingleTickerProviderStateMixin {
   static const _terminalTab = 1;
 
@@ -109,6 +144,19 @@ class _SessionScaffoldState extends State<_SessionScaffold>
   late final _built = <int>{widget.initialTab};
 
   late int _shown = widget.initialTab;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final complex = widget.complexId;
+      if (mounted && complex != null) {
+        ref
+            .read(kantorRecentComplexChatsProvider.notifier)
+            .remember(complex, widget.officeId, widget.sid);
+      }
+    });
+  }
 
   void _onTab() {
     final i = _tabs.index;
@@ -199,7 +247,14 @@ class _SessionScaffoldState extends State<_SessionScaffold>
             ),
           ),
         ),
-        actions: [_Menu(feed: widget.feed, sess: s, actions: widget.actions)],
+        actions: [
+          KantorComplexSwitcherButton(
+            officeId: widget.officeId,
+            currentSid: widget.sid,
+            tab: _tabNames[_shown],
+          ),
+          _Menu(feed: widget.feed, sess: s, actions: widget.actions),
+        ],
         bottom: TabBar(
           controller: _tabs,
           // five tabs don't fit 360dp: scroll horizontally, compact labels
@@ -306,15 +361,16 @@ class _OutsideNote extends ConsumerWidget {
   );
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header({required this.feed, required this.sess});
 
   final KantorOfficeFeed feed;
   final Json sess;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final g = context.ghina;
+    final complex = ref.watch(kantorActiveComplexProvider);
     final r = feed.role(sess['role'] as String?);
     final look = r ?? KantorSprite.guestLook('${sess['sid']}');
     final model = kantorSessionModelText(r, sess);
@@ -378,7 +434,11 @@ class _Header extends StatelessWidget {
                 ],
               ),
               Text(
-                sub,
+                [
+                  if (complex != null) complex.name,
+                  if (feed.office?['name'] != null) '${feed.office!['name']}',
+                  sub,
+                ].join(' · '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GhinaType.caption.copyWith(color: g.textSecondary),

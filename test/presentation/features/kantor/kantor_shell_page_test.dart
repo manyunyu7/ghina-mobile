@@ -37,16 +37,21 @@ void main() {
         isA<NeverScrollableScrollPhysics>(),
       );
       final bar = t.widget<TabBar>(find.byType(TabBar));
-      // the floor is the fourth tab on the phone (agents, wiki and files come first)
-      expect(bar.controller!.index, 3);
+      final floorIndex = bar.tabs.indexWhere(
+        (tab) => (tab as Tab).text == 'Kantor',
+      );
+      final boardIndex = bar.tabs.indexWhere(
+        (tab) => (tab as Tab).text == 'Board',
+      );
+      expect(bar.controller!.index, floorIndex);
       await t.fling(find.byType(TabBarView), const Offset(-300, 0), 1500);
       await t.pump(const Duration(milliseconds: 500));
-      expect(bar.controller!.index, 3);
+      expect(bar.controller!.index, floorIndex);
       await t.tap(
         find.descendant(of: find.byType(TabBar), matching: find.text('Board')),
       );
       await t.pump(const Duration(milliseconds: 500));
-      expect(bar.controller!.index, 4);
+      expect(bar.controller!.index, boardIndex);
       // elsewhere the page view swipes again
       expect(t.widget<TabBarView>(find.byType(TabBarView)).physics, isNull);
     },

@@ -13,6 +13,7 @@ import 'attachment_model.dart';
 import 'attachment_notifier.dart';
 import 'attachment_uploader.dart';
 import 'kantor_feed.dart';
+import 'chat_context.dart';
 
 /// Where the outbox (copies of the files + `queue.json`) lives. Tests override.
 final kantorOutboxDirProvider = Provider<Future<Directory>>((ref) async {
@@ -71,7 +72,22 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     return const [];
   }
 
-  UploadNotifier get _notify => ref.read(kantorUploadNotifierProvider);
+  String? get _connection {
+    // Using the uploader also keeps overridden uploaders testable.
+    final uploader = ref.read(kantorUploaderProvider);
+    if (uploader == null) return null;
+    return kantorConnectionKey(
+      KantorConfig(
+        baseUrl: uploader.dio.options.baseUrl,
+        token: '${uploader.dio.options.headers['Authorization'] ?? ''}'
+            .replaceFirst(RegExp(r'^Bearer '), ''),
+      ),
+    );
+  }
+
+  UploadNotifier get _notify => ref.mounted
+      ? ref.read(kantorUploadNotifierProvider)
+      : const NoUploadNotifier();
 
   Future<File> _queueFile() async => File(
     p.join((await ref.read(kantorOutboxDirProvider)).path, 'queue.json'),
@@ -80,34 +96,45 @@ class KantorUploads extends Notifier<List<UploadJob>> {
   Future<void> _restore() async {
     try {
       final f = await _queueFile();
+      if (!ref.mounted) return;
       if (await f.exists()) {
         final raw = jsonDecode(await f.readAsString());
+        if (!ref.mounted) return;
         final jobs = <UploadJob>[
           if (raw is List)
             for (final j in raw)
               if (j is Map) UploadJob.fromJson(Map<String, dynamic>.from(j)),
         ];
+        // Legacy jobs lack an origin: bind once to the connection present at
+        // migration, then persist it before any network request.
+        final connection = _connection;
         // anything that was mid-flight when the process died goes back in line
         state = [
           ...state,
           for (final j in jobs)
             if (state.every((x) => x.id != j.id))
-              j.status == UploadStatus.uploading
-                  ? j.copyWith(status: UploadStatus.queued)
-                  : j,
+              j.copyWith(
+                connection: j.connection.isEmpty ? connection : null,
+                status: j.status == UploadStatus.uploading
+                    ? UploadStatus.queued
+                    : j.status,
+              ),
         ];
       }
     } catch (e) {
       debugPrint('Kantor outbox restore: $e');
     }
+    if (!ref.mounted) return;
     _loaded = true;
+    await _save();
     await _pump();
   }
 
   Future<void> _save() async {
-    if (!_loaded) return;
+    if (!_loaded || !ref.mounted) return;
     try {
       final f = await _queueFile();
+      if (!ref.mounted) return;
       final keep = [
         for (final j in state)
           if (j.status != UploadStatus.done) j.toJson(),
@@ -133,7 +160,15 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     required String name,
     required String mime,
     String caption = '',
+    String? connection,
+    String office = '',
   }) async {
+    final target = connection ?? _connection;
+    if (target == null || target != _connection) {
+      throw const UploadFailure(
+        'Kompleks sudah berganti. Pilih file lagi di chat tujuan.',
+      );
+    }
     final dir = await ref.read(kantorOutboxDirProvider);
     final id = '${DateTime.now().microsecondsSinceEpoch}';
     final dest = p.join(dir.path, '$id${p.extension(name)}');
@@ -141,6 +176,8 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     final job = UploadJob(
       id: id,
       sid: sid,
+      connection: target,
+      office: office,
       agent: agent,
       path: dest,
       name: name,
@@ -148,6 +185,10 @@ class KantorUploads extends Notifier<List<UploadJob>> {
       mime: mime,
       caption: caption,
     );
+    if (!ref.mounted) {
+      _forget(job);
+      throw const UploadFailure('Antrean sudah ditutup.');
+    }
     state = [...state, job];
     await _save();
     unawaited(_pump());
@@ -179,20 +220,36 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     unawaited(File(job.path).delete().then((_) {}, onError: (_) {}));
   }
 
-  UploadJob? _next() {
+  UploadJob? _next(String connection) {
     for (final j in state) {
-      if (j.status == UploadStatus.queued) return j;
+      if (j.status == UploadStatus.queued && j.connection == connection)
+        return j;
     }
     return null;
   }
 
   Future<void> _pump() async {
     if (_running || !_loaded || !ref.mounted) return;
-    final uploader = ref.read(kantorUploaderProvider);
-    if (uploader == null) return;
+    if (ref.read(kantorUploaderProvider) == null) return;
     _running = true;
     try {
-      for (var job = _next(); job != null && ref.mounted; job = _next()) {
+      while (ref.mounted) {
+        // Capture the destination for each job, rather than letting a previous
+        // pump send newly queued work using another complex's client.
+        final uploader = ref.read(kantorUploaderProvider);
+        final connection = _connection;
+        if (uploader == null || connection == null) break;
+        if (state.any((j) => j.connection.isEmpty)) {
+          state = [
+            for (final j in state)
+              j.connection.isEmpty ? j.copyWith(connection: connection) : j,
+          ];
+          await _save();
+          // The active connection may have changed while the queue was saved.
+          continue;
+        }
+        final job = _next(connection);
+        if (job == null) break;
         await _runOne(uploader, job);
       }
     } finally {
@@ -211,8 +268,12 @@ class KantorUploads extends Notifier<List<UploadJob>> {
       id,
       (j) => j.copyWith(status: UploadStatus.uploading, clearError: true),
     );
-    UploadJob cur() => state.firstWhere((j) => j.id == id, orElse: () => job);
-    int waiting() => state.where((j) => j.status == UploadStatus.queued).length;
+    UploadJob cur() => !ref.mounted
+        ? job
+        : state.firstWhere((j) => j.id == id, orElse: () => job);
+    int waiting() => !ref.mounted
+        ? 0
+        : state.where((j) => j.status == UploadStatus.queued).length;
     try {
       await uploader.upload(
         cur(),
@@ -231,6 +292,7 @@ class KantorUploads extends Notifier<List<UploadJob>> {
       );
       await _notify.finished(cur());
       _forget(job);
+      if (!ref.mounted) return;
       _sweep?.cancel();
       _sweep = Timer(const Duration(seconds: 2), () {
         if (!ref.mounted) return;
@@ -268,8 +330,14 @@ final kantorAttachmentAlertsProvider = Provider<void>((ref) {
     if (msg == null || msg['t'] != 'attachment') return;
     final item = KantorAttachment.fromJson(asJson(msg['item']));
     final sid = '${msg['sid']}';
-    if (item.mine || item.id.isEmpty || !seen.add(item.id)) return;
-    if ((kantorOpenChats[sid] ?? 0) > 0) return;
+    final config = ref.read(kantorConfigProvider).value;
+    if (config == null) return;
+    final connection = kantorConnectionKey(config);
+    final office = '${msg['office'] ?? ''}';
+    if (item.mine || item.id.isEmpty || !seen.add('$connection/${item.id}'))
+      return;
+    if ((kantorOpenChats[kantorOpenChatKey(connection, office, sid)] ?? 0) > 0)
+      return;
     var who = item.agent;
     if (who.isEmpty) {
       final office = '${msg['office'] ?? ''}';

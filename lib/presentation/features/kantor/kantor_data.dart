@@ -87,16 +87,35 @@ const _lastOfficeKey = 'kantor.last_office';
 
 /// The office opened last, or null (also when storage is unavailable).
 final kantorLastOfficeProvider = FutureProvider<String?>((ref) async {
+  final baseUrl = ref.watch(kantorConfigProvider).value?.baseUrl;
+  if (baseUrl == null) return null;
   try {
-    return (await SharedPreferences.getInstance()).getString(_lastOfficeKey);
+    final prefs = await SharedPreferences.getInstance();
+    final key = _officeKey(baseUrl);
+    final saved = prefs.getString(key);
+    if (saved != null) return saved;
+    // The old unscoped value belongs only to the migrated connection.
+    final profiles = await ref.watch(kantorComplexProfilesProvider.future);
+    if (profiles.any((p) => p.id == 'legacy' && p.baseUrl == baseUrl)) {
+      final legacy = prefs.getString(_lastOfficeKey);
+      if (legacy != null) await prefs.setString(key, legacy);
+      return legacy;
+    }
+    return null;
   } catch (_) {
     return null;
   }
 });
 
-Future<void> rememberKantorOffice(String id) async {
+String _officeKey(String baseUrl) =>
+    '$_lastOfficeKey.${Uri.encodeComponent(baseUrl.replaceAll(RegExp(r'/+$'), ''))}';
+
+Future<void> rememberKantorOffice(String id, {String? baseUrl}) async {
   try {
-    await (await SharedPreferences.getInstance()).setString(_lastOfficeKey, id);
+    await (await SharedPreferences.getInstance()).setString(
+      baseUrl == null ? _lastOfficeKey : _officeKey(baseUrl),
+      id,
+    );
   } catch (_) {}
 }
 

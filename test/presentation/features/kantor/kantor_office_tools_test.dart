@@ -238,10 +238,18 @@ void main() {
     Widget home, {
     List<Override> overrides = const [],
     bool withApi = true,
+    bool withRouter = false,
   }) async {
     t.view.physicalSize = const Size(800, 2400);
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
+    final router = withRouter
+        ? GoRouter(
+            initialLocation: '/kantor',
+            routes: [GoRoute(path: '/kantor', builder: (_, _) => home)],
+          )
+        : null;
+    if (router != null) addTearDown(router.dispose);
     await t.pumpWidget(
       ProviderScope(
         overrides: [
@@ -249,7 +257,12 @@ void main() {
           kantorEventsProvider.overrideWith((ref) => const Stream.empty()),
           ...overrides,
         ],
-        child: MaterialApp(theme: GhinaTheme.light(), home: home),
+        child: router == null
+            ? MaterialApp(theme: GhinaTheme.light(), home: home)
+            : MaterialApp.router(
+                theme: GhinaTheme.light(),
+                routerConfig: router,
+              ),
       ),
     );
     await settle(t);
@@ -326,6 +339,7 @@ void main() {
       await pumpApp(
         t,
         const KantorComplexPage(),
+        withRouter: true,
         overrides: [
           kantorStateProvider.overrideWith((_) async => _state),
           kantorEndedProvider.overrideWith((_) async => const []),
@@ -338,7 +352,7 @@ void main() {
         t.getTopLeft(bar).dy < t.getTopLeft(find.text('Kotak masuk izin')).dy,
         isTrue,
       );
-      expect(find.byTooltip('Kantor baru'), findsOneWidget);
+      expect(find.text('Kantor baru'), findsOneWidget);
       await t.tap(bar);
       await t.pumpAndSettle();
       expect(find.byType(KantorSearchPage), findsOneWidget);

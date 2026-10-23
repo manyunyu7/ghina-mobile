@@ -18,6 +18,8 @@ class UploadJob {
     required this.size,
     required this.mime,
     this.caption = '',
+    this.connection = '',
+    this.office = '',
     this.uploadId,
     this.sent = 0,
     this.status = UploadStatus.queued,
@@ -27,6 +29,10 @@ class UploadJob {
   /// Local id, not the daemon's.
   final String id;
   final String sid;
+
+  /// Fingerprint of the originating URL/account, never its token.
+  final String connection;
+  final String office;
 
   /// Display name of the agent, for notifications.
   final String agent;
@@ -54,6 +60,7 @@ class UploadJob {
 
   UploadJob copyWith({
     String? uploadId,
+    String? connection,
     int? sent,
     UploadStatus? status,
     String? error,
@@ -61,6 +68,8 @@ class UploadJob {
   }) => UploadJob(
     id: id,
     sid: sid,
+    connection: connection ?? this.connection,
+    office: office,
     agent: agent,
     path: path,
     name: name,
@@ -76,6 +85,8 @@ class UploadJob {
   Map<String, dynamic> toJson() => {
     'id': id,
     'sid': sid,
+    'connection': connection,
+    'office': office,
     'agent': agent,
     'path': path,
     'name': name,
@@ -91,6 +102,8 @@ class UploadJob {
   factory UploadJob.fromJson(Map<String, dynamic> j) => UploadJob(
     id: '${j['id']}',
     sid: '${j['sid']}',
+    connection: '${j['connection'] ?? ''}',
+    office: '${j['office'] ?? ''}',
     agent: '${j['agent'] ?? ''}',
     path: '${j['path']}',
     name: '${j['name']}',

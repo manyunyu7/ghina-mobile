@@ -16,6 +16,7 @@ import 'attachment_uploads.dart';
 import 'attachment_views.dart';
 import '../pratinjau/pratinjau_chat_bubble.dart';
 import 'chat_dictation.dart';
+import 'chat_context.dart';
 import 'chat_images.dart';
 import 'chat_subagents.dart';
 import 'chat_model.dart';
@@ -43,6 +44,25 @@ class KantorChatTab extends ConsumerStatefulWidget {
 
 class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   final _input = TextEditingController();
+  late final KantorApi? _api;
+  late final String _connection;
+  late final KantorChatMemory _memory;
+  late final ScrollController _scroll;
+  late final String _openKey;
+
+  bool get _active {
+    if (!mounted) return false;
+    final current = ref.read(kantorApiProvider);
+    return current == null
+        ? _api == null
+        : kantorConnectionKey(current.config) == _connection;
+  }
+
+  void _saveDraft() => _memory.draft = _input.value;
+  void _saveScroll() {
+    if (_scroll.hasClients) _memory.scrollOffset = _scroll.offset;
+  }
+
   Timer? _timer;
   Timer? _bump;
   List<ChatEntry>? _entries;
@@ -60,8 +80,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   bool _holdMic = false;
 
   KantorActions? get _actions {
-    final api = ref.read(kantorApiProvider);
-    return api == null ? null : KantorActions(api);
+    return !_active || _api == null ? null : KantorActions(_api);
   }
 
   Json get _sess => widget.feed.session(widget.sid) ?? const {};
@@ -69,7 +88,19 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   @override
   void initState() {
     super.initState();
-    kantorOpenChats[widget.sid] = (kantorOpenChats[widget.sid] ?? 0) + 1;
+    _api = ref.read(kantorApiProvider);
+    _connection = _api == null ? '' : kantorConnectionKey(_api.config);
+    _memory = ref.read(kantorChatMemoryProvider).putIfAbsent((
+      connection: _connection,
+      office: widget.feed.officeId,
+      sid: widget.sid,
+    ), KantorChatMemory.new);
+    _input.value = _memory.draft;
+    _input.addListener(_saveDraft);
+    _scroll = ScrollController(initialScrollOffset: _memory.scrollOffset)
+      ..addListener(_saveScroll);
+    _openKey = kantorOpenChatKey(_connection, widget.feed.officeId, widget.sid);
+    kantorOpenChats[_openKey] = (kantorOpenChats[_openKey] ?? 0) + 1;
     _load();
     _loadAtts();
     _timer = Timer.periodic(_pollEvery, (_) => _load());
@@ -96,19 +127,23 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     _timer?.cancel();
     _bump?.cancel();
     widget.feed.removeListener(_onFeed);
-    final open = (kantorOpenChats[widget.sid] ?? 1) - 1;
+    _dictation.dispose();
+    _saveDraft();
+    _saveScroll();
+    _scroll.dispose();
+    final open = (kantorOpenChats[_openKey] ?? 1) - 1;
     if (open <= 0) {
-      kantorOpenChats.remove(widget.sid);
+      kantorOpenChats.remove(_openKey);
     } else {
-      kantorOpenChats[widget.sid] = open;
+      kantorOpenChats[_openKey] = open;
     }
     _input.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
-    final api = ref.read(kantorApiProvider);
-    if (api == null || _loading || !mounted) return;
+    final api = _api;
+    if (!_active || api == null || _loading) return;
     _loading = true;
     try {
       final data = asJson(
@@ -117,7 +152,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
           query: {'n': 200},
         ),
       );
-      if (!mounted) return;
+      if (!_active) return;
       if (data['size'] != null && data['size'] == _size && _entries != null)
         return;
       _size = data['size'];
@@ -127,7 +162,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
         _error = null;
       });
     } catch (e) {
-      if (mounted && _entries == null) setState(() => _error = e);
+      if (_active && _entries == null) setState(() => _error = e);
     } finally {
       _loading = false;
     }
@@ -136,14 +171,14 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   /// Attachments are optional for the daemon (older builds answer 404): a
   /// failure just leaves the list as it was.
   Future<void> _loadAtts() async {
-    final api = ref.read(kantorApiProvider);
-    if (api == null || _loadingAtts || !mounted) return;
+    final api = _api;
+    if (!_active || api == null || _loadingAtts) return;
     _loadingAtts = true;
     try {
       final list = parseAttachments(
         await api.get('/api/sessions/${widget.sid}/attachments'),
       );
-      if (mounted && !_sameAtts(list)) setState(() => _atts = list);
+      if (_active && !_sameAtts(list)) setState(() => _atts = list);
     } catch (_) {
       // keep what we have
     } finally {
@@ -161,7 +196,10 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
       ].every((x) => x);
 
   void _onEvent(Json? msg) {
-    if (msg == null || msg['t'] != 'attachment' || msg['sid'] != widget.sid)
+    if (!_active ||
+        msg == null ||
+        msg['t'] != 'attachment' ||
+        msg['sid'] != widget.sid)
       return;
     final item = KantorAttachment.fromJson(asJson(msg['item']));
     if (item.id.isEmpty) return;
@@ -178,25 +216,26 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     final landed = next.any(
       (j) =>
           j.sid == widget.sid &&
+          j.connection == _connection &&
           j.status == UploadStatus.done &&
           was[j.id] != UploadStatus.done,
     );
     if (landed) _loadAtts();
   }
 
-  bool get _canAttach => _sess['status'] != 'ended';
+  bool get _canAttach => _active && _sess['status'] != 'ended';
 
   Future<void> _attach() async {
     final choice = await showAttachSheet(context);
-    if (choice == null || !mounted) return;
+    if (choice == null || !_active) return;
     List<PickedAttachment> picked;
     try {
       picked = await pickAttachments(choice);
     } catch (e) {
-      if (mounted) _err('Tidak bisa mengambil berkas.');
+      if (_active) _err('Tidak bisa mengambil berkas.');
       return;
     }
-    if (picked.isEmpty || !mounted) return;
+    if (picked.isEmpty || !_active) return;
     var caption = _input.text.trim();
     final who = sessionName(widget.feed, _sess);
     final uploads = ref.read(kantorUploadsProvider.notifier);
@@ -205,12 +244,15 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
         // the text in the field is the caption of the first file only
         await uploads.enqueue(
           sid: widget.sid,
+          connection: _connection,
+          office: widget.feed.officeId,
           agent: who,
           source: f.file,
           name: f.name,
           mime: f.mime,
           caption: caption,
         );
+        if (!_active) return;
         if (caption.isNotEmpty) {
           _input.clear();
           caption = '';
@@ -218,12 +260,13 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
       }
       HapticFeedback.selectionClick();
     } catch (e) {
-      if (mounted) _err('Gagal menyiapkan file: $e');
+      if (_active) _err('Gagal menyiapkan file: $e');
     }
   }
 
   bool get _canSend {
     final s = _sess;
+    if (!_active) return false;
     if (s['status'] == 'ended') return false;
     final typeable =
         s['tty'] != null && !['vscode', 'lain'].contains(s['host']);
@@ -239,34 +282,43 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   );
 
   Future<void> _say(String text) async {
+    if (!_active) return;
     // sending mid-dictation takes the last words along
     final fromField = text == _input.text;
     if (_dictation.active) await _dictation.stop();
-    if (!mounted) return;
+    if (!_active) return;
     if (fromField) text = _input.text;
     final t = text.trim();
     if (t.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await _actions?.sendText(widget.sid, t);
+      final actions = _actions;
+      if (actions == null) return;
+      await actions.sendText(widget.sid, t);
+      if (!_active) {
+        if (_memory.draft.text == text) _memory.draft = TextEditingValue.empty;
+        return;
+      }
       if (text == _input.text) _input.clear();
       HapticFeedback.selectionClick();
       _bumpLoad(1200);
     } catch (e) {
-      if (mounted) _err(e);
+      if (_active) _err(e);
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
-    if (mounted) setState(() => _sending = false);
   }
 
   Future<void> _act(String action) async {
+    if (!_active) return;
     if (action == 'esc') {
       final pick = await askStopMode(context, _sess);
-      if (pick == null || !mounted) return;
+      if (pick == null || !_active) return;
       action = pick;
     }
     try {
       final did = await _actions?.action(widget.sid, action) ?? true;
-      if (mounted) {
+      if (mounted && _active) {
         showToastBadge(
           context,
           message: !did
@@ -282,7 +334,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
         );
       }
     } catch (e) {
-      if (mounted) _err(e);
+      if (_active) _err(e);
     }
   }
 
@@ -293,169 +345,182 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     ref.listen(dictationControllerProvider, _dictation.onChange);
     final dictating = ref.watch(dictationControllerProvider).isActive;
     final view = ref.watch(chatViewPrefsProvider);
-    final api = ref.watch(kantorApiProvider);
+    ref.watch(kantorApiProvider);
+    final api = _api;
     final outbox = [
       for (final j in ref.watch(kantorUploadsProvider))
-        if (j.sid == widget.sid) j,
+        if (j.sid == widget.sid &&
+            j.connection == _connection &&
+            (j.office.isEmpty || j.office == widget.feed.officeId))
+          j,
     ];
     return ChatScope(
       scale: view.scale,
       child: ListenableBuilder(
-      listenable: widget.feed,
-      builder: (context, _) {
-        final can = _canSend;
-        final perms = [
-          for (final i in widget.feed.inbox)
-            if (i['sid'] == widget.sid) i,
-        ];
-        return Column(
-          children: [
-            Expanded(child: _list(context, api, outbox, view)),
-            if (perms.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  GhinaSpace.md,
-                  GhinaSpace.sm,
-                  GhinaSpace.md,
-                  0,
+        listenable: widget.feed,
+        builder: (context, _) {
+          final can = _canSend;
+          final perms = [
+            for (final i in widget.feed.inbox)
+              if (i['sid'] == widget.sid) i,
+          ];
+          return Column(
+            children: [
+              Expanded(
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: _pinchDown,
+                  onPointerMove: _pinchMove,
+                  onPointerUp: _pinchEnd,
+                  onPointerCancel: _pinchEnd,
+                  child: _list(context, api, outbox, view),
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+              ),
+              if (perms.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    GhinaSpace.md,
+                    GhinaSpace.sm,
+                    GhinaSpace.md,
+                    0,
                   ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        for (final p in perms)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: GhinaSpace.sm,
-                            ),
-                            child: KantorPermissionCard(
-                              item: p,
-                              who: sessionName(widget.feed, _sess),
-                              onDecide: (b) async {
-                                try {
-                                  await _actions?.decide('${p['id']}', b);
-                                } catch (e) {
-                                  if (mounted) _err(e);
-                                }
-                              },
-                              onSubmit: (answers) async {
-                                try {
-                                  await _actions?.submitAsk(
-                                    '${p['id']}',
-                                    answers,
-                                  );
-                                  _bumpLoad();
-                                } catch (e) {
-                                  if (mounted) _err(e);
-                                }
-                              },
-                              onAnswer: (n) async {
-                                try {
-                                  await _actions?.answerAsk(p, n);
-                                  _bumpLoad();
-                                } catch (e) {
-                                  if (mounted) _err(e);
-                                }
-                              },
-                            ),
-                          ),
-                      ],
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
                     ),
-                  ),
-                ),
-              ),
-            ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
-            _StatusLine(feed: widget.feed, sess: _sess),
-            _Quick(
-              scale: view.scale,
-              enabled: can,
-              onSay: _say,
-              onEsc: () => _act('esc'),
-              onCompact: () => _act('compact'),
-            ),
-            if (dictating)
-              DictationBar(
-                onStop: _dictation.stop,
-                onCancel: _dictation.cancel,
-              ),
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                GhinaSpace.md,
-                GhinaSpace.xs,
-                GhinaSpace.md,
-                GhinaSpace.sm,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    key: const ValueKey('kantor-attach'),
-                    tooltip: 'Kirim foto, video, atau file',
-                    onPressed: _canAttach ? _attach : null,
-                    icon: const Icon(Icons.attach_file_rounded),
-                  ),
-                  GestureDetector(
-                    onLongPressStart: can
-                        ? (_) {
-                            if (_dictation.active) return;
-                            _holdMic = true;
-                            HapticFeedback.lightImpact();
-                            _dictation.start();
-                          }
-                        : null,
-                    onLongPressEnd: can
-                        ? (_) {
-                            if (_holdMic) _dictation.stop();
-                            _holdMic = false;
-                          }
-                        : null,
-                    child: IconButton(
-                      key: const ValueKey('kantor-mic'),
-                      tooltip: dictating
-                          ? 'Selesai dikte'
-                          : 'Dikte (ketuk atau tahan)',
-                      onPressed: can ? _dictation.toggle : null,
-                      icon: Icon(
-                        dictating
-                            ? Icons.stop_circle_rounded
-                            : Icons.mic_rounded,
-                        color: dictating ? GhinaColors.blue.base : null,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          for (final p in perms)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: GhinaSpace.sm,
+                              ),
+                              child: KantorPermissionCard(
+                                item: p,
+                                who: sessionName(widget.feed, _sess),
+                                onDecide: (b) async {
+                                  try {
+                                    await _actions?.decide('${p['id']}', b);
+                                  } catch (e) {
+                                    if (_active) _err(e);
+                                  }
+                                },
+                                onSubmit: (answers) async {
+                                  try {
+                                    await _actions?.submitAsk(
+                                      '${p['id']}',
+                                      answers,
+                                    );
+                                    _bumpLoad();
+                                  } catch (e) {
+                                    if (_active) _err(e);
+                                  }
+                                },
+                                onAnswer: (n) async {
+                                  try {
+                                    await _actions?.answerAsk(p, n);
+                                    _bumpLoad();
+                                  } catch (e) {
+                                    if (_active) _err(e);
+                                  }
+                                },
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: ChunkyTextField(
-                      controller: _input,
-                      enabled: can,
-                      hint: can
-                          ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
-                          : _sess['status'] == 'ended'
-                          ? 'Sesi sudah selesai'
-                          : 'Tidak bisa mengetik ke sesi ini dari sini',
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.newline,
-                    ),
-                  ),
-                  const SizedBox(width: GhinaSpace.sm),
-                  ChunkyIconButton(
-                    icon: Icons.send_rounded,
-                    tooltip: 'Kirim',
-                    color: can ? GhinaColors.green : GhinaColors.gray,
-                    onPressed: can && !_sending
-                        ? () => _say(_input.text)
-                        : null,
-                  ),
-                ],
+                ),
+              ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
+              _StatusLine(feed: widget.feed, sess: _sess),
+              _Quick(
+                scale: view.scale,
+                enabled: can,
+                onSay: _say,
+                onEsc: () => _act('esc'),
+                onCompact: () => _act('compact'),
               ),
-            ),
-          ],
-        );
-      },
-    ),
+              if (dictating)
+                DictationBar(
+                  onStop: _dictation.stop,
+                  onCancel: _dictation.cancel,
+                ),
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  GhinaSpace.md,
+                  GhinaSpace.xs,
+                  GhinaSpace.md,
+                  GhinaSpace.sm,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      key: const ValueKey('kantor-attach'),
+                      tooltip: 'Kirim foto, video, atau file',
+                      onPressed: _canAttach ? _attach : null,
+                      icon: const Icon(Icons.attach_file_rounded),
+                    ),
+                    GestureDetector(
+                      onLongPressStart: can
+                          ? (_) {
+                              if (_dictation.active) return;
+                              _holdMic = true;
+                              HapticFeedback.lightImpact();
+                              _dictation.start();
+                            }
+                          : null,
+                      onLongPressEnd: can
+                          ? (_) {
+                              if (_holdMic) _dictation.stop();
+                              _holdMic = false;
+                            }
+                          : null,
+                      child: IconButton(
+                        key: const ValueKey('kantor-mic'),
+                        tooltip: dictating
+                            ? 'Selesai dikte'
+                            : 'Dikte (ketuk atau tahan)',
+                        onPressed: can ? _dictation.toggle : null,
+                        icon: Icon(
+                          dictating
+                              ? Icons.stop_circle_rounded
+                              : Icons.mic_rounded,
+                          color: dictating ? GhinaColors.blue.base : null,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ChunkyTextField(
+                        controller: _input,
+                        enabled: can,
+                        hint: can
+                            ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
+                            : _sess['status'] == 'ended'
+                            ? 'Sesi sudah selesai'
+                            : 'Tidak bisa mengetik ke sesi ini dari sini',
+                        minLines: 1,
+                        maxLines: 5,
+                        textInputAction: TextInputAction.newline,
+                      ),
+                    ),
+                    const SizedBox(width: GhinaSpace.sm),
+                    ChunkyIconButton(
+                      icon: Icons.send_rounded,
+                      tooltip: 'Kirim',
+                      color: can ? GhinaColors.green : GhinaColors.gray,
+                      onPressed: can && !_sending
+                          ? () => _say(_input.text)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -508,6 +573,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     List<UploadJob> outbox,
     ChatViewPrefs view,
   ) {
+    if (!_active) return const SizedBox.shrink();
     final transcript = _entries;
     if (transcript == null) {
       if (_error != null) {
@@ -557,14 +623,9 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
         _sess['status'] == 'working' || _sess['status'] == 'waiting';
     // reversed list: the newest message stays in view without scroll juggling
     final rev = entries.reversed.toList();
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: _pinchDown,
-      onPointerMove: _pinchMove,
-      onPointerUp: _pinchEnd,
-      onPointerCancel: _pinchEnd,
-      child: ListView.builder(
+    return ListView.builder(
       key: const ValueKey('chat-list'),
+      controller: _scroll,
       reverse: true,
       physics: _pinching ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(GhinaSpace.md),
@@ -641,7 +702,6 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
           },
         );
       },
-    ),
     );
   }
 
@@ -696,15 +756,17 @@ class _Bubble extends StatelessWidget {
               decoration: flat
                   ? null
                   : BoxDecoration(
-                color: mine ? GhinaColors.blue.base : g.surface,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(GhinaRadii.lg),
-                  topRight: const Radius.circular(GhinaRadii.lg),
-                  bottomLeft: Radius.circular(mine ? GhinaRadii.lg : 4),
-                  bottomRight: Radius.circular(mine ? 4 : GhinaRadii.lg),
-                ),
-                border: mine ? null : Border.all(color: g.border, width: 2),
-              ),
+                      color: mine ? GhinaColors.blue.base : g.surface,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(GhinaRadii.lg),
+                        topRight: const Radius.circular(GhinaRadii.lg),
+                        bottomLeft: Radius.circular(mine ? GhinaRadii.lg : 4),
+                        bottomRight: Radius.circular(mine ? 4 : GhinaRadii.lg),
+                      ),
+                      border: mine
+                          ? null
+                          : Border.all(color: g.border, width: 2),
+                    ),
               child: mine
                   ? SelectableText(
                       text,
@@ -904,8 +966,8 @@ class _ToolRowState extends State<_ToolRow> {
                       style: GhinaType.bodyS.copyWith(
                         color: g.textSecondary,
                         fontFamily: 'monospace',
-                        fontSize: (GhinaType.bodyS.fontSize ?? 13) *
-                            widget.codeScale,
+                        fontSize:
+                            (GhinaType.bodyS.fontSize ?? 13) * widget.codeScale,
                       ),
                     ),
                   ),
@@ -931,8 +993,8 @@ class _ToolRowState extends State<_ToolRow> {
                 style: GhinaType.caption.copyWith(
                   color: g.textSecondary,
                   fontFamily: 'monospace',
-                  fontSize: (GhinaType.caption.fontSize ?? 12) *
-                      widget.codeScale,
+                  fontSize:
+                      (GhinaType.caption.fontSize ?? 12) * widget.codeScale,
                 ),
               ),
             ),

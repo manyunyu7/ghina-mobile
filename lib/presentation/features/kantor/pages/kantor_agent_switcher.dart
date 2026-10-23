@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
+import 'kantor_complex_agent_switcher.dart';
 import '../codex/kantor_codex.dart';
-import '../kantor_data.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
 import '../session/start_shift_sheet.dart';
@@ -15,7 +15,7 @@ import '../widgets/kantor_states.dart';
 
 /// Agent picker for one office: jump to another agent's session (replacing the
 /// current page), or start a shift for a role that is off duty. A second tab
-/// "Semua" lists the active agents of every office.
+/// "Semua kompleks" lists the active agents across saved server connections.
 Future<void> showKantorAgentSwitcher(
   BuildContext context, {
   required String officeId,
@@ -29,13 +29,12 @@ Future<void> showKantorAgentSwitcher(
     builder: (sheet) => _AgentSwitcher(
       officeId: officeId,
       currentSid: currentSid,
+      tab: tab,
       onOpen: (sid) {
         Navigator.pop(sheet);
-        router.go(kantorAgentPath(officeId, sid, tab: tab));
-      },
-      onOpenAgent: (a, t) {
-        Navigator.pop(sheet);
-        router.go(kantorAgentPath(a.officeId, a.sid, tab: t ?? tab));
+        router.go(
+          kantorAgentPath(officeId, sid, tab: kantorSwitchSessionTab(tab)),
+        );
       },
     ),
   );
@@ -64,13 +63,13 @@ class _AgentSwitcher extends ConsumerStatefulWidget {
     required this.officeId,
     required this.currentSid,
     required this.onOpen,
-    required this.onOpenAgent,
+    this.tab,
   });
 
   final String officeId;
   final String? currentSid;
+  final String? tab;
   final void Function(String sid) onOpen;
-  final void Function(KantorAgentRef agent, String? tab) onOpenAgent;
 
   @override
   ConsumerState<_AgentSwitcher> createState() => _AgentSwitcherState();
@@ -103,7 +102,7 @@ class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
             showSelectedIcon: false,
             segments: const [
               ButtonSegment(value: false, label: Text('Kantor ini')),
-              ButtonSegment(value: true, label: Text('Semua')),
+              ButtonSegment(value: true, label: Text('Semua kompleks')),
             ],
             selected: {_all},
             onSelectionChanged: (v) => setState(() {
@@ -118,29 +117,18 @@ class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
   }
 
   Widget _everyOffice() {
-    final state = ref.watch(kantorStateProvider).value;
-    if (state == null) {
-      return const SizedBox(height: 160, child: KantorLoading());
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChunkyTextField(
-          hint: 'Cari agen, kantor, model…',
-          prefixIcon: Icons.search_rounded,
-          onChanged: (v) => setState(() => _query = v),
-        ),
-        Flexible(
-          child: KantorActiveAgentsList(
-            state: state,
-            query: _query,
-            currentSid: widget.currentSid,
-            shrinkWrap: true,
-            onOpen: widget.onOpenAgent,
-          ),
-        ),
-      ],
+    final router = GoRouter.of(context);
+    return SizedBox(
+      height: MediaQuery.sizeOf(context).height * .6,
+      child: KantorComplexAgentPicker(
+        officeId: widget.officeId,
+        currentSid: widget.currentSid,
+        tab: widget.tab,
+        onNavigate: (path) {
+          Navigator.of(context).pop();
+          router.go(path);
+        },
+      ),
     );
   }
 

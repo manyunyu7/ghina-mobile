@@ -25,25 +25,178 @@ final class KantorConfig {
   bool get ready => baseUrl.isNotEmpty && token.isNotEmpty;
 }
 
-/// URL and token in the Keychain / Keystore.
+/// A named connection. Credentials stay in Keychain / Keystore.
+final class KantorComplexProfile {
+  const KantorComplexProfile({
+    required this.id,
+    required this.name,
+    required this.baseUrl,
+    required this.token,
+  });
+  final String id;
+  final String name;
+  final String baseUrl;
+  final String token;
+  KantorConfig get config => KantorConfig(baseUrl: baseUrl, token: token);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'token': token,
+  };
+  factory KantorComplexProfile.fromJson(Map<String, dynamic> json) =>
+      KantorComplexProfile(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        baseUrl: json['baseUrl'] as String,
+        token: json['token'] as String,
+      );
+}
+
+/// All connections and the active ID live in one secure record, so switching
+/// cannot leave a URL paired with another connection's token.
 final class KantorConfigStore {
   KantorConfigStore([FlutterSecureStorage? storage])
     : _storage = storage ?? const FlutterSecureStorage();
-
   static const _urlKey = 'kantor.url';
   static const _tokenKey = 'kantor.token';
-
+  static const _profilesKey = 'kantor.complexes.v1';
   final FlutterSecureStorage _storage;
+  Future<void> _pending = Future.value();
 
-  Future<KantorConfig> load() async => KantorConfig(
-    baseUrl: (await _storage.read(key: _urlKey)) ?? KantorConfig.defaultUrl,
-    token: (await _storage.read(key: _tokenKey)) ?? '',
-  );
-
-  Future<void> save(KantorConfig config) async {
-    await _storage.write(key: _urlKey, value: config.baseUrl.trim());
-    await _storage.write(key: _tokenKey, value: config.token.trim());
+  Future<T> _locked<T>(Future<T> Function() action) {
+    final result = _pending.then((_) => action());
+    _pending = result.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return result;
   }
+
+  Future<({List<KantorComplexProfile> profiles, String? activeId})>
+  _read() async {
+    final raw = await _storage.read(key: _profilesKey);
+    if (raw != null) {
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      return (
+        profiles: (json['profiles'] as List)
+            .map(
+              (e) => KantorComplexProfile.fromJson(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
+            .toList(),
+        activeId: json['activeId'] as String?,
+      );
+    }
+    final url = await _storage.read(key: _urlKey) ?? KantorConfig.defaultUrl;
+    final token = await _storage.read(key: _tokenKey) ?? '';
+    if (token.isEmpty) {
+      return (profiles: <KantorComplexProfile>[], activeId: null);
+    }
+    final profile = KantorComplexProfile(
+      id: 'legacy',
+      name: _nameFor(url),
+      baseUrl: url,
+      token: token,
+    );
+    await _write([profile], profile.id);
+    return (profiles: [profile], activeId: profile.id);
+  }
+
+  static String _nameFor(String url) => Uri.tryParse(url)?.host ?? 'Kompleks';
+
+  Future<void> _write(
+    List<KantorComplexProfile> profiles,
+    String? activeId,
+  ) async {
+    await _storage.write(
+      key: _profilesKey,
+      value: jsonEncode({
+        'profiles': profiles.map((e) => e.toJson()).toList(),
+        'activeId': activeId,
+      }),
+    );
+  }
+
+  Future<List<KantorComplexProfile>> loadProfiles() =>
+      _locked(() async => (await _read()).profiles);
+  Future<String?> loadActiveId() =>
+      _locked(() async => (await _read()).activeId);
+  Future<KantorConfig> load() => _locked(() async {
+    final saved = await _read();
+    for (final profile in saved.profiles) {
+      if (profile.id == saved.activeId) return profile.config;
+    }
+    return const KantorConfig(baseUrl: KantorConfig.defaultUrl, token: '');
+  });
+
+  Future<void> upsert(KantorComplexProfile profile, {bool activate = false}) =>
+      _locked(() => _upsert(profile, activate: activate));
+
+  Future<void> _upsert(
+    KantorComplexProfile profile, {
+    bool activate = false,
+  }) async {
+    final saved = await _read();
+    final profiles = [...saved.profiles];
+    final index = profiles.indexWhere((e) => e.id == profile.id);
+    if (index < 0) {
+      profiles.add(profile);
+    } else {
+      profiles[index] = profile;
+    }
+    await _write(profiles, activate ? profile.id : saved.activeId);
+  }
+
+  Future<void> activate(String id) => _locked(() async {
+    final saved = await _read();
+    if (!saved.profiles.any((e) => e.id == id)) {
+      throw const KantorException(
+        KantorFailure.notFound,
+        'Kompleks tidak ditemukan.',
+      );
+    }
+    await _write(saved.profiles, id);
+  });
+
+  Future<void> remove(String id) => _locked(() async {
+    final saved = await _read();
+    if (saved.activeId == id) {
+      throw const KantorException(
+        KantorFailure.server,
+        'Pindah ke kompleks lain sebelum menghapus koneksi aktif.',
+      );
+    }
+    await _write(
+      saved.profiles.where((e) => e.id != id).toList(),
+      saved.activeId,
+    );
+  });
+
+  Future<void> save(KantorConfig config, {String? name, String? profileId}) =>
+      _locked(() async {
+        final saved = await _read();
+        KantorComplexProfile? previous;
+        for (final p in saved.profiles) {
+          if (p.id == (profileId ?? saved.activeId)) previous = p;
+        }
+        await _upsert(
+          KantorComplexProfile(
+            id:
+                profileId ??
+                previous?.id ??
+                DateTime.now().microsecondsSinceEpoch.toString(),
+            name: name?.trim().isNotEmpty == true
+                ? name!.trim()
+                : previous?.name ?? _nameFor(config.baseUrl),
+            baseUrl: config.baseUrl.trim(),
+            token: config.token.trim(),
+          ),
+          activate: true,
+        );
+      });
 }
 
 enum KantorFailure {
@@ -307,8 +460,7 @@ extension KantorPratinjauApi on KantorApi {
     String office,
     String id,
     String emoji,
-  ) async =>
-      _item(await post('${_pv(office, id)}/reaksi', {'emoji': emoji}));
+  ) async => _item(await post('${_pv(office, id)}/reaksi', {'emoji': emoji}));
 
   /// Pin / archive / snooze. [clearSnooze] sends `snoozedUntil: null`.
   Future<PratinjauItem> pratinjauTanda(
