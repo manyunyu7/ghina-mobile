@@ -111,6 +111,8 @@ class KantorProfileTab extends StatelessWidget {
                   'Status',
                   kantorStatusLabel['${s['status']}'] ?? '${s['status']}',
                 ),
+                if (kantorEngineIsGemini(s, r))
+                  _fact(context, 'Mesin', 'Gemini (Antigravity)'),
                 if (kantorEngineIsCodex(s, r))
                   _fact(context, 'Mesin', 'OpenAI Codex'),
                 _fact(context, 'Model', kantorSessionModelText(r, s)),

@@ -43,7 +43,9 @@ final class KantorRole {
     look: j,
     budget: j['budget'] is num ? (j['budget'] as num).toDouble() : null,
     reportsTo: j['reportsTo'] is String ? j['reportsTo'] as String : null,
-    engine: _s(j['engine']) == 'codex' ? 'codex' : 'claude',
+    engine: const ['codex', 'antigravity'].contains(j['engine'])
+        ? _s(j['engine'])
+        : 'claude',
     effort: _s(j['effort']),
   );
 
@@ -64,6 +66,7 @@ final class KantorRole {
   /// `claude` (bawaan, juga untuk server lama) atau `codex`.
   final String engine;
   final String effort;
+  bool get isGemini => engine == 'antigravity';
   bool get isCodex => engine == 'codex';
 
   /// Model untuk tampilan; role Codex tanpa model memakai bawaan Codex.
@@ -72,6 +75,8 @@ final class KantorRole {
           model.isEmpty ? 'Bawaan Codex' : model,
           if (effort.isNotEmpty) effort,
         ].join(' · ')
+      : isGemini
+      ? (model.isEmpty ? 'Bawaan Gemini' : model)
       : kantorModelName(model);
 }
 

@@ -66,7 +66,7 @@ class _ShiftFormState extends State<_ShiftForm> {
         widget.feed.officeId,
         '${widget.role['id']}',
         task: _task.text,
-        permissionMode: _eng.codex ? null : _perm,
+        permissionMode: _eng.managed ? null : _perm,
         extra: _eng.body(widget.role),
       );
       if (mounted) Navigator.of(context).pop(sid);
@@ -90,7 +90,7 @@ class _ShiftFormState extends State<_ShiftForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${widget.role['title'] ?? ''} - ${kantorIsCodex(widget.role) ? (('${widget.role['model'] ?? ''}').isEmpty ? 'Codex' : '${widget.role['model']}') : modelLabel(widget.role['model'])}',
+            '${widget.role['title'] ?? ''} - ${kantorSessionModelText(widget.role, widget.role)}',
             style: GhinaType.bodyS.copyWith(color: g.textSecondary),
           ),
           GhinaSpace.gapMd,
@@ -107,7 +107,7 @@ class _ShiftFormState extends State<_ShiftForm> {
             role: widget.role,
             onChanged: (s) => setState(() => _eng = s),
           ),
-          if (!_eng.codex) ...[
+          if (!_eng.managed) ...[
             GhinaSpace.gapMd,
             Text(
               'MODE IZIN',

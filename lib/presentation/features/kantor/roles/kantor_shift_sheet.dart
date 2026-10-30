@@ -107,7 +107,7 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
     final body = <String, dynamic>{
       if (task.isNotEmpty) 'task': task,
       if (_card.isNotEmpty) 'cardId': _card,
-      if (!_eng.codex && _perm.isNotEmpty) 'permissionMode': _perm,
+      if (!_eng.managed && _perm.isNotEmpty) 'permissionMode': _perm,
       if (widget.liveSessions > 0 && _worktree) 'worktree': true,
       ..._eng.body(widget.role.look),
     };
@@ -176,7 +176,7 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
           role: widget.role.look,
           onChanged: (s) => setState(() => _eng = s),
         ),
-        if (!_eng.codex) ...[
+        if (!_eng.managed) ...[
           const SizedBox(height: GhinaSpace.md),
           KantorPickField<String>(
             label: 'Mode izin',
@@ -187,7 +187,7 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
             onChanged: (v) => setState(() => _perm = v),
           ),
         ],
-        if (!_eng.codex && _perm == 'bypassPermissions')
+        if (!_eng.managed && _perm == 'bypassPermissions')
           Padding(
             padding: const EdgeInsets.only(top: GhinaSpace.sm),
             child: Text(

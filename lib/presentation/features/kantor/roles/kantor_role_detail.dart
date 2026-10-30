@@ -267,11 +267,7 @@ class _RoleDetailState extends ConsumerState<KantorRoleDetailScreen> {
         ChunkyCard(
           child: Column(
             children: [
-              _fact(
-                context,
-                'Mesin',
-                role.isCodex ? 'OpenAI Codex' : 'Claude Code',
-              ),
+              _fact(context, 'Mesin', kantorEngineName(role.engine)),
               _fact(context, 'Model', role.modelText),
               _fact(
                 context,

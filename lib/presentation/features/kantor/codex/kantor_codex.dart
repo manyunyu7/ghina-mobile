@@ -7,7 +7,7 @@ import '../roles/kantor_ui.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
 
-/// Mesin kedua Kantor: OpenAI Codex. Semua yang khusus Codex ada di sini.
+/// Pemilihan mesin, model, dan izin Kantor.
 
 /// True bila sesi atau role memakai Codex. Server lama tidak mengirim
 /// `engine`, jadi hilang berarti Claude.
@@ -18,6 +18,25 @@ bool kantorEngineIsCodex(Json? session, Json? role) =>
     session != null && session['engine'] != null
     ? kantorIsCodex(session)
     : kantorIsCodex(role);
+
+bool kantorIsGemini(Json? j) => j?['engine'] == 'antigravity';
+
+bool kantorEngineIsGemini(Json? session, Json? role) =>
+    session?['engine'] != null ? kantorIsGemini(session) : kantorIsGemini(role);
+
+String kantorEngineName(String engine) => switch (engine) {
+  'codex' => 'OpenAI Codex',
+  'antigravity' => 'Gemini (Antigravity)',
+  _ => 'Claude Code',
+};
+
+const kantorGeminiModes = <String, String>{
+  'default': 'Tanya dulu',
+  'acceptEdits': 'Edit file otomatis',
+  'auto': 'Auto',
+  'plan': 'Hanya merencanakan',
+  'bypassPermissions': 'Lewati semua izin',
+};
 
 const kantorCodexModes = <(String, String, String)>[
   ('default', 'Tanya dulu', 'Minta izin sebelum menjalankan perintah.'),
@@ -41,6 +60,11 @@ const kantorCodexEfforts = ['low', 'medium', 'high', 'xhigh'];
 
 /// Model + effort aktif untuk tampilan. Codex: dari sesi; Claude: seperti biasa.
 String kantorSessionModelText(Json? role, Json sess) {
+  if (kantorEngineIsGemini(sess, role)) {
+    final model =
+        sess['model'] ?? (kantorIsGemini(role) ? (role?['model']) : null);
+    return '$model' == 'null' || '$model'.isEmpty ? 'Bawaan Gemini' : '$model';
+  }
   if (!kantorEngineIsCodex(sess, role)) {
     return modelLabel(role?['model'] ?? sess['model']);
   }
@@ -191,7 +215,9 @@ class _CodexFieldsState extends ConsumerState<KantorCodexFields> {
         ref.watch(kantorCodexCatalogProvider).value ??
         const KantorCodexCatalog();
     final efforts = cat.effortsFor(_model);
-    final hint = cat.defaultModel.isEmpty ? 'mis. gpt-5-codex' : cat.defaultModel;
+    final hint = cat.defaultModel.isEmpty
+        ? 'mis. gpt-5-codex'
+        : cat.defaultModel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -251,6 +277,7 @@ class KantorEngineSel {
     this.effort = '',
     this.perm = '',
     this.codex = false,
+    this.gemini = false,
   });
 
   final String engine;
@@ -260,25 +287,30 @@ class KantorEngineSel {
 
   /// Mesin efektif adalah Codex.
   final bool codex;
+  final bool gemini;
+  bool get managed => codex || gemini;
 
   factory KantorEngineSel.initial(Json role) {
     final c = kantorIsCodex(role);
+    final a = kantorIsGemini(role);
     return KantorEngineSel(
-      model: c ? '${role['model'] ?? ''}' : '',
+      model: c || a ? '${role['model'] ?? ''}' : '',
       effort: c ? '${role['effort'] ?? ''}' : '',
-      perm: c ? 'default' : '',
+      perm: c || a ? 'default' : '',
       codex: c,
+      gemini: a,
     );
   }
 
   /// Tambahan badan `POST .../start` untuk pilihan ini.
   Map<String, dynamic> body(Json role) => {
     if (engine.isNotEmpty) 'engine': engine,
-    if (codex) ...{
+    if (managed) ...{
       if (model.isNotEmpty) 'model': model,
-      if (effort.isNotEmpty) 'effort': effort,
+      if (codex && effort.isNotEmpty) 'effort': effort,
       'permissionMode': perm.isEmpty ? 'default' : perm,
-    } else if (engine == 'claude' && kantorIsCodex(role))
+    } else if (engine == 'claude' &&
+        (kantorIsCodex(role) || kantorIsGemini(role)))
       'model': 'sonnet',
   };
 
@@ -288,12 +320,14 @@ class KantorEngineSel {
     String? effort,
     String? perm,
     bool? codex,
+    bool? gemini,
   }) => KantorEngineSel(
     engine: engine ?? this.engine,
     model: model ?? this.model,
     effort: effort ?? this.effort,
     perm: perm ?? this.perm,
     codex: codex ?? this.codex,
+    gemini: gemini ?? this.gemini,
   );
 }
 
@@ -323,7 +357,7 @@ class _EngineFieldsState extends State<KantorEngineFields> {
 
   @override
   Widget build(BuildContext context) {
-    final roleCodex = kantorIsCodex(widget.role);
+    final roleEngine = '${widget.role['engine'] ?? 'claude'}';
     final g = context.ghina;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,25 +369,44 @@ class _EngineFieldsState extends State<KantorEngineFields> {
         GhinaSpace.gapSm,
         KantorChips(
           options: {
-            '': 'Bawaan (${roleCodex ? 'Codex' : 'Claude'})',
+            '': 'Bawaan (${kantorEngineName(roleEngine)})',
             'claude': 'Claude Code',
             'codex': 'OpenAI Codex',
+            'antigravity': 'Gemini (Antigravity)',
           },
           value: _sel.engine,
           onChanged: (v) {
-            final codex = v.isEmpty ? roleCodex : v == 'codex';
+            final effective = v.isEmpty ? roleEngine : v;
             final fresh = KantorEngineSel.initial(widget.role);
             _set(
-              codex == roleCodex
+              effective == roleEngine
                   ? fresh.copy(engine: v)
                   : KantorEngineSel(
                       engine: v,
-                      codex: codex,
-                      perm: codex ? 'default' : '',
+                      codex: effective == 'codex',
+                      gemini: effective == 'antigravity',
+                      perm: effective != 'claude' ? 'default' : '',
                     ),
             );
           },
         ),
+        if (_sel.gemini) ...[
+          GhinaSpace.gapMd,
+          KantorGeminiFields(
+            key: ValueKey('gemini/${_sel.engine}'),
+            model: _sel.model,
+            onChanged: (m) => _set(_sel.copy(model: m)),
+          ),
+          GhinaSpace.gapMd,
+          const KantorFieldLabel('Mode izin'),
+          KantorChips(
+            options: kantorGeminiModes,
+            value: _sel.perm,
+            onChanged: (v) => _set(_sel.copy(perm: v)),
+          ),
+          if (_sel.perm == 'bypassPermissions')
+            const Text('Gemini menjalankan perintah tanpa meminta izin.'),
+        ],
         if (_sel.codex) ...[
           GhinaSpace.gapMd,
           KantorCodexFields(
@@ -440,7 +493,8 @@ class _SettingsFormState extends State<_SettingsForm> {
 
   @override
   Widget build(BuildContext context) {
-    final changed = (_model != _m0 && _model.isNotEmpty) ||
+    final changed =
+        (_model != _m0 && _model.isNotEmpty) ||
         (_effort != _e0 && _effort.isNotEmpty);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -465,6 +519,55 @@ class _SettingsFormState extends State<_SettingsForm> {
           loading: _busy,
           onPressed: _busy || !changed ? null : _apply,
         ),
+      ],
+    );
+  }
+}
+
+/// Katalog resmi instalasi Antigravity di PC yang menjalankan kantor.
+final kantorGeminiCatalogProvider =
+    FutureProvider.autoDispose<KantorCodexCatalog>((ref) async {
+      final api = ref.watch(kantorApiProvider);
+      if (api == null) return const KantorCodexCatalog();
+      final j = await api.get('/api/antigravity/models');
+      return KantorCodexCatalog.fromJson((j as Map).cast<String, dynamic>());
+    });
+
+class KantorGeminiFields extends ConsumerWidget {
+  const KantorGeminiFields({
+    super.key,
+    required this.model,
+    required this.onChanged,
+  });
+  final String model;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final result = ref.watch(kantorGeminiCatalogProvider);
+    final cat = result.value;
+    final models =
+        cat?.models.where((m) => m.slug.startsWith('gemini')).toList() ?? [];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        KantorPickField<String>(
+          label: 'Model Gemini',
+          value: model,
+          emptyLabel: 'Bawaan Antigravity',
+          options: [
+            const KantorChoice('', 'Bawaan Antigravity'),
+            if (model.isNotEmpty && !models.any((m) => m.slug == model))
+              KantorChoice(model, model),
+            for (final m in models) KantorChoice(m.slug, m.name, m.desc),
+          ],
+          onChanged: onChanged,
+        ),
+        if (result.isLoading) const LinearProgressIndicator(),
+        if (result.hasError || (cat != null && !cat.available))
+          const Text(
+            'Katalog Gemini belum tersedia. Periksa Antigravity di PC kantor.',
+          ),
       ],
     );
   }

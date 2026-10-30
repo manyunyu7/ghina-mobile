@@ -557,7 +557,21 @@ class _Menu extends StatelessWidget {
     );
   }
 
+  bool get _gemini =>
+      kantorEngineIsGemini(sess, feed.role(sess['role'] as String?));
+
+  void _nativeGeminiSettings(BuildContext context) {
+    _toast(
+      context,
+      'Gunakan /model atau /permissions di Terminal Antigravity pada PC kantor.',
+    );
+  }
+
   Future<void> _mode(BuildContext context) async {
+    if (_gemini) {
+      _nativeGeminiSettings(context);
+      return;
+    }
     final codex = _codex;
     final picked = await showChunkyBottomSheet<String>(
       context,
@@ -608,6 +622,10 @@ class _Menu extends StatelessWidget {
   }
 
   Future<void> _model(BuildContext context) async {
+    if (_gemini) {
+      _nativeGeminiSettings(context);
+      return;
+    }
     final List<KantorModelChoice> choices;
     try {
       choices = await actions?.openModelPicker(_sid) ?? const [];

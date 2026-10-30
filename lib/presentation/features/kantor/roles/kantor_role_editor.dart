@@ -269,12 +269,13 @@ class _RoleEditorState extends ConsumerState<KantorRoleEditorScreen> {
                 options: const {
                   'claude': 'Claude Code',
                   'codex': 'OpenAI Codex',
+                  'antigravity': 'Gemini (Antigravity)',
                 },
                 value: _engine,
                 onChanged: (v) => setState(() {
                   if (v == _engine) return;
                   _engine = v;
-                  _model = v == 'codex' ? '' : 'sonnet';
+                  _model = v == 'claude' ? 'sonnet' : '';
                   _effort = '';
                 }),
               ),
@@ -288,6 +289,11 @@ class _RoleEditorState extends ConsumerState<KantorRoleEditorScreen> {
                     _model = m;
                     _effort = e;
                   }),
+                )
+              else if (_engine == 'antigravity')
+                KantorGeminiFields(
+                  model: _model,
+                  onChanged: (m) => setState(() => _model = m),
                 )
               else ...[
                 const KantorFieldLabel('Model'),
