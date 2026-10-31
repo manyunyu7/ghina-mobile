@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
-import '../codex/kantor_codex.dart';
+import '../engines/kantor_engines.dart';
 import '../widgets/kantor_sprite.dart';
 import 'kantor_look.dart';
 import 'kantor_role.dart';
@@ -128,7 +128,7 @@ class _RoleEditorState extends ConsumerState<KantorRoleEditorScreen> {
       'skills': _skills,
       'engine': _engine,
       'model': _model,
-      'effort': _engine == 'codex' ? _effort : '',
+      'effort': _effort,
       'room':
           _room ??
           office.rooms
@@ -264,48 +264,17 @@ class _RoleEditorState extends ConsumerState<KantorRoleEditorScreen> {
                 ],
               ),
               const SizedBox(height: GhinaSpace.lg),
-              const KantorFieldLabel('Mesin'),
-              KantorChips(
-                options: const {
-                  'claude': 'Claude Code',
-                  'codex': 'OpenAI Codex',
-                  'antigravity': 'Gemini (Antigravity)',
-                },
-                value: _engine,
-                onChanged: (v) => setState(() {
-                  if (v == _engine) return;
-                  _engine = v;
-                  _model = v == 'claude' ? 'sonnet' : '';
-                  _effort = '';
-                }),
+              KantorCatalogFields(
+                engine: _engine,
+                model: _model,
+                effort: _effort,
+                onChanged: (engine, model, effort, permission, spec) =>
+                    setState(() {
+                      _engine = engine;
+                      _model = model;
+                      _effort = effort;
+                    }),
               ),
-              const SizedBox(height: GhinaSpace.md),
-              if (_engine == 'codex')
-                KantorCodexFields(
-                  key: ValueKey('codex/${widget.role?.id}'),
-                  model: _model,
-                  effort: _effort,
-                  onChanged: (m, e) => setState(() {
-                    _model = m;
-                    _effort = e;
-                  }),
-                )
-              else if (_engine == 'antigravity')
-                KantorGeminiFields(
-                  model: _model,
-                  onChanged: (m) => setState(() => _model = m),
-                )
-              else ...[
-                const KantorFieldLabel('Model'),
-                KantorChips(
-                  options: {
-                    for (final m in kantorModelOptions)
-                      m.$1: kantorModelName(m.$1),
-                  },
-                  value: _model,
-                  onChanged: (v) => setState(() => _model = v),
-                ),
-              ],
               const SizedBox(height: GhinaSpace.md),
               KantorPickField<String>(
                 label: 'Ruangan',

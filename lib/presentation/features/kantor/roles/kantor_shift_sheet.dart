@@ -57,7 +57,6 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
   final _task = TextEditingController();
   List<({String id, String title, bool mine})> _cards = const [];
   String _card = '';
-  String _perm = '';
   late KantorEngineSel _eng = KantorEngineSel.initial(widget.role.look);
   bool _worktree = true;
   bool _busy = false;
@@ -107,7 +106,6 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
     final body = <String, dynamic>{
       if (task.isNotEmpty) 'task': task,
       if (_card.isNotEmpty) 'cardId': _card,
-      if (!_eng.managed && _perm.isNotEmpty) 'permissionMode': _perm,
       if (widget.liveSessions > 0 && _worktree) 'worktree': true,
       ..._eng.body(widget.role.look),
     };
@@ -176,25 +174,6 @@ class _KantorShiftFormState extends ConsumerState<KantorShiftForm> {
           role: widget.role.look,
           onChanged: (s) => setState(() => _eng = s),
         ),
-        if (!_eng.managed) ...[
-          const SizedBox(height: GhinaSpace.md),
-          KantorPickField<String>(
-            label: 'Mode izin',
-            value: _perm,
-            options: [
-              for (final m in kantorPermModes) KantorChoice(m.$1, m.$2),
-            ],
-            onChanged: (v) => setState(() => _perm = v),
-          ),
-        ],
-        if (!_eng.managed && _perm == 'bypassPermissions')
-          Padding(
-            padding: const EdgeInsets.only(top: GhinaSpace.sm),
-            child: Text(
-              'Role ini akan menjalankan perintah apa pun tanpa bertanya, termasuk yang menyentuh prod. Kotak masuk izin tidak dipakai.',
-              style: GhinaType.bodyS.copyWith(color: GhinaColors.orange.base),
-            ),
-          ),
         const SizedBox(height: GhinaSpace.lg),
         ChunkyButton(
           label: 'Mulai shift',

@@ -43,9 +43,7 @@ final class KantorRole {
     look: j,
     budget: j['budget'] is num ? (j['budget'] as num).toDouble() : null,
     reportsTo: j['reportsTo'] is String ? j['reportsTo'] as String : null,
-    engine: const ['codex', 'antigravity'].contains(j['engine'])
-        ? _s(j['engine'])
-        : 'claude',
+    engine: _s(j['engine']).isEmpty ? 'claude' : _s(j['engine']),
     effort: _s(j['effort']),
   );
 

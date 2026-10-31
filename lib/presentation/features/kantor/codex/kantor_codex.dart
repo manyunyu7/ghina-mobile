@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../roles/kantor_ui.dart';
+import '../engines/kantor_engines.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
 
@@ -27,15 +28,7 @@ bool kantorEngineIsGemini(Json? session, Json? role) =>
 String kantorEngineName(String engine) => switch (engine) {
   'codex' => 'OpenAI Codex',
   'antigravity' => 'Gemini (Antigravity)',
-  _ => 'Claude Code',
-};
-
-const kantorGeminiModes = <String, String>{
-  'default': 'Tanya dulu',
-  'acceptEdits': 'Edit file otomatis',
-  'auto': 'Auto',
-  'plan': 'Hanya merencanakan',
-  'bypassPermissions': 'Lewati semua izin',
+  _ => engine.isEmpty || engine == 'claude' ? 'Claude Code' : engine,
 };
 
 const kantorCodexModes = <(String, String, String)>[
@@ -278,6 +271,8 @@ class KantorEngineSel {
     this.perm = '',
     this.codex = false,
     this.gemini = false,
+    this.catalog = false,
+    this.supportsEffort = false,
   });
 
   final String engine;
@@ -288,7 +283,8 @@ class KantorEngineSel {
   /// Mesin efektif adalah Codex.
   final bool codex;
   final bool gemini;
-  bool get managed => codex || gemini;
+  final bool catalog, supportsEffort;
+  bool get managed => catalog || codex || gemini;
 
   factory KantorEngineSel.initial(Json role) {
     final c = kantorIsCodex(role);
@@ -307,8 +303,10 @@ class KantorEngineSel {
     if (engine.isNotEmpty) 'engine': engine,
     if (managed) ...{
       if (model.isNotEmpty) 'model': model,
-      if (codex && effort.isNotEmpty) 'effort': effort,
-      'permissionMode': perm.isEmpty ? 'default' : perm,
+      if ((catalog ? supportsEffort : codex) && effort.isNotEmpty)
+        'effort': effort,
+      if (!catalog || perm.isNotEmpty)
+        'permissionMode': perm.isEmpty ? 'default' : perm,
     } else if (engine == 'claude' &&
         (kantorIsCodex(role) || kantorIsGemini(role)))
       'model': 'sonnet',
@@ -321,6 +319,8 @@ class KantorEngineSel {
     String? perm,
     bool? codex,
     bool? gemini,
+    bool? catalog,
+    bool? supportsEffort,
   }) => KantorEngineSel(
     engine: engine ?? this.engine,
     model: model ?? this.model,
@@ -328,116 +328,40 @@ class KantorEngineSel {
     perm: perm ?? this.perm,
     codex: codex ?? this.codex,
     gemini: gemini ?? this.gemini,
+    catalog: catalog ?? this.catalog,
+    supportsEffort: supportsEffort ?? this.supportsEffort,
   );
 }
 
-/// Mesin + (untuk Codex) model, effort, dan mode izin. Mode izin Claude
-/// tetap diurus sheet pemanggil saat [KantorEngineSel.codex] false.
-class KantorEngineFields extends StatefulWidget {
+/// Form shift mengikuti katalog server, termasuk mesin yang baru ditambahkan.
+class KantorEngineFields extends StatelessWidget {
   const KantorEngineFields({
     super.key,
     required this.role,
     required this.onChanged,
   });
-
   final Json role;
   final ValueChanged<KantorEngineSel> onChanged;
 
   @override
-  State<KantorEngineFields> createState() => _EngineFieldsState();
-}
-
-class _EngineFieldsState extends State<KantorEngineFields> {
-  late KantorEngineSel _sel = KantorEngineSel.initial(widget.role);
-
-  void _set(KantorEngineSel s) {
-    setState(() => _sel = s);
-    widget.onChanged(s);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final roleEngine = '${widget.role['engine'] ?? 'claude'}';
-    final g = context.ghina;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'MESIN',
-          style: GhinaType.overline.copyWith(color: g.textSecondary),
-        ),
-        GhinaSpace.gapSm,
-        KantorChips(
-          options: {
-            '': 'Bawaan (${kantorEngineName(roleEngine)})',
-            'claude': 'Claude Code',
-            'codex': 'OpenAI Codex',
-            'antigravity': 'Gemini (Antigravity)',
-          },
-          value: _sel.engine,
-          onChanged: (v) {
-            final effective = v.isEmpty ? roleEngine : v;
-            final fresh = KantorEngineSel.initial(widget.role);
-            _set(
-              effective == roleEngine
-                  ? fresh.copy(engine: v)
-                  : KantorEngineSel(
-                      engine: v,
-                      codex: effective == 'codex',
-                      gemini: effective == 'antigravity',
-                      perm: effective != 'claude' ? 'default' : '',
-                    ),
-            );
-          },
-        ),
-        if (_sel.gemini) ...[
-          GhinaSpace.gapMd,
-          KantorGeminiFields(
-            key: ValueKey('gemini/${_sel.engine}'),
-            model: _sel.model,
-            onChanged: (m) => _set(_sel.copy(model: m)),
-          ),
-          GhinaSpace.gapMd,
-          const KantorFieldLabel('Mode izin'),
-          KantorChips(
-            options: kantorGeminiModes,
-            value: _sel.perm,
-            onChanged: (v) => _set(_sel.copy(perm: v)),
-          ),
-          if (_sel.perm == 'bypassPermissions')
-            const Text('Gemini menjalankan perintah tanpa meminta izin.'),
-        ],
-        if (_sel.codex) ...[
-          GhinaSpace.gapMd,
-          KantorCodexFields(
-            key: ValueKey('${_sel.engine}/${_sel.model}'),
-            model: _sel.model,
-            effort: _sel.effort,
-            onChanged: (m, e) => _set(_sel.copy(model: m, effort: e)),
-          ),
-          GhinaSpace.gapMd,
-          Text(
-            'MODE IZIN',
-            style: GhinaType.overline.copyWith(color: g.textSecondary),
-          ),
-          GhinaSpace.gapSm,
-          KantorChips(
-            options: {for (final m in kantorCodexModes) m.$1: m.$2},
-            value: _sel.perm,
-            onChanged: (v) => _set(_sel.copy(perm: v)),
-          ),
-          if (_sel.perm == 'bypassPermissions')
-            Padding(
-              padding: const EdgeInsets.only(top: GhinaSpace.sm),
-              child: Text(
-                'Codex berjalan tanpa sandbox dan tanpa bertanya.',
-                style: GhinaType.bodyS.copyWith(color: GhinaColors.orange.base),
-              ),
-            ),
-        ],
-      ],
-    );
-  }
+  Widget build(BuildContext context) => KantorCatalogFields(
+    engine: '${role['engine'] ?? 'claude'}',
+    model: '${role['model'] ?? ''}',
+    effort: '${role['effort'] ?? ''}',
+    inherit: true,
+    onChanged: (engine, model, effort, permission, spec) => onChanged(
+      KantorEngineSel(
+        engine: engine,
+        model: model,
+        effort: effort,
+        perm: permission,
+        codex: spec.id == 'codex',
+        gemini: spec.id == 'antigravity',
+        catalog: true,
+        supportsEffort: spec.supportsEffort,
+      ),
+    ),
+  );
 }
 
 /// Sheet ganti model + effort untuk sesi Codex yang sedang jalan (harus idle).

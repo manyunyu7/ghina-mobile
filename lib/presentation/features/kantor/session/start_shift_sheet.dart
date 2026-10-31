@@ -5,14 +5,6 @@ import '../codex/kantor_codex.dart';
 import 'kantor_actions.dart';
 import 'kantor_feed.dart';
 
-const _perms = <(String, String)>[
-  ('', 'Default kantor'),
-  ('default', 'Selalu tanya'),
-  ('acceptEdits', 'Edit file otomatis'),
-  ('auto', 'Auto'),
-  ('plan', 'Hanya merencanakan'),
-];
-
 /// "Mulai shift" for a role off duty (web `startShiftDialog`). Returns the new
 /// session id, or null when cancelled or failed.
 Future<String?> showStartShiftSheet(
@@ -45,7 +37,6 @@ class _ShiftForm extends StatefulWidget {
 
 class _ShiftFormState extends State<_ShiftForm> {
   final _task = TextEditingController();
-  String _perm = '';
   late KantorEngineSel _eng = KantorEngineSel.initial(widget.role);
   bool _busy = false;
   String? _error;
@@ -66,7 +57,6 @@ class _ShiftFormState extends State<_ShiftForm> {
         widget.feed.officeId,
         '${widget.role['id']}',
         task: _task.text,
-        permissionMode: _eng.managed ? null : _perm,
         extra: _eng.body(widget.role),
       );
       if (mounted) Navigator.of(context).pop(sid);
@@ -107,22 +97,6 @@ class _ShiftFormState extends State<_ShiftForm> {
             role: widget.role,
             onChanged: (s) => setState(() => _eng = s),
           ),
-          if (!_eng.managed) ...[
-            GhinaSpace.gapMd,
-            Text(
-              'MODE IZIN',
-              style: GhinaType.overline.copyWith(color: g.textSecondary),
-            ),
-            GhinaSpace.gapSm,
-            ChunkyChoiceChips<String>(
-              options: [
-                for (final p in _perms) ChunkyChoice(value: p.$1, label: p.$2),
-              ],
-              selected: {_perm},
-              onChanged: (s) =>
-                  setState(() => _perm = s.isEmpty ? '' : s.first),
-            ),
-          ],
           if (_error != null) ...[
             GhinaSpace.gapSm,
             Text(

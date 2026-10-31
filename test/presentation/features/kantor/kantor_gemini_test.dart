@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/kantor/codex/kantor_codex.dart';
+import 'package:ghina/presentation/features/kantor/engines/kantor_engines.dart';
 import 'package:ghina/presentation/features/kantor/roles/kantor_role.dart';
 
 void main() {
@@ -34,12 +35,30 @@ void main() {
       await t.pumpWidget(
         ProviderScope(
           overrides: [
-            kantorGeminiCatalogProvider.overrideWith(
-              (ref) async => KantorCodexCatalog.fromJson({
-                'available': true,
-                'models': [
-                  {'slug': 'gemini-flash', 'name': 'Gemini Flash'},
-                  {'slug': 'other-model', 'name': 'Other'},
+            kantorEngineCatalogProvider.overrideWith(
+              (ref) async => KantorEngineCatalog.fromJson({
+                'engines': [
+                  {
+                    'id': 'claude',
+                    'name': 'Claude Code',
+                    'available': true,
+                    'models': [
+                      {'slug': 'opus', 'name': 'Opus'},
+                    ],
+                  },
+                  {
+                    'id': 'antigravity',
+                    'name': 'Gemini (Antigravity)',
+                    'available': true,
+                    'defaultPermissionMode': 'default',
+                    'permissionModes': [
+                      {'id': 'default', 'name': 'Tanya dulu'},
+                      {'id': 'acceptEdits', 'name': 'Edit file otomatis'},
+                    ],
+                    'models': [
+                      {'slug': 'gemini-flash', 'name': 'Gemini Flash'},
+                    ],
+                  },
                 ],
               }),
             ),
@@ -57,9 +76,10 @@ void main() {
           ),
         ),
       );
+      await t.pumpAndSettle();
       await t.tap(find.text('Gemini (Antigravity)'));
       await t.pumpAndSettle();
-      expect(find.text('Model Gemini'), findsOneWidget);
+      expect(find.text('Model Gemini (Antigravity)'), findsOneWidget);
       expect(find.text('Edit file otomatis'), findsOneWidget);
       expect(selected!.body(const {'engine': 'claude', 'model': 'opus'}), {
         'engine': 'antigravity',
@@ -68,7 +88,7 @@ void main() {
       expect(selected!.managed, true);
       final body = selected!
           .copy(model: 'gemini-flash', perm: 'plan', effort: 'high')
-          .body(const {'engine': 'claude'});
+          .body(const {'engine': 'claude', 'model': 'opus'});
       expect(body, {
         'engine': 'antigravity',
         'model': 'gemini-flash',
@@ -76,8 +96,11 @@ void main() {
       });
       await t.tap(find.text('Claude Code'));
       await t.pumpAndSettle();
-      expect(selected!.managed, false);
-      expect(selected!.body(const {'engine': 'claude'}), {'engine': 'claude'});
+      expect(selected!.managed, true);
+      expect(selected!.body(const {'engine': 'claude'}), {
+        'engine': 'claude',
+        'model': 'opus',
+      });
     },
   );
 }
