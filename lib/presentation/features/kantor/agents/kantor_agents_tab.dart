@@ -89,6 +89,14 @@ class _AgentList extends StatelessWidget {
     }
   }
 
+  Future<void> _dismiss(BuildContext context, Json item) async {
+    try {
+      await actions?.dismiss('${item['id']}');
+    } catch (e) {
+      if (context.mounted) _toast(context, '$e');
+    }
+  }
+
   Future<void> _answer(BuildContext context, Json item, int n) async {
     try {
       await actions?.answerAsk(item, n);
@@ -247,6 +255,7 @@ class _AgentList extends StatelessWidget {
             who: i['who'] as String?,
             onDecide: (b) => _decide(context, i, b),
             onAnswer: (n) => _answer(context, i, n),
+            onDismiss: () => _dismiss(context, i),
             onOpen: i['tool'] == 'AskUserQuestion' && i['sid'] != null
                 ? () => _open(context, '${i['sid']}')
                 : null,

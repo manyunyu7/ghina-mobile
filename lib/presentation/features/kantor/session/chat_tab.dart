@@ -488,6 +488,13 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                                 child: KantorPermissionCard(
                                   item: p,
                                   who: sessionName(widget.feed, _sess),
+                                  onDismiss: () async {
+                                    try {
+                                      await _actions?.dismiss('${p['id']}');
+                                    } catch (e) {
+                                      if (_active) _err(e);
+                                    }
+                                  },
                                   onDecide: (b) async {
                                     try {
                                       await _actions?.decide('${p['id']}', b);

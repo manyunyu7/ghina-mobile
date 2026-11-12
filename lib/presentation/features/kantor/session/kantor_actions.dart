@@ -33,6 +33,10 @@ class KantorActions {
   Future<void> decide(String inboxId, String behavior) =>
       api.post('/api/inbox/$inboxId', {'behavior': behavior});
 
+  /// Tutup kartu izin/pertanyaan tanpa menjawab (mis. sudah dijawab di terminal).
+  Future<void> dismiss(String inboxId) =>
+      api.post('/api/inbox/$inboxId/dismiss');
+
   Future<void> sendText(String sid, String text) =>
       api.post('/api/sessions/$sid/action', {'action': 'text', 'text': text});
 

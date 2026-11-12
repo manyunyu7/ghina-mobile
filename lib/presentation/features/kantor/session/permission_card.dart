@@ -93,7 +93,11 @@ class KantorPermissionCard extends StatelessWidget {
     this.onSubmit,
     this.who,
     this.onOpen,
+    this.onDismiss,
   });
+
+  /// Tombol ✕: tutup kartu tanpa menjawab. Null = tidak ditampilkan.
+  final VoidCallback? onDismiss;
 
   /// Inbox item: `{id, sid, tool, summary, held, who}`.
   final Json item;
@@ -134,13 +138,23 @@ class KantorPermissionCard extends StatelessWidget {
               style: GhinaType.body.w(800).copyWith(color: g.textPrimary),
             ),
           ),
+          if (onDismiss != null)
+            IconButton(
+              key: ValueKey('dismiss-${item['id']}'),
+              tooltip: 'Tutup kartu ini (tidak menjawab)',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              icon: Icon(Icons.close_rounded, size: 18, color: g.textMuted),
+              onPressed: onDismiss,
+            ),
         ],
       ),
       const SizedBox(height: GhinaSpace.sm),
     ];
 
     final a = _ask ? parseAsk(summary) : null;
-    final form = _ask &&
+    final form =
+        _ask &&
         _held &&
         onOpen == null &&
         onSubmit != null &&
@@ -292,8 +306,8 @@ class _AskOptionTile extends StatelessWidget {
               color: selected
                   ? accent.base
                   : onTap == null
-                      ? g.border
-                      : accent.base.withValues(alpha: .55),
+                  ? g.border
+                  : accent.base.withValues(alpha: .55),
               width: selected ? 2.5 : 1.5,
             ),
           ),
