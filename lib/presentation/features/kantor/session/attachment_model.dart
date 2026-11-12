@@ -21,6 +21,8 @@ class KantorAttachment {
     this.processing = false,
     this.delivered = true,
     this.duration,
+    this.message,
+    this.note,
   });
 
   final String id;
@@ -52,6 +54,14 @@ class KantorAttachment {
   /// Seconds, for video/audio when known.
   final double? duration;
 
+  /// The one combined message the daemon typed into the session for the
+  /// batch this file went with (the owner's note followed by the file list).
+  /// Null for files that were not sent through a batch.
+  final String? message;
+
+  /// What the owner typed for that batch; empty when nothing.
+  final String? note;
+
   factory KantorAttachment.fromJson(Json j) {
     final dir = '${j['dir'] ?? j['from'] ?? j['by'] ?? j['direction'] ?? ''}';
     final at = j['at'] ?? j['created_at'] ?? j['ts'];
@@ -73,6 +83,8 @@ class KantorAttachment {
       processing: j['processing'] == true,
       delivered: j['delivered'] != false,
       duration: (j['duration'] as num?)?.toDouble(),
+      message: j['message'] is String ? j['message'] as String : null,
+      note: j['note'] is String ? j['note'] as String : null,
     );
   }
 
@@ -111,6 +123,11 @@ List<KantorAttachment> parseAttachments(Object? data) {
       : (data is Map ? (data['items'] ?? data['attachments']) : null);
   return [for (final j in asJsonList(list)) KantorAttachment.fromJson(j)];
 }
+
+/// `hiddenBeforeClear` of the attachments response: how many files from
+/// before the session's last /clear the daemon left out. 0 when absent.
+int hiddenBeforeClear(Object? data) =>
+    data is Map ? (data['hiddenBeforeClear'] as num?)?.toInt() ?? 0 : 0;
 
 /// Puts each attachment before the first entry that is newer than it, so
 /// files read in time order with the messages. Entries without a usable time

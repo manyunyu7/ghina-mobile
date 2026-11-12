@@ -113,7 +113,9 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
         ref.watch(kantorComplexProfilesProvider).value ??
         const <KantorComplexProfile>[];
     final active = ref.watch(kantorActiveComplexProvider);
-    if (!_loaded && config.hasValue && (!config.value!.ready || active != null)) {
+    if (!_loaded &&
+        config.hasValue &&
+        (!config.value!.ready || active != null)) {
       _loaded = true;
       _url.text = config.value!.baseUrl;
       _token.text = config.value!.token;
@@ -213,10 +215,19 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
           const KantorDaemonSettings(),
           ChunkyTile(
             title: 'Tampilan chat',
-            subtitle: 'Ukuran teks, kerapatan, kartu tool',
+            subtitle: 'Ukuran teks, wallpaper, gelembung, warna, maskot',
             leading: const Icon(Icons.text_fields_rounded),
             showChevron: true,
             onTap: () => showChatViewSheet(context),
+          ),
+          GhinaSpace.gapSm,
+          ChunkyTile(
+            title: 'Tampilan terminal',
+            subtitle: 'Tema warna, font, ukuran huruf',
+            leading: const Icon(Icons.terminal_rounded),
+            showChevron: true,
+            onTap: () =>
+                showChatViewSheet(context, scope: ViewSheetScope.terminal),
           ),
           const SizedBox(height: GhinaSpace.xl),
           Text(

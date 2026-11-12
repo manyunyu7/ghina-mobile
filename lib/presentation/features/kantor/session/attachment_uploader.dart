@@ -18,6 +18,8 @@ class UploadJob {
     required this.size,
     required this.mime,
     this.caption = '',
+    this.defer = false,
+    this.attachmentId,
     this.connection = '',
     this.office = '',
     this.uploadId,
@@ -41,6 +43,14 @@ class UploadJob {
   final int size;
   final String mime;
   final String caption;
+
+  /// Sent with `defer: true`: the daemon keeps the file without telling the
+  /// agent until the whole batch is delivered (see [KantorUploader.deliver]).
+  final bool defer;
+
+  /// The daemon's attachment id (not the upload id), known once the last
+  /// chunk is in. This is what the batch delivery needs.
+  final String? attachmentId;
   final String? uploadId;
   final int sent;
   final UploadStatus status;
@@ -60,6 +70,7 @@ class UploadJob {
 
   UploadJob copyWith({
     String? uploadId,
+    String? attachmentId,
     String? connection,
     int? sent,
     UploadStatus? status,
@@ -76,6 +87,8 @@ class UploadJob {
     size: size,
     mime: mime,
     caption: caption,
+    defer: defer,
+    attachmentId: attachmentId ?? this.attachmentId,
     uploadId: uploadId ?? this.uploadId,
     sent: sent ?? this.sent,
     status: status ?? this.status,
@@ -93,6 +106,8 @@ class UploadJob {
     'size': size,
     'mime': mime,
     'caption': caption,
+    'defer': defer,
+    'attachmentId': attachmentId,
     'uploadId': uploadId,
     'sent': sent,
     'status': status.name,
@@ -110,6 +125,8 @@ class UploadJob {
     size: (j['size'] as num?)?.toInt() ?? 0,
     mime: '${j['mime'] ?? 'application/octet-stream'}',
     caption: '${j['caption'] ?? ''}',
+    defer: j['defer'] == true,
+    attachmentId: j['attachmentId'] as String?,
     uploadId: j['uploadId'] as String?,
     sent: (j['sent'] as num?)?.toInt() ?? 0,
     status: UploadStatus.values.firstWhere(
@@ -181,6 +198,7 @@ class KantorUploader {
             'size': total,
             'mime': job.mime,
             if (job.caption.isNotEmpty) 'caption': job.caption,
+            if (job.defer) 'defer': true,
           },
           cancelToken: cancel,
         ),
@@ -256,6 +274,37 @@ class KantorUploader {
     return id!;
   }
 
+  /// The daemon's attachment id of a finished upload (what batch delivery
+  /// needs; it differs from the upload id). Null when the daemon has none.
+  Future<String?> attachmentIdOf(
+    String uploadId, {
+    CancelToken? cancel,
+  }) async => (await _retrying(() => _status(uploadId, cancel))).attachment;
+
+  String? _attId(Map<String, dynamic> d) {
+    final a = d['attachment'];
+    final id = a is Map ? a['id'] : null;
+    return id == null || '$id'.isEmpty ? null : '$id';
+  }
+
+  /// Types the held files of [ids] plus the owner's [text] into the agent
+  /// session as ONE message (`POST /api/sessions/:sid/attachments/deliver`).
+  /// The daemon waits for video/audio processing first (up to 3 minutes), so
+  /// this waits longer than the other calls. Returns false when the files are
+  /// stored but could not be typed into the session.
+  Future<bool> deliver(String sid, List<String> ids, String text) async {
+    final r = await _retrying(
+      () => _guard(
+        () => dio.post<dynamic>(
+          '/api/sessions/${Uri.encodeComponent(sid)}/attachments/deliver',
+          data: {'ids': ids, 'text': text},
+          options: Options(receiveTimeout: const Duration(minutes: 4)),
+        ),
+      ),
+    );
+    return _map(r.data)['delivered'] != false;
+  }
+
   /// Retries [run] on connection loss with the same backoff as the chunks.
   Future<T> _retrying<T>(Future<T> Function() run) async {
     for (var tries = 1; ; tries++) {
@@ -271,7 +320,7 @@ class KantorUploader {
   static const _retryable = '\u0000retry:';
   static const _notFound = 'Unggahan tidak ditemukan di Kantor.';
 
-  Future<({int offset, bool done})> _status(
+  Future<({int offset, bool done, String? attachment})> _status(
     String id,
     CancelToken? cancel,
   ) async {
@@ -286,6 +335,7 @@ class KantorUploader {
     return (
       offset: (d['offset'] as num?)?.toInt() ?? 0,
       done: d['done'] == true,
+      attachment: _attId(d),
     );
   }
 

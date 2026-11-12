@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.9.7+41
+version: 1.9.8+42
 
 environment:
   sdk: ^3.12.0
@@ -110,6 +110,31 @@ flutter:
     - family: PatrickHand
       fonts:
         - asset: assets/fonts/PatrickHand-Regular.ttf
+    # font terminal Kantor (OFL 1.1; Ubuntu Mono: Ubuntu Font Licence 1.0).
+    # Lisensi masing-masing ada di assets/fonts/<Nama>-OFL.txt / UbuntuMono-UFL.txt.
+    # JetBrains Mono, Fira Code, Source Code Pro, Roboto Mono: variable font (bobot 400 bawaan).
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono.ttf
+    - family: UbuntuMono
+      fonts:
+        - asset: assets/fonts/UbuntuMono-Regular.ttf
+        - asset: assets/fonts/UbuntuMono-Bold.ttf
+          weight: 700
+    - family: FiraCode
+      fonts:
+        - asset: assets/fonts/FiraCode.ttf
+    - family: SourceCodePro
+      fonts:
+        - asset: assets/fonts/SourceCodePro.ttf
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+        - asset: assets/fonts/IBMPlexMono-Bold.ttf
+          weight: 700
+    - family: RobotoMono
+      fonts:
+        - asset: assets/fonts/RobotoMono.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

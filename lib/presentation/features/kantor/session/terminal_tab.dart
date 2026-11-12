@@ -9,32 +9,8 @@ import 'package:xterm/xterm.dart';
 
 import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
-
-final _theme = TerminalTheme(
-  cursor: GhinaColors.orange.base,
-  selection: GhinaColors.blue.base.withValues(alpha: 0.35),
-  foreground: const Color(0xFFD4DAE3),
-  background: const Color(0xFF0E1218),
-  black: const Color(0xFF1A2A31),
-  red: GhinaColors.red.base,
-  green: GhinaColors.green.base,
-  yellow: GhinaColors.yellow.base,
-  blue: GhinaColors.blue.base,
-  magenta: GhinaColors.purple.base,
-  cyan: const Color(0xFF2DD4BF),
-  white: GhinaColors.darkTextSecondary,
-  brightBlack: GhinaColors.darkTextMuted,
-  brightRed: const Color(0xFFFF7A7A),
-  brightGreen: GhinaColors.lime.base,
-  brightYellow: const Color(0xFFFFE066),
-  brightBlue: const Color(0xFF6CCBFA),
-  brightMagenta: GhinaColors.pink.base,
-  brightCyan: const Color(0xFF7DE8D8),
-  brightWhite: Colors.white,
-  searchHitBackground: GhinaColors.yellow.base,
-  searchHitBackgroundCurrent: GhinaColors.orange.base,
-  searchHitForeground: Colors.black,
-);
+import 'terminal_prefs.dart';
+import 'terminal_themes.dart';
 
 /// Live terminal of a session (`{kind: 'session', sid}`) or a room shell
 /// (`{kind: 'shell', office, room}`) through the daemon's `/ws/term`.
@@ -87,7 +63,6 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   bool _ctrl = false;
   bool _connecting = false;
   bool _closed = false;
-  double _font = 13;
   int _cols = 80;
   int _rows = 24;
   bool _sized = false;
@@ -214,12 +189,16 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     if (d?.text != null) _terminal.paste(d!.text!);
   }
 
-  void _zoom(double d) => setState(() => _font = (_font + d).clamp(9, 20));
+  void _zoom(double d) => ref
+      .read(terminalPrefsProvider.notifier)
+      .update((p) => p.copyWith(fontSize: p.fontSize + d));
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final g = context.ghina;
+    final look = ref.watch(terminalPrefsProvider);
+    final font = look.fontSize;
     return Column(
       children: [
         Container(
@@ -254,17 +233,17 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Perkecil huruf',
                 icon: const Icon(Icons.remove_rounded, size: 18),
-                onPressed: () => _zoom(-1),
+                onPressed: font > termFontMin ? () => _zoom(-1) : null,
               ),
               Text(
-                '${_font.round()}',
+                '${font.round()}',
                 style: GhinaType.caption.copyWith(color: g.textSecondary),
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Perbesar huruf',
                 icon: const Icon(Icons.add_rounded, size: 18),
-                onPressed: () => _zoom(1),
+                onPressed: font < termFontMax ? () => _zoom(1) : null,
               ),
               IconButton(
                 visualDensity: VisualDensity.compact,
@@ -284,8 +263,12 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
               focusNode: _focus,
               autofocus: false,
               hardwareKeyboardOnly: false,
-              theme: _theme,
-              textStyle: TerminalStyle(fontSize: _font),
+              theme: look.themeDef.toTerminalTheme(),
+              textStyle: TerminalStyle(
+                fontSize: font,
+                fontFamily: look.face.family,
+                fontFamilyFallback: TermFace.fallback,
+              ),
               padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
               keyboardType: TextInputType.visiblePassword,
               deleteDetection: true,

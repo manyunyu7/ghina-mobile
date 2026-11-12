@@ -270,7 +270,15 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
               currentSid: widget.sid,
               tab: _tabNames[_shown],
             ),
-            _Menu(feed: widget.feed, sess: s, actions: widget.actions),
+            _Menu(
+              feed: widget.feed,
+              sess: s,
+              actions: widget.actions,
+              // the open tab decides which look settings the menu offers
+              scope: _shown == _terminalTab
+                  ? ViewSheetScope.terminal
+                  : ViewSheetScope.chat,
+            ),
           ],
           bottom: TabBar(
             controller: _tabs,
@@ -504,8 +512,14 @@ class _Header extends ConsumerWidget {
 }
 
 class _Menu extends StatelessWidget {
-  const _Menu({required this.feed, required this.sess, required this.actions});
+  const _Menu({
+    required this.feed,
+    required this.sess,
+    required this.actions,
+    this.scope = ViewSheetScope.chat,
+  });
 
+  final ViewSheetScope scope;
   final KantorOfficeFeed feed;
   final Json sess;
   final KantorActions? actions;
@@ -736,7 +750,7 @@ class _Menu extends StatelessWidget {
     return PopupMenuButton<String>(
       tooltip: 'Aksi sesi',
       onSelected: (v) => v == 'view'
-          ? showChatViewSheet(context)
+          ? showChatViewSheet(context, scope: scope)
           : v == 'mode'
           ? _mode(context)
           : v == 'codexmodel'
@@ -745,7 +759,14 @@ class _Menu extends StatelessWidget {
           ? _model(context)
           : _run(context, v),
       itemBuilder: (_) => [
-        const PopupMenuItem(value: 'view', child: Text('Tampilan chat...')),
+        PopupMenuItem(
+          value: 'view',
+          child: Text(
+            scope == ViewSheetScope.terminal
+                ? 'Tampilan terminal...'
+                : 'Tampilan chat...',
+          ),
+        ),
         if (alive) ...[
           const PopupMenuItem(value: 'esc', child: Text('Hentikan (Esc)')),
           const PopupMenuItem(

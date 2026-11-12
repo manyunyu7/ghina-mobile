@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../../di/di.dart';
+import 'attach_picker.dart';
 import 'attachment_model.dart';
 import 'attachment_notifier.dart';
 import 'attachment_uploader.dart';
@@ -61,9 +62,19 @@ class KantorUploads extends Notifier<List<UploadJob>> {
   String? _activeId;
   Timer? _sweep;
 
+  /// Deferred uploads somebody waits for: completes with the attachment id,
+  /// or null when the file failed or was cancelled.
+  final _waiters = <String, Completer<String?>>{};
+
   @override
   List<UploadJob> build() {
-    ref.onDispose(() => _sweep?.cancel());
+    ref.onDispose(() {
+      _sweep?.cancel();
+      for (final w in _waiters.values) {
+        if (!w.isCompleted) w.complete(null);
+      }
+      _waiters.clear();
+    });
     // A saved token appearing (or changing) may unblock a waiting queue.
     ref.listen(kantorUploaderProvider, (_, next) {
       if (next != null) unawaited(_pump());
@@ -162,6 +173,7 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     String caption = '',
     String? connection,
     String office = '',
+    bool defer = false,
   }) async {
     final target = connection ?? _connection;
     if (target == null || target != _connection) {
@@ -184,7 +196,9 @@ class KantorUploads extends Notifier<List<UploadJob>> {
       size: await File(dest).length(),
       mime: mime,
       caption: caption,
+      defer: defer,
     );
+    if (defer) _waiters[id] = Completer<String?>();
     if (!ref.mounted) {
       _forget(job);
       throw const UploadFailure('Antrean sudah ditutup.');
@@ -193,6 +207,47 @@ class KantorUploads extends Notifier<List<UploadJob>> {
     await _save();
     unawaited(_pump());
     return job;
+  }
+
+  /// Sends [files] as one message: every file goes up held (`defer`), then the
+  /// daemon is asked to hand them all to the agent together with [text].
+  /// Files that fail are left out (their bubble keeps its retry button, and a
+  /// retried file is delivered on its own). With no file arriving, nothing is
+  /// delivered and the caller decides what to do with [text].
+  Future<BatchResult> sendBatch({
+    required String sid,
+    required String agent,
+    required List<PickedAttachment> files,
+    required String text,
+    String? connection,
+    String office = '',
+  }) async {
+    final waits = <Future<String?>>[];
+    for (final f in files) {
+      final job = await enqueue(
+        sid: sid,
+        connection: connection,
+        office: office,
+        agent: agent,
+        source: f.file,
+        name: f.name,
+        mime: f.mime,
+        defer: true,
+      );
+      final w = _waiters[job.id];
+      if (w != null) waits.add(w.future);
+    }
+    final ids = [
+      for (final id in await Future.wait(waits))
+        if (id != null && id.isNotEmpty) id,
+    ];
+    final failed = files.length - ids.length;
+    final uploader = ref.mounted ? ref.read(kantorUploaderProvider) : null;
+    if (ids.isEmpty || uploader == null) {
+      return BatchResult(sent: 0, failed: failed, delivered: false);
+    }
+    final delivered = await uploader.deliver(sid, ids, text);
+    return BatchResult(sent: ids.length, failed: failed, delivered: delivered);
   }
 
   void retry(String id) {
@@ -208,6 +263,7 @@ class KantorUploads extends Notifier<List<UploadJob>> {
   void cancel(String id) {
     if (_activeId == id) _cancel?.cancel();
     final job = state.where((j) => j.id == id).firstOrNull;
+    _waiters.remove(id)?.complete(null);
     state = [
       for (final j in state)
         if (j.id != id) j,
@@ -275,7 +331,7 @@ class KantorUploads extends Notifier<List<UploadJob>> {
         ? 0
         : state.where((j) => j.status == UploadStatus.queued).length;
     try {
-      await uploader.upload(
+      final upId = await uploader.upload(
         cur(),
         cancel: _cancel,
         onOpened: (uid) =>
@@ -290,7 +346,24 @@ class KantorUploads extends Notifier<List<UploadJob>> {
         (j) => j.copyWith(status: UploadStatus.done, sent: j.size),
         save: true,
       );
+      // a held file is delivered by id of its attachment, not of its upload
+      final att = job.defer ? await uploader.attachmentIdOf(upId) : null;
+      if (att != null) {
+        _set(id, (j) => j.copyWith(attachmentId: att), save: true);
+      }
       await _notify.finished(cur());
+      final waiter = _waiters.remove(id);
+      if (waiter != null) {
+        waiter.complete(att);
+      } else if (job.defer && att != null) {
+        // nobody is waiting for it (retried after a failure, or restored after
+        // the app was killed): deliver this file on its own
+        try {
+          await uploader.deliver(job.sid, [att], '');
+        } catch (e) {
+          debugPrint('Kantor outbox deliver: $e');
+        }
+      }
       _forget(job);
       if (!ref.mounted) return;
       _sweep?.cancel();
@@ -302,8 +375,10 @@ class KantorUploads extends Notifier<List<UploadJob>> {
         ];
       });
     } on UploadCancelled {
+      _waiters.remove(id)?.complete(null);
       _forget(job); // cancel() already removed it from the list
     } catch (e) {
+      _waiters.remove(id)?.complete(null);
       _set(
         id,
         (j) =>
@@ -313,6 +388,25 @@ class KantorUploads extends Notifier<List<UploadJob>> {
       await _notify.failed(cur());
     }
   }
+}
+
+/// How a batch (files held in the tray plus the owner's text) went.
+class BatchResult {
+  const BatchResult({
+    required this.sent,
+    required this.failed,
+    required this.delivered,
+  });
+
+  /// Files that arrived and were handed to the agent.
+  final int sent;
+
+  /// Files that failed or were cancelled; they are not part of the message.
+  final int failed;
+
+  /// False when the files are stored but the daemon could not type the
+  /// message into the session.
+  final bool delivered;
 }
 
 final kantorUploadsProvider = NotifierProvider<KantorUploads, List<UploadJob>>(
