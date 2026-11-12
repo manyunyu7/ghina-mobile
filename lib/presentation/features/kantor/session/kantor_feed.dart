@@ -36,6 +36,43 @@ class KantorOfficeFeed extends ChangeNotifier {
   List<Json> get roles => asJsonList(office?['roles']);
   List<Json> get rooms => asJsonList(asJson(office?['plan'])['rooms']);
 
+  /// `/clear` dan `/resume` memberi percakapan id sesi baru di pane tmux yang
+  /// sama; server mengabarkannya lewat `session-gone` dengan `next`.
+  final _next = <String, String>{};
+  final _tmuxOf = <String, String>{};
+
+  /// Id sesi yang sekarang memegang percakapan [sid]: ikuti `next`, atau
+  /// (kabarnya terlewat saat app di latar) sesi hidup di pane tmux yang sama.
+  String follow(String sid) {
+    var cur = sid;
+    for (var i = 0; i < 8; i++) {
+      final n = _next[cur];
+      if (n != null && n != cur) {
+        cur = n;
+        continue;
+      }
+      final s = session(cur);
+      final t = s?['tmux'];
+      if (t is String && t.isNotEmpty) _tmuxOf[cur] = t;
+      final tmux = _tmuxOf[cur];
+      if (tmux != null && (s == null || s['status'] == 'ended')) {
+        Json? live;
+        for (final x in sessions) {
+          if (x['tmux'] == tmux && x['status'] != 'ended' && x['sid'] != cur) {
+            live = x;
+            break;
+          }
+        }
+        if (live != null) {
+          cur = '${live['sid']}';
+          continue;
+        }
+      }
+      break;
+    }
+    return cur;
+  }
+
   Json? session(String sid) {
     for (final s in sessions) {
       if (s['sid'] == sid) return s;
@@ -98,6 +135,10 @@ class KantorOfficeFeed extends ChangeNotifier {
         final list = sessions;
         final i = list.indexWhere((x) => x['sid'] == msg['sid']);
         if (i >= 0) list[i] = {...list[i], 'status': 'ended', 'waiting': null};
+        final next = msg['next'];
+        if (next is String && next.isNotEmpty && msg['sid'] is String) {
+          _next[msg['sid'] as String] = next;
+        }
         office!['sessions'] = list;
       case 'inbox':
         final item = asJson(msg['item']);

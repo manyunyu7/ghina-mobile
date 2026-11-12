@@ -44,6 +44,7 @@ class KantorNotice {
     if (o == null || o.isEmpty) return '/kantor';
     final base = '/kantor/o/${Uri.encodeComponent(o)}';
     if (event == 'meeting_done') return '$base?tab=rapat';
+    if ((path ?? '').contains('/konten')) return '$base?tab=konten';
     if (event == 'pratinjau') {
       // The item id rides in the legacy hash route `#/o/<office>/pratinjau/<id>`.
       final m = RegExp(r'/pratinjau/([^/?#]+)').firstMatch(path ?? '');

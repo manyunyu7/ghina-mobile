@@ -9,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
+import '../kantor_data.dart';
+import '../kantor_place.dart';
+import '../session/kantor_konteks.dart';
 import '../widgets/kantor_sprite.dart';
 
 String kantorComplexChatIdentity(String complex, String office, String sid) =>
@@ -162,6 +165,41 @@ class _KantorComplexAgentPickerState
     }
   }
 
+  /// Back to where the owner left this complex. An agent picked explicitly
+  /// never goes through here; this only runs from the complex header.
+  Future<void> _resume(KantorComplexProfile profile) async {
+    if (_opening != null) return;
+    setState(() {
+      _opening = 'resume-' + profile.id;
+      _error = null;
+    });
+    try {
+      await ref.read(kantorConfigProvider.notifier).activate(profile.id);
+      final place = await KantorPlaceStore.load(profile.id);
+      final state = Map<String, dynamic>.from(
+        await ref.read(kantorComplexApiProvider(profile.id)).get('/api/state')
+            as Map,
+      );
+      if (!mounted) return;
+      final paths = kantorResumePaths(place, state);
+      if (paths.isEmpty) {
+        ref.read(kantorSkipResumeProvider.notifier).set(true);
+      }
+      widget.onNavigate(paths.isEmpty ? '/kantor' : paths.last);
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            'Tidak bisa membuka ' +
+            profile.name +
+            '. Periksa koneksi lalu coba lagi.',
+      );
+      ref.invalidate(kantorComplexStateProvider(profile.id));
+    } finally {
+      if (mounted) setState(() => _opening = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profiles = ref.watch(kantorComplexProfilesProvider);
@@ -195,32 +233,44 @@ class _KantorComplexAgentPickerState
               const Icon(Icons.dns_outlined, size: 18),
               const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.name,
-                      style: GhinaType.h3,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (active?.id == profile.id || waiting > 0)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (active?.id == profile.id)
-                            Text('Aktif', style: GhinaType.caption),
-                          if (waiting > 0)
-                            Text(
-                              waiting.toString() + ' menunggu kamu',
-                              style: GhinaType.caption.copyWith(
-                                color: GhinaColors.orange.edge,
-                              ),
-                            ),
-                        ],
+                child: InkWell(
+                  onTap: _opening != null ? null : () => _resume(profile),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        profile.name,
+                        style: GhinaType.h3,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                      if (active?.id == profile.id || waiting > 0)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (active?.id == profile.id)
+                              Text('Aktif', style: GhinaType.caption),
+                            if (waiting > 0)
+                              Text(
+                                waiting.toString() + ' menunggu kamu',
+                                style: GhinaType.caption.copyWith(
+                                  color: GhinaColors.orange.edge,
+                                ),
+                              ),
+                          ],
+                        ),
+                      if (active?.id != profile.id &&
+                          ref
+                                  .watch(kantorSavedPlaceProvider(profile.id))
+                                  .value !=
+                              null)
+                        Text(
+                          'Lanjutkan di tempat terakhir',
+                          style: GhinaType.caption,
+                        ),
+                    ],
+                  ),
                 ),
               ),
               IconButton(
@@ -387,9 +437,12 @@ class _KantorComplexAgentPickerState
         subtitle: [
           if (showComplex)
             profile.name + ' / ' + agent.office['name'].toString(),
-          agent.waiting && agent.session['waiting'] is! Map
-              ? 'Menunggu kamu'
-              : agent.doing,
+          kantorKonteksSubtitle(
+            agent.session,
+            agent.waiting && agent.session['waiting'] is! Map
+                ? 'Menunggu kamu'
+                : agent.doing,
+          ),
         ].join(' · '),
         trailing: _opening == identity
             ? const SizedBox(

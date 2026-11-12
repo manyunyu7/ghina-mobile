@@ -13,6 +13,8 @@ import '../board/kantor_board_tab.dart';
 import '../files/kantor_files_tab.dart';
 import '../floor/kantor_floor_tab.dart';
 import '../kantor_data.dart';
+import '../kantor_place.dart';
+import '../konten/konten_tab.dart';
 import 'kantor_agent_switcher.dart';
 import 'kantor_office_switcher.dart';
 import '../meetings/kantor_meetings_tab.dart';
@@ -43,6 +45,7 @@ final _tabs = <(String, String, _TabBuilder)>[
   ('pratinjau', 'Pratinjau', (id) => KantorPratinjauFeed(officeId: id)),
   ('kantor', 'Kantor', (id) => KantorFloorTab(officeId: id)),
   ('board', 'Board', (id) => KantorBoardTab(officeId: id)),
+  ('konten', 'Konten', (id) => KantorKontenTab(officeId: id)),
   ('timeline', 'Timeline', (id) => KantorTimelineTab(officeId: id)),
   ('rapat', 'Rapat', (id) => KantorMeetingsTab(officeId: id)),
   ('notes', 'Notes', (id) => KantorNotesTab(officeId: id)),
@@ -116,18 +119,33 @@ class _KantorShellPageState extends ConsumerState<_KantorShellBody>
     );
     _onFloor = _isFloor(_controller.index);
     _controller.addListener(_syncSwipe);
+    _lastTab = _controller.index;
     if (widget.officeId != '_kompleks') {
+      rememberKantorOfficePlace(
+        ref,
+        widget.officeId,
+        _visible[_controller.index].$1,
+      );
       final baseUrl = ref.read(kantorConfigProvider).value?.baseUrl;
       rememberKantorOffice(widget.officeId, baseUrl: baseUrl);
       ref.invalidate(kantorLastOfficeProvider);
     }
   }
 
+  int _lastTab = 0;
+
   bool _isFloor(int i) => _visible[i].$1 == 'kantor';
 
   void _syncSwipe() {
     final on = _isFloor(_controller.index);
     if (on != _onFloor && mounted) setState(() => _onFloor = on);
+    final i = _controller.index;
+    if (i != _lastTab && !_controller.indexIsChanging) {
+      _lastTab = i;
+      if (widget.officeId != '_kompleks') {
+        rememberKantorOfficePlace(ref, widget.officeId, _visible[i].$1);
+      }
+    }
   }
 
   @override

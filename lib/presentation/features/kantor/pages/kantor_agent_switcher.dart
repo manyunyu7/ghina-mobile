@@ -9,6 +9,7 @@ import 'kantor_complex_agent_switcher.dart';
 import '../codex/kantor_codex.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
+import '../session/kantor_konteks.dart';
 import '../session/start_shift_sheet.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
@@ -308,7 +309,7 @@ class _AgentRow extends StatelessWidget {
           child: KantorSprite(look: entry.look, size: 36),
         ),
         title: entry.job.isEmpty ? entry.name : '${entry.name} · ${entry.job}',
-        subtitle: entry.sub,
+        subtitle: kantorKonteksSubtitle(entry.session, entry.sub),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

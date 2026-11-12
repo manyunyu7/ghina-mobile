@@ -8,6 +8,7 @@ import '../codex/kantor_codex.dart';
 import '../dm/kantor_dm_screen.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
+import '../session/kantor_konteks.dart';
 import '../session/permission_card.dart';
 import '../roles/kantor_new_agent_sheet.dart';
 import '../session/start_shift_sheet.dart';
@@ -431,12 +432,15 @@ class _AgentTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  row.sub,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.bodyS.copyWith(color: g.textSecondary),
-                ),
+                if (s != null && KantorKonteks.ofSession(s) != null)
+                  KantorKonteksLines(session: s, fallback: row.sub)
+                else
+                  Text(
+                    row.sub,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.bodyS.copyWith(color: g.textSecondary),
+                  ),
               ],
             ),
           ),

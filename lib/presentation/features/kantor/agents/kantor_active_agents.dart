@@ -10,6 +10,7 @@ import '../codex/kantor_codex.dart';
 import '../kantor_data.dart';
 import '../kantor_format.dart';
 import '../session/kantor_feed.dart';
+import '../session/kantor_konteks.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
 
@@ -95,6 +96,7 @@ class KantorAgentRef {
     codex ? 'codex' : 'claude',
     toolFull(session['tool']),
     (session['waiting'] as Map?)?['summary'],
+    KantorKonteks.ofSession(session)?.topic,
   ].join(' ').toLowerCase();
 }
 
@@ -263,15 +265,12 @@ class KantorActiveAgentTile extends ConsumerWidget {
                         ),
                     ],
                   ),
-                  Text(
-                    a.doing,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GhinaType.bodyS.copyWith(
-                      color: a.waiting
-                          ? GhinaColors.orange.edge
-                          : g.textPrimary,
-                    ),
+                  KantorKonteksLines(
+                    session: a.session,
+                    fallback: a.doing,
+                    fallbackColor: a.waiting
+                        ? GhinaColors.orange.edge
+                        : g.textPrimary,
                   ),
                   Text(
                     a.subs > 0 ? '${a.meta} · ${a.subs} subagent' : a.meta,
@@ -538,11 +537,10 @@ class KantorActiveAgentsStrip extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: GhinaType.bodyS.w(800),
                             ),
-                            Text(
-                              a.doing,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GhinaType.caption,
+                            KantorKonteksLines(
+                              session: a.session,
+                              fallback: a.doing,
+                              showTopic: false,
                             ),
                             Text(
                               '${a.office['name']}${a.codex ? ' · Codex' : ''}',

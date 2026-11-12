@@ -9,6 +9,7 @@ import '../../../../di/di.dart';
 import '../../../design_system/design_system.dart';
 import '../kantor_data.dart';
 import '../kantor_format.dart';
+import '../kantor_place.dart';
 import '../agents/kantor_active_agents.dart';
 import '../search/kantor_search.dart';
 import '../shows/shows_button.dart';
@@ -45,17 +46,32 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
     if (!_resuming) return false;
     final last = ref.watch(kantorLastOfficeProvider);
     if (last.isLoading) return true;
-    final id = last.value;
-    if (id == null) return _resuming = false;
+    final cid = ref.watch(kantorActiveComplexProvider)?.id;
+    if (cid == null &&
+        (ref.watch(kantorComplexProfilesProvider).isLoading ||
+            ref.watch(kantorConfigProvider).isLoading)) {
+      return true;
+    }
+    final saved = cid == null
+        ? const AsyncData<KantorPlace?>(null)
+        : ref.watch(kantorSavedPlaceProvider(cid));
+    if (saved.isLoading) return true;
+    // Saved place first; the older "last office" value is the fallback.
+    final lastId = last.value;
+    final place =
+        saved.value ?? (lastId == null ? null : KantorPlace(office: lastId));
+    if (place == null) return _resuming = false;
     final st = ref.watch(kantorStateProvider);
     if (st.isLoading) return true;
-    final known = (st.value?['offices'] as List? ?? const []).any(
-      (o) => (o as Map)['id'] == id,
-    );
     _resuming = false;
-    if (!known) return false;
+    final paths = st.hasValue
+        ? kantorResumePaths(place, st.value!)
+        : const <String>[];
+    if (paths.isEmpty) return false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.go('/kantor/o/${Uri.encodeComponent(id)}');
+      if (!mounted) return;
+      context.go(paths.first);
+      if (paths.length > 1) context.push(paths[1]);
     });
     return true;
   }

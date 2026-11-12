@@ -6,6 +6,7 @@ import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
 import '../codex/kantor_codex.dart';
 import '../pages/kantor_agent_switcher.dart';
+import '../kantor_place.dart';
 import '../pages/kantor_complex_agent_switcher.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
@@ -15,6 +16,7 @@ import 'kantor_adopt.dart';
 import 'chat_view_prefs.dart';
 import 'kantor_actions.dart';
 import 'kantor_feed.dart';
+import 'kantor_konteks.dart';
 import 'profile_tab.dart';
 import 'session_pratinjau_tab.dart';
 import 'stop_choice.dart';
@@ -44,14 +46,16 @@ class KantorSessionPage extends ConsumerWidget {
     return ListenableBuilder(
       listenable: feed,
       builder: (context, _) {
-        final s = feed.session(sid);
+        // setelah /clear atau /resume percakapan pindah ke id sesi baru
+        final cur = feed.follow(sid);
+        final s = feed.session(cur);
         if (feed.loading) {
           return Scaffold(
             appBar: AppBar(
               actions: [
                 KantorComplexSwitcherButton(
                   officeId: officeId,
-                  currentSid: sid,
+                  currentSid: cur,
                   tab: tab,
                 ),
               ],
@@ -65,7 +69,7 @@ class KantorSessionPage extends ConsumerWidget {
               actions: [
                 KantorComplexSwitcherButton(
                   officeId: officeId,
-                  currentSid: sid,
+                  currentSid: cur,
                   tab: tab,
                 ),
               ],
@@ -91,13 +95,13 @@ class KantorSessionPage extends ConsumerWidget {
             kantorComplexChatIdentity(
               api == null ? '' : kantorConnectionKey(api.config),
               officeId,
-              sid,
+              cur,
             ),
           ),
           complexId: complex?.id,
           feed: feed,
           officeId: officeId,
-          sid: sid,
+          sid: cur,
           initialTab: _tabNames
               .indexOf(tab ?? '')
               .clamp(0, _tabNames.length - 1),
@@ -155,12 +159,21 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             .read(kantorRecentComplexChatsProvider.notifier)
             .remember(complex, widget.officeId, widget.sid);
       }
+      if (mounted) {
+        rememberKantorSessionPlace(
+          ref,
+          widget.officeId,
+          widget.sid,
+          _tabNames[_tabs.index],
+        );
+      }
     });
   }
 
   void _onTab() {
     final i = _tabs.index;
     if (i == _shown) return;
+    rememberKantorSessionPlace(ref, widget.officeId, widget.sid, _tabNames[i]);
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _shown = i;
@@ -211,88 +224,118 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     // Only the selected tab is visible and focusable: the others stay mounted
     // (state kept) but are offstage and out of the focus tree, so the terminal
     // can never steal the keyboard from the chat field.
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        titleSpacing: 0,
-        // tap the agent to switch (this office or all); swipe the header to
-        // step to the previous/next active agent, staying on the same tab
-        title: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragEnd: (d) {
-            final v = d.primaryVelocity ?? 0;
-            if (v.abs() < 400) return;
-            kantorStepAgent(
-              context,
-              currentSid: widget.sid,
-              dir: v < 0 ? 1 : -1,
-              tab: _tabNames[_shown],
-            );
-          },
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => showKantorAgentSwitcher(
-              context,
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) forgetKantorSessionPlace(ref);
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          titleSpacing: 0,
+          // tap the agent to switch (this office or all); swipe the header to
+          // step to the previous/next active agent, staying on the same tab
+          title: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (v.abs() < 400) return;
+              kantorStepAgent(
+                context,
+                currentSid: widget.sid,
+                dir: v < 0 ? 1 : -1,
+                tab: _tabNames[_shown],
+              );
+            },
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => showKantorAgentSwitcher(
+                context,
+                officeId: widget.officeId,
+                currentSid: widget.sid,
+                tab: _tabNames[_shown],
+              ),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _Header(feed: widget.feed, sess: s),
+                  ),
+                  const Icon(Icons.expand_more_rounded, size: 20),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            KantorComplexSwitcherButton(
               officeId: widget.officeId,
               currentSid: widget.sid,
               tab: _tabNames[_shown],
             ),
-            child: Row(
-              children: [
-                Flexible(
-                  child: _Header(feed: widget.feed, sess: s),
+            _Menu(feed: widget.feed, sess: s, actions: widget.actions),
+          ],
+          bottom: TabBar(
+            controller: _tabs,
+            // five tabs don't fit 360dp: scroll horizontally, compact labels
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelStyle: GhinaType.bodyS.w(800),
+            unselectedLabelStyle: GhinaType.bodyS.w(700),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+            tabs: const [
+              Tab(text: 'Chat'),
+              Tab(text: 'Terminal'),
+              Tab(text: 'Profil'),
+              Tab(text: 'Subagent'),
+              Tab(text: 'Pratinjau'),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              // konteks hanya di Chat dan Terminal; hilang saat keyboard terbuka
+              if (_shown == 0 || _shown == 1)
+                KantorKonteksBar(
+                  session: s,
+                  onDraft: widget.actions == null
+                      ? null
+                      : (aksi) => widget.actions!.api.post(
+                          '/api/sessions/${widget.sid}/draft-laporan',
+                          {'aksi': aksi},
+                        ),
+                  onLabel: widget.actions == null
+                      ? null
+                      : (text, carry, tell) async {
+                          await widget.actions!.api.post(
+                            '/api/sessions/${widget.sid}/label',
+                            {'text': text, 'carry': carry, 'tell': tell},
+                          );
+                          await widget.feed.load();
+                        },
                 ),
-                const Icon(Icons.expand_more_rounded, size: 20),
-              ],
+              Expanded(child: _tabStack(s)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tabStack(Json s) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < _tabNames.length; i++)
+          if (_built.contains(i))
+            Offstage(
+              key: ValueKey('tab$i'),
+              offstage: _shown != i,
+              child: TickerMode(
+                enabled: _shown == i,
+                child: ExcludeFocus(excluding: _shown != i, child: _page(i, s)),
+              ),
             ),
-          ),
-        ),
-        actions: [
-          KantorComplexSwitcherButton(
-            officeId: widget.officeId,
-            currentSid: widget.sid,
-            tab: _tabNames[_shown],
-          ),
-          _Menu(feed: widget.feed, sess: s, actions: widget.actions),
-        ],
-        bottom: TabBar(
-          controller: _tabs,
-          // five tabs don't fit 360dp: scroll horizontally, compact labels
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelStyle: GhinaType.bodyS.w(800),
-          unselectedLabelStyle: GhinaType.bodyS.w(700),
-          labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-          tabs: const [
-            Tab(text: 'Chat'),
-            Tab(text: 'Terminal'),
-            Tab(text: 'Profil'),
-            Tab(text: 'Subagent'),
-            Tab(text: 'Pratinjau'),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            for (var i = 0; i < _tabNames.length; i++)
-              if (_built.contains(i))
-                Offstage(
-                  key: ValueKey('tab$i'),
-                  offstage: _shown != i,
-                  child: TickerMode(
-                    enabled: _shown == i,
-                    child: ExcludeFocus(
-                      excluding: _shown != i,
-                      child: _page(i, s),
-                    ),
-                  ),
-                ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
