@@ -15,6 +15,8 @@ import 'attachment_tray.dart';
 import 'chat_look.dart';
 import 'chat_look_paint.dart';
 import 'chat_timeline.dart';
+import 'compact_card.dart';
+import 'compact_summary.dart';
 import 'teammate_card.dart';
 import 'teammate_message.dart';
 import 'attachment_model.dart';
@@ -827,6 +829,20 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   /// A prompt of the owner. A message from another Claude session shows as a
   /// card on the left; words the owner typed around it stay a normal bubble.
   Widget _userRow(UserEntry e, ChatViewPrefs view) {
+    final cs = compactSummary(e.text);
+    if (cs != null) {
+      final pasted = !e.text.trimLeft().startsWith('This session is being');
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (cs.rest.isNotEmpty) ...[
+            _Bubble(text: cs.rest, at: e.at, mine: true, view: view),
+            const SizedBox(height: GhinaSpace.sm),
+          ],
+          CompactCard(msg: cs, at: e.at, view: view, pasted: pasted),
+        ],
+      );
+    }
     final tm = teammateMsgs(e.text);
     if (tm == null) {
       return _Bubble(text: e.text, at: e.at, mine: true, view: view);

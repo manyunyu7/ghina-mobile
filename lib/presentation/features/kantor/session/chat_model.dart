@@ -137,6 +137,7 @@ List<ChatEntry> buildChat(List<Json> items) {
           out.add(ImageEntry(img, at));
         }
       case 'user':
+      case 'compact': // ringkasan kompaksi; dikenali lagi saat ditampilkan
         cur = null;
         out.add(UserEntry(s, at));
       default:
