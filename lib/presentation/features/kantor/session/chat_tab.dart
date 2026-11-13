@@ -673,7 +673,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                       ),
                       Expanded(
                         child: TextField(
-                        key: const ValueKey('messenger-input'),
+                          key: const ValueKey('messenger-input'),
                           controller: _input,
                           enabled: can,
                           minLines: 1,
@@ -920,7 +920,18 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                               }
                             },
                     ),
-                  ChatImageThumbs(api: api, sid: widget.sid, images: e.images),
+                  ChatImageThumbs(
+                    api: api,
+                    sid: widget.sid,
+                    // Messenger look: pictures the agent only looked at stay
+                    // behind the folded tool line (open it to see them).
+                    images: view.messenger && view.tools == ChatToolMode.compact
+                        ? [
+                            for (final x in e.images)
+                              if (x.src != 'view') x,
+                          ]
+                        : e.images,
+                  ),
                 ],
               ),
             ),
@@ -1290,37 +1301,48 @@ class _ToolGroupState extends State<_ToolGroup> {
         !_open &&
         widget.mode == ChatToolMode.compact) {
       final c = ChatStyleColors.of(context, widget.style);
+      final muted = c.wa && !c.dark ? const Color(0xFF667781) : c.muted;
+      final n = calls.length;
+      final text = widget.running
+          ? 'sedang bekerja · $n langkah'
+          : '$n langkah · ${toolSummary(calls)}';
       return Align(
         alignment: Alignment.centerLeft,
-        child: Material(
-          color: c.tool,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => setState(() => _open = true),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    widget.running ? Icons.more_horiz : Icons.check_rounded,
-                    size: 14,
-                    color: c.accent,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      calls.map((c) => c.shortName).join(' · '),
-                      style: GhinaType.caption.copyWith(
-                        color: c.ink,
-                        fontFamily: 'monospace',
-                      ),
+        child: InkWell(
+          key: ValueKey('tool-line-${widget.entry.at}'),
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => setState(() => _open = true),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.running)
+                  SizedBox(
+                    width: 11,
+                    height: 11,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.6,
+                      color: muted,
+                    ),
+                  )
+                else
+                  Icon(Icons.check_rounded, size: 13, color: muted),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.caption.copyWith(
+                      color: muted,
+                      fontSize: 12,
                     ),
                   ),
-                  const Icon(Icons.expand_more, size: 14),
-                ],
-              ),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right_rounded, size: 14, color: muted),
+              ],
             ),
           ),
         ),
@@ -1646,4 +1668,39 @@ class _Quick extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "menjalankan perintah, membaca file": what a run of tool calls did, in
+/// words, the two most frequent kinds first.
+String toolSummary(List<ToolCall> calls) {
+  String kind(ToolCall c) {
+    final n = c.name;
+    if (n == 'Bash') return 'menjalankan perintah';
+    if (n == 'Read') return 'membaca file';
+    if (n == 'Edit' ||
+        n == 'Write' ||
+        n == 'MultiEdit' ||
+        n == 'NotebookEdit') {
+      return 'mengubah file';
+    }
+    if (n == 'Grep' || n == 'Glob') return 'mencari di kode';
+    if (n == 'WebFetch' || n == 'WebSearch') return 'mencari di web';
+    if (n == 'Agent' || n == 'Task') return 'memakai subagent';
+    if (n == 'AskUserQuestion') return 'bertanya';
+    if (n == 'ToolSearch') return 'menyiapkan alat';
+    if (n.startsWith('mcp__kantor')) return 'memakai alat kantor';
+    if (n.startsWith('mcp__mobile')) return 'mengoperasikan HP';
+    if (n.startsWith('mcp__claude-in-chrome')) return 'memakai browser';
+    if (n.startsWith('mcp__')) return 'memakai ${c.shortName}';
+    return n;
+  }
+
+  final cnt = <String, int>{};
+  for (final c in calls) {
+    final k = kind(c);
+    cnt[k] = (cnt[k] ?? 0) + 1;
+  }
+  final top = cnt.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+  final words = top.take(2).map((e) => e.key).toList();
+  return top.length > 2 ? '${words.join(', ')}, …' : words.join(', ');
 }

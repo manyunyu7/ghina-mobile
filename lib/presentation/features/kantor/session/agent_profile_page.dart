@@ -52,64 +52,325 @@ class _ProfilePersonaState extends State<_ProfilePersona> {
   );
 }
 
-/// A labelled file-kind tile stays useful for HTML bundles, missing thumbnails,
-/// and files whose generated thumbnail is an otherwise blank white image.
+/// Telegram "Media"-style tile: real thumbnail for images/video, a tinted
+/// kind tile for HTML bundles, PDFs and the rest; title on a dark gradient,
+/// status dot, file count and version badges.
 class _ProfilePreviewTile extends StatelessWidget {
   const _ProfilePreviewTile({
     required this.item,
+    required this.api,
     required this.colors,
     required this.onTap,
   });
   final PratinjauItem item;
+  final KantorApi api;
   final ChatStyleColors colors;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
+    final files = item.files;
+    final visual = files
+        .where((f) => f.kind == 'image' || f.kind == 'video')
+        .firstOrNull;
     final kind =
-        item.files.firstOrNull?.kind ??
-        (item.mode == 'bundle' ? 'html' : 'other');
-    return Tooltip(
-      message: item.title,
+        files.firstOrNull?.kind ?? (item.mode == 'bundle' ? 'html' : 'other');
+    final (statusLabel, statusSwatch) = pratinjauStatusLook(item.status);
+    final label = _kindLabel(
+      item.mode == 'bundle' ? 'html' : kind,
+      files.firstOrNull?.name,
+    );
+    return Semantics(
+      button: true,
+      label: '${item.title}, $statusLabel',
       child: Material(
         color: colors.surface,
-        borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: ValueKey('profile-preview-${item.id}'),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Icon(
-                        pratinjauKindIcon(kind),
-                        size: 28,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (visual != null)
+                PratinjauThumb(
+                  api: api,
+                  file: visual,
+                  compact: true,
+                  purged: item.filesPurged,
+                )
+              else
+                Container(
+                  color: colors.accent.withValues(
+                    alpha: colors.dark ? 0.18 : 0.10,
+                  ),
+                  alignment: const Alignment(0, -0.35),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        pratinjauKindIcon(
+                          item.mode == 'bundle' ? 'html' : kind,
+                        ),
+                        size: 30,
                         color: colors.accent,
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        style: GhinaType.caption.copyWith(
+                          color: colors.accent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.45, 1],
+                      colors: [Color(0x00000000), Color(0xB3000000)],
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Flexible(
-                  flex: 2,
-                  child: Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: GhinaType.caption.copyWith(
-                      color: colors.ink,
-                      fontSize: 12,
+              ),
+              Positioned(
+                left: 6,
+                right: 6,
+                bottom: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GhinaType.caption.copyWith(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: statusSwatch.base,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            statusLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GhinaType.caption.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (files.length > 1 || item.version > 1)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: _TileBadge(
+                    [
+                      if (files.length > 1) '${files.length} berkas',
+                      if (item.version > 1) 'v${item.version}',
+                    ].join(' · '),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TileBadge extends StatelessWidget {
+  const _TileBadge(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      text,
+      style: GhinaType.caption.copyWith(
+        color: Colors.white,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
+/// "PNG", "PDF", "HTML": the file's extension, else its kind.
+String _kindLabel(String kind, [String? name]) {
+  final n = name ?? '';
+  final dot = n.lastIndexOf('.');
+  if (dot > 0 && dot < n.length - 1 && n.length - dot <= 6) {
+    return n.substring(dot + 1).toUpperCase();
+  }
+  return switch (kind) {
+    'html' => 'HTML',
+    'image' => 'GAMBAR',
+    'video' => 'VIDEO',
+    'audio' => 'AUDIO',
+    'pdf' => 'PDF',
+    _ => 'FILE',
+  };
+}
+
+Color _extColor(String ext) => switch (ext) {
+  'PDF' => const Color(0xFFD93F3F),
+  'PNG' ||
+  'JPG' ||
+  'JPEG' ||
+  'WEBP' ||
+  'GIF' ||
+  'GAMBAR' => const Color(0xFF2F6FEB),
+  'MP4' || 'MOV' || 'WEBM' || 'VIDEO' => const Color(0xFF7C4DFF),
+  'MP3' || 'M4A' || 'WAV' || 'AUDIO' => const Color(0xFFE84393),
+  'HTML' || 'ZIP' => const Color(0xFFF28C28),
+  'APK' => const Color(0xFF3DA35D),
+  'CSV' || 'XLS' || 'XLSX' => const Color(0xFF1E8E5A),
+  'MD' || 'TXT' || 'JSON' => const Color(0xFF5B6E6A),
+  _ => const Color(0xFF0F766E),
+};
+
+const _bulan = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+];
+
+/// One row of the Telegram "Files"-style list: a session attachment or a
+/// file inside a pratinjau item.
+class _ProfileFileEntry {
+  _ProfileFileEntry({
+    required this.name,
+    required this.size,
+    required this.ext,
+    required this.source,
+    required this.at,
+    required this.onTap,
+    this.thumb,
+  });
+  final String name;
+  final int size;
+  final String ext;
+  final String source;
+  final DateTime? at;
+  final VoidCallback? onTap;
+  final Widget? thumb;
+}
+
+class _ProfileFileRow extends StatelessWidget {
+  const _ProfileFileRow({required this.entry, required this.colors});
+  final _ProfileFileEntry entry;
+  final ChatStyleColors colors;
+  @override
+  Widget build(BuildContext context) {
+    final e = entry;
+    final t = e.at;
+    final when = t == null
+        ? null
+        : '${t.day} ${_bulan[t.month - 1].substring(0, 3)} · '
+              '${t.hour.toString().padLeft(2, '0')}.${t.minute.toString().padLeft(2, '0')}';
+    final sub = [
+      if (e.size > 0) fmtSize(e.size),
+      ?when,
+      e.source,
+    ].where((x) => x.isNotEmpty).join(' · ');
+    return InkWell(
+      onTap: e.onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child:
+                    e.thumb ??
+                    ColoredBox(
+                      color: _extColor(e.ext),
+                      child: Center(
+                        child: Text(
+                          e.ext.length > 4 ? e.ext.substring(0, 4) : e.ext,
+                          style: GhinaType.caption.copyWith(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.body.copyWith(
+                      color: colors.ink,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.caption.copyWith(
+                      color: colors.muted,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -632,45 +893,165 @@ class _AgentProfileState extends ConsumerState<KantorAgentProfilePage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (selected == 'Pratinjau')
-                    GridView.count(
-                      crossAxisCount: 3,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 3,
-                      crossAxisSpacing: 3,
-                      children: [
-                        for (final item in items)
-                          _ProfilePreviewTile(
-                            item: item,
-                            colors: c,
-                            onTap: () => openPreview(item),
-                          ),
-                      ],
-                    ),
-                  if (selected == 'File')
-                    surface(
-                      Column(
+                  if (selected == 'Pratinjau' && api != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: GridView.count(
+                        crossAxisCount: 3,
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 2,
+                        crossAxisSpacing: 2,
                         children: [
-                          for (final attachment in attachments)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: AttachmentBubble(
-                                item: attachment,
-                                api: api,
-                              ),
-                            ),
-                          for (final row in fileRows)
-                            ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              leading: const Icon(
-                                Icons.insert_drive_file_outlined,
-                              ),
-                              title: Text(row.file.name),
-                              onTap: () => openPreview(row.item, row.file.id),
+                          for (final item in items)
+                            _ProfilePreviewTile(
+                              item: item,
+                              api: api,
+                              colors: c,
+                              onTap: () => openPreview(item),
                             ),
                         ],
                       ),
+                    ),
+                  if (selected == 'File' && api != null)
+                    Builder(
+                      builder: (context) {
+                        DateTime? when(String? iso) => iso == null
+                            ? null
+                            : DateTime.tryParse(iso)?.toLocal();
+                        final entries =
+                            <_ProfileFileEntry>[
+                              for (final a in attachments)
+                                _ProfileFileEntry(
+                                  name: a.name,
+                                  size: a.size,
+                                  ext: _kindLabel(a.kind.name, a.name),
+                                  source: a.mine
+                                      ? 'kamu kirim'
+                                      : (a.agent.isEmpty
+                                            ? 'dari agent'
+                                            : 'dari ${a.agent}'),
+                                  at: when(a.at),
+                                  thumb: a.hasThumb
+                                      ? Image.network(
+                                          api.url(a.thumbPath).toString(),
+                                          headers: api.authHeaders,
+                                          fit: BoxFit.cover,
+                                          cacheWidth: 144,
+                                          errorBuilder: (_, _, _) => ColoredBox(
+                                            color: _extColor(
+                                              _kindLabel(a.kind.name, a.name),
+                                            ),
+                                            child: const Icon(
+                                              Icons.image_outlined,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
+                                  onTap: () async {
+                                    if (a.kind == AttachmentKind.image ||
+                                        a.kind == AttachmentKind.video) {
+                                      await Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              a.kind == AttachmentKind.video
+                                              ? KantorVideoViewer(
+                                                  item: a,
+                                                  api: api,
+                                                )
+                                              : KantorImageViewer(
+                                                  item: a,
+                                                  api: api,
+                                                ),
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+                                    try {
+                                      final f = await downloadAttachment(
+                                        api,
+                                        a,
+                                      );
+                                      await shareAttachmentFile(f, a);
+                                    } catch (_) {
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Gagal membuka ${a.name}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              for (final row in fileRows)
+                                _ProfileFileEntry(
+                                  name: row.file.name,
+                                  size: row.file.size,
+                                  ext: _kindLabel(row.file.kind, row.file.name),
+                                  source: 'Pratinjau: ${row.item.title}',
+                                  at: when(row.item.createdAt),
+                                  thumb:
+                                      (row.file.kind == 'image' ||
+                                              row.file.kind == 'video') &&
+                                          !row.item.filesPurged
+                                      ? PratinjauThumb(
+                                          api: api,
+                                          file: row.file,
+                                          compact: true,
+                                        )
+                                      : null,
+                                  onTap: () =>
+                                      openPreview(row.item, row.file.id),
+                                ),
+                            ]..sort((x, y) {
+                              final ax = x.at, ay = y.at;
+                              if (ax == null && ay == null) return 0;
+                              if (ax == null) return 1;
+                              if (ay == null) return -1;
+                              return ay.compareTo(ax);
+                            });
+                        final children = <Widget>[];
+                        String? month;
+                        for (final e in entries) {
+                          final m = e.at == null
+                              ? 'Lainnya'
+                              : '${_bulan[e.at!.month - 1]} ${e.at!.year}';
+                          if (m != month) {
+                            month = m;
+                            children.add(
+                              Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  6,
+                                  children.isEmpty ? 2 : 14,
+                                  6,
+                                  4,
+                                ),
+                                child: Text(
+                                  m,
+                                  style: GhinaType.caption.copyWith(
+                                    color: c.muted,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          children.add(_ProfileFileRow(entry: e, colors: c));
+                        }
+                        return surface(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: children,
+                          ),
+                        );
+                      },
                     ),
                   if (selected == 'Rapat')
                     surface(

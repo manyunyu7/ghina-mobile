@@ -378,9 +378,11 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
         if (sp[c.id] != null) c,
     ];
     if (scheduled.isEmpty && real.isNotEmpty) {
-      return Column(
+      // Scrolls: a long unscheduled list used to overflow the screen.
+      return ListView(
         children: [
-          Expanded(
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
             child: EmptyState(
               title: 'Belum ada kartu terjadwal',
               message:

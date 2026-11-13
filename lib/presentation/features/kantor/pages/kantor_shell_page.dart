@@ -121,14 +121,19 @@ class _KantorShellPageState extends ConsumerState<_KantorShellBody>
     _controller.addListener(_syncSwipe);
     _lastTab = _controller.index;
     if (widget.officeId != '_kompleks') {
-      rememberKantorOfficePlace(
-        ref,
-        widget.officeId,
-        _visible[_controller.index].$1,
-      );
-      final baseUrl = ref.read(kantorConfigProvider).value?.baseUrl;
-      rememberKantorOffice(widget.officeId, baseUrl: baseUrl);
-      ref.invalidate(kantorLastOfficeProvider);
+      // Writing providers while the tree is building throws ("setState()
+      // called during build"), so remember the place after this frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        rememberKantorOfficePlace(
+          ref,
+          widget.officeId,
+          _visible[_controller.index].$1,
+        );
+        final baseUrl = ref.read(kantorConfigProvider).value?.baseUrl;
+        rememberKantorOffice(widget.officeId, baseUrl: baseUrl);
+        ref.invalidate(kantorLastOfficeProvider);
+      });
     }
   }
 

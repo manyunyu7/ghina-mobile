@@ -16,6 +16,7 @@ import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
 import '../session/chat_view_prefs.dart';
 import '../session/chat_style.dart';
+import 'kantor_room_marks.dart';
 import '../meetings/kantor_meeting.dart';
 import '../meetings/kantor_meeting_detail.dart';
 
@@ -61,172 +62,590 @@ class _MessengerAgentList extends ConsumerStatefulWidget {
       _MessengerAgentListState();
 }
 
+/// One room row's data, worked out once per build.
+class _Room {
+  _Room({
+    required this.s,
+    required this.role,
+    required this.name,
+    required this.preview,
+    required this.kind,
+    required this.at,
+    required this.mine,
+    required this.unread,
+    required this.pinned,
+    required this.muted,
+    required this.live,
+  });
+  final Json s;
+  final Json? role;
+  final String name;
+  final String preview;
+
+  /// 'izin' | 'kerja' | 'pesan'
+  final String kind;
+  final DateTime? at;
+  final bool mine;
+  final bool unread;
+  final bool pinned;
+  final bool muted;
+  final bool live;
+  String get sid => '${s['sid']}';
+}
+
+const _avatarTints = [
+  Color(0xFFDDEBFF),
+  Color(0xFFFFE6D5),
+  Color(0xFFE3F5E1),
+  Color(0xFFF1E4FF),
+  Color(0xFFFFE1EA),
+  Color(0xFFDFF4F4),
+  Color(0xFFFFF3C9),
+];
+
+Color _tintFor(String key) =>
+    _avatarTints[key.codeUnits.fold<int>(
+          0,
+          (a, b) => (a * 31 + b) & 0x7fffffff,
+        ) %
+        _avatarTints.length];
+
 class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
   String _filter = 'Semua';
   String _query = '';
+
+  Future<void> _open(BuildContext context, String sid) async {
+    final marks = ref.read(kantorRoomMarksProvider.notifier);
+    marks.markRead(sid);
+    await context.push('/kantor/o/${widget.feed.officeId}/s/$sid');
+    marks.markRead(sid);
+  }
+
+  Future<void> _roomSheet(BuildContext context, _Room r) async {
+    final marks = ref.read(kantorRoomMarksProvider.notifier);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                r.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+              ),
+              title: Text(r.pinned ? 'Lepas sematan' : 'Sematkan'),
+              onTap: () {
+                marks.togglePin(r.sid);
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                r.muted ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+              ),
+              title: Text(r.muted ? 'Bunyikan' : 'Bisukan'),
+              subtitle: const Text('Hanya di daftar ini, di HP ini'),
+              onTap: () {
+                marks.toggleMute(r.sid);
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                r.unread
+                    ? Icons.mark_chat_read_outlined
+                    : Icons.mark_chat_unread_outlined,
+              ),
+              title: Text(
+                r.unread ? 'Tandai sudah dibaca' : 'Tandai belum dibaca',
+              ),
+              onTap: () {
+                r.unread ? marks.markRead(r.sid) : marks.markUnread(r.sid);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _newChat(BuildContext context) async {
+    final feed = widget.feed;
+    final api = ref.read(kantorApiProvider);
+    final liveRoles = {
+      for (final s in feed.sessions)
+        if (s['status'] != 'ended') s['role'],
+    };
+    final off = feed.roles
+        .where((r) => r['archived'] != true && !liveRoles.contains(r['id']))
+        .toList();
+    final c = ChatStyleColors.of(context, widget.style);
+    final picked = await showModalBottomSheet<Object>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * .7,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  'Chat baru',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: c.send,
+                  child: const Icon(
+                    Icons.person_add_alt_1,
+                    color: Colors.white,
+                  ),
+                ),
+                title: const Text('Agen baru'),
+                onTap: () => Navigator.pop(ctx, 'baru'),
+              ),
+              if (off.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                  child: Text(
+                    'Mulai shift',
+                    style: GhinaType.caption.copyWith(color: c.muted),
+                  ),
+                ),
+              for (final r in off)
+                ListTile(
+                  leading: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: _tintFor('${r['id']}'),
+                    child: KantorSprite(look: r, size: 34),
+                  ),
+                  title: Text('${r['name']}'),
+                  subtitle: Text('${r['title'] ?? ''}'),
+                  onTap: () => Navigator.pop(ctx, r),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!context.mounted || picked == null) return;
+    if (picked == 'baru') {
+      await showKantorNewAgentSheet(context, officeId: feed.officeId);
+      return;
+    }
+    final sid = await showStartShiftSheet(
+      context,
+      feed: feed,
+      actions: api == null ? null : KantorActions(api),
+      role: picked as Json,
+    );
+    if (sid != null && context.mounted) await _open(context, sid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final feed = widget.feed;
     final c = ChatStyleColors.of(context, widget.style);
+    final marks = ref.watch(kantorRoomMarksProvider);
     final meetings =
         ref.watch(kantorMeetingsProvider(feed.officeId)).value ??
         const <KantorMeetingBrief>[];
     final waiting = {for (final item in feed.inbox) '${item['sid']}'};
     final filters = [
       'Semua',
+      'Belum dibaca',
       'Aktif',
       'Menunggu izin',
       if (meetings.isNotEmpty) 'Rapat',
     ];
     final selected = filters.contains(_filter) ? _filter : 'Semua';
-    final sessions = feed.sessions.where((s) {
-      if (selected == 'Rapat') return false;
-      if (selected == 'Aktif' && s['status'] == 'ended') return false;
-      if (selected == 'Menunggu izin' &&
-          s['status'] != 'waiting' &&
-          !waiting.contains(s['sid'])) {
-        return false;
-      }
+
+    _Room room(Json s) {
+      final sid = '${s['sid']}';
       final role = feed.role(s['role'] as String?);
-      return '${sessionName(feed, s)} ${role?['title'] ?? ''} ${KantorKonteks.ofSession(s)?.detail(s) ?? ''}'
-          .toLowerCase()
-          .contains(_query);
-    }).toList();
+      final k = KantorKonteks.ofSession(s);
+      final status = '${s['status']}';
+      final inbox = feed.inbox.where((i) => i['sid'] == s['sid']).toList();
+      final w = s['waiting'] is Map ? asJson(s['waiting']) : null;
+      final askAt = kantorTime(k?.ask?.at);
+      final replyAt = kantorTime(k?.reply?.at);
+      final ownerLast =
+          k?.ask != null &&
+          !k!.ask!.fromAgent &&
+          (replyAt == null || (askAt != null && askAt.isAfter(replyAt)));
+      final at = [askAt, replyAt, kantorTime(s['lastSeen'])]
+          .whereType<DateTime>()
+          .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
+      final String kind;
+      final String preview;
+      if (inbox.isNotEmpty || w != null || status == 'waiting') {
+        kind = 'izin';
+        final it = inbox.isNotEmpty ? inbox.first : w;
+        final ask = it?['tool'] == 'AskUserQuestion';
+        preview =
+            '${ask ? 'Bertanya' : 'Menunggu izin'}: ${it?['summary'] ?? it?['tool'] ?? ''}';
+      } else if (status == 'working' || status == 'starting') {
+        kind = 'kerja';
+        preview = status == 'starting' ? 'baru datang…' : 'sedang bekerja…';
+      } else {
+        kind = 'pesan';
+        preview = ownerLast
+            ? k.ask!.s
+            : (k?.reply?.s ??
+                  k?.step ??
+                  k?.detail(s) ??
+                  (kantorStatusLabel[status] ?? status));
+      }
+      final read = marks.readAt[sid];
+      final unread =
+          marks.unread.contains(sid) ||
+          (!ownerLast &&
+              replyAt != null &&
+              read != null &&
+              replyAt.millisecondsSinceEpoch > read);
+      return _Room(
+        s: s,
+        role: role,
+        name: sessionName(feed, s),
+        preview: preview.replaceAll('\n', ' '),
+        kind: kind,
+        at: at,
+        mine: ownerLast && kind == 'pesan',
+        unread: unread,
+        pinned: marks.pinned.contains(sid),
+        muted: marks.muted.contains(sid),
+        live: status != 'ended',
+      );
+    }
+
+    final rooms =
+        feed.sessions.map(room).where((r) {
+          if (selected == 'Rapat') return false;
+          if (selected == 'Aktif' && !r.live) return false;
+          if (selected == 'Belum dibaca' && !r.unread) return false;
+          if (selected == 'Menunggu izin' &&
+              r.kind != 'izin' &&
+              !waiting.contains(r.sid)) {
+            return false;
+          }
+          return '${r.name} ${r.role?['title'] ?? ''} ${r.preview}'
+              .toLowerCase()
+              .contains(_query);
+        }).toList()..sort((a, b) {
+          if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+          final ta = a.at, tb = b.at;
+          if (ta == null || tb == null) return ta == null ? 1 : -1;
+          return tb.compareTo(ta);
+        });
+    final unreadCount = feed.sessions.map(room).where((r) => r.unread).length;
     final visibleMeetings = meetings
         .where((m) => m.topic.toLowerCase().contains(_query))
         .toList();
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-      children: [
-        TextField(
-          key: const ValueKey('room-search'),
-          onChanged: (value) =>
-              setState(() => _query = value.trim().toLowerCase()),
-          decoration: const InputDecoration(
-            hintText: 'Cari agent, ruangan, atau pesan',
-            prefixIcon: Icon(Icons.search),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+    final badge = c.send;
+
+    Widget row(_Room r) {
+      final previewColor = switch (r.kind) {
+        'izin' => const Color(0xFFC2410C),
+        'kerja' => badge,
+        _ => c.muted,
+      };
+      final stamp = messengerStamp(r.at);
+      return InkWell(
+        key: ValueKey('room-${r.sid}'),
+        onTap: () => _open(context, r.sid),
+        onLongPress: () => _roomSheet(context, r),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final filter in filters)
-                Padding(
-                  padding: const EdgeInsets.only(right: 7),
-                  child: ChoiceChip(
-                    showCheckmark: false,
-                    labelStyle: GhinaType.caption.copyWith(fontSize: 13),
-                    label: Text(filter),
-                    selected: selected == filter,
-                    onSelected: (_) => setState(() => _filter = filter),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 27,
+                    backgroundColor: _tintFor(
+                      r.role?['id']?.toString() ?? r.sid,
+                    ),
+                    child: KantorSprite(
+                      look: r.role ?? KantorSprite.guestLook(r.sid),
+                      size: 44,
+                    ),
+                  ),
+                  if (r.live)
+                    Positioned(
+                      right: 0,
+                      bottom: 1,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.only(bottom: 12, top: 4),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: c.muted.withValues(alpha: .12)),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GhinaType.body.copyWith(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                color: c.ink,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            stamp,
+                            style: GhinaType.caption.copyWith(
+                              fontSize: 12,
+                              color: r.unread && !r.muted ? badge : c.muted,
+                              fontWeight: r.unread
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (r.mine) ...[
+                            Icon(
+                              Icons.done_all_rounded,
+                              size: 17,
+                              color: c.tick,
+                            ),
+                            const SizedBox(width: 3),
+                          ],
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  if (r.mine)
+                                    TextSpan(
+                                      text: 'Kamu: ',
+                                      style: TextStyle(color: c.muted),
+                                    ),
+                                  TextSpan(text: r.preview),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GhinaType.bodyS.copyWith(
+                                fontSize: 14,
+                                color: previewColor,
+                                fontWeight: r.kind == 'pesan'
+                                    ? FontWeight.w400
+                                    : FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (r.muted) ...[
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.volume_off_rounded,
+                              size: 17,
+                              color: c.muted,
+                              semanticLabel: 'Dibisukan',
+                            ),
+                          ],
+                          if (r.pinned) ...[
+                            const SizedBox(width: 6),
+                            Transform.rotate(
+                              angle: .6,
+                              child: Icon(
+                                Icons.push_pin_rounded,
+                                size: 16,
+                                color: c.muted,
+                                semanticLabel: 'Disematkan',
+                              ),
+                            ),
+                          ],
+                          if (r.unread || r.kind == 'izin') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: r.muted
+                                    ? c.muted.withValues(alpha: .6)
+                                    : r.kind == 'izin'
+                                    ? const Color(0xFFEA580C)
+                                    : badge,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                r.kind == 'izin' ? '!' : '1',
+                                style: GhinaType.caption.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        if (selected == 'Rapat')
-          for (final meeting in visibleMeetings)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: c.mine,
-                child: Icon(Icons.groups_outlined, color: c.accent),
-              ),
-              title: Text(meeting.topic),
-              subtitle: Text(meeting.status),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => KantorMeetingDetailScreen(
-                    officeId: feed.officeId,
-                    meetingId: meeting.id,
+      );
+    }
+
+    return Stack(
+      children: [
+        ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 10, bottom: 96),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                key: const ValueKey('room-search'),
+                onChanged: (value) =>
+                    setState(() => _query = value.trim().toLowerCase()),
+                decoration: InputDecoration(
+                  hintText: 'Cari agent, ruangan, atau pesan',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: c.muted.withValues(alpha: .08),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
             ),
-        for (final s in sessions)
-          Builder(
-            builder: (context) {
-              final role = feed.role(s['role'] as String?);
-              final k = KantorKonteks.ofSession(s);
-              final inbox = feed.inbox
-                  .where((i) => i['sid'] == s['sid'])
-                  .toList();
-              final status =
-                  kantorStatusLabel['${s['status']}'] ?? '${s['status']}';
-              final subtitle = inbox.isNotEmpty
-                  ? 'Menunggu izin: ${inbox.first['summary'] ?? inbox.first['tool'] ?? ''}'
-                  : k?.reply?.s ?? k?.step ?? k?.detail(s) ?? status;
-              return Column(
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
                 children: [
-                  ListTile(
-                    key: ValueKey('room-${s['sid']}'),
-                    contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: c.mine,
-                      child: KantorSprite(
-                        look: role ?? KantorSprite.guestLook('${s['sid']}'),
-                        size: 40,
+                  for (final filter in filters)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 7),
+                      child: ChoiceChip(
+                        showCheckmark: false,
+                        side: BorderSide.none,
+                        shape: const StadiumBorder(),
+                        backgroundColor: c.muted.withValues(alpha: .08),
+                        selectedColor: c.mine,
+                        labelStyle: GhinaType.caption.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: selected == filter ? c.accent : c.muted,
+                        ),
+                        label: Text(
+                          filter == 'Belum dibaca' && unreadCount > 0
+                              ? '$filter $unreadCount'
+                              : filter,
+                        ),
+                        selected: selected == filter,
+                        onSelected: (_) => setState(() => _filter = filter),
                       ),
                     ),
-                    title: Text(
-                      [
-                        sessionName(feed, s),
-                        if ('${role?['title'] ?? ''}'.isNotEmpty)
-                          '${role!['title']}',
-                      ].join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GhinaType.body.w(700),
-                    ),
-                    subtitle: Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GhinaType.bodyS.copyWith(color: c.muted),
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (agoText(k?.reply?.at ?? s['lastSeen']).isNotEmpty)
-                          Text(
-                            agoText(k?.reply?.at ?? s['lastSeen']),
-                            style: GhinaType.caption.copyWith(color: c.accent),
-                          ),
-                        if (inbox.isNotEmpty)
-                          Badge(
-                            label: Text('${inbox.length}'),
-                            backgroundColor: c.accent,
-                          ),
-                      ],
-                    ),
-                    onTap: () => context.push(
-                      '/kantor/o/${feed.officeId}/s/${s['sid']}',
-                    ),
-                  ),
-                  Divider(
-                    height: 1,
-                    indent: 64,
-                    color: c.muted.withValues(alpha: .15),
-                  ),
                 ],
-              );
-            },
-          ),
-        if (sessions.isEmpty &&
-            (selected != 'Rapat' || visibleMeetings.isEmpty))
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Tidak ada percakapan pada filter ini.',
-              textAlign: TextAlign.center,
+              ),
             ),
+            const SizedBox(height: 6),
+            if (selected == 'Rapat')
+              for (final meeting in visibleMeetings)
+                ListTile(
+                  leading: CircleAvatar(
+                    radius: 27,
+                    backgroundColor: c.mine,
+                    child: Icon(Icons.groups_outlined, color: c.accent),
+                  ),
+                  title: Text(
+                    meeting.topic,
+                    style: GhinaType.body.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(meeting.status),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => KantorMeetingDetailScreen(
+                        officeId: feed.officeId,
+                        meetingId: meeting.id,
+                      ),
+                    ),
+                  ),
+                ),
+            for (final r in rooms) row(r),
+            if (rooms.isEmpty &&
+                (selected != 'Rapat' || visibleMeetings.isEmpty))
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Tidak ada percakapan pada filter ini.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+          ],
+        ),
+        Positioned(
+          right: 16,
+          bottom: 20,
+          child: FloatingActionButton(
+            key: const ValueKey('room-new-chat'),
+            heroTag: 'room-new-chat',
+            tooltip: 'Chat baru',
+            backgroundColor: c.send,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            onPressed: () => _newChat(context),
+            child: const Icon(Icons.add_comment_rounded),
           ),
+        ),
       ],
     );
   }

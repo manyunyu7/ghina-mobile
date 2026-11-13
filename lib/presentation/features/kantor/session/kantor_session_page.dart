@@ -21,6 +21,7 @@ import 'chat_context.dart';
 import 'kantor_adopt.dart';
 import 'chat_view_prefs.dart';
 import 'chat_style.dart';
+import 'attachment_files.dart';
 import 'attachment_model.dart';
 import 'attachment_views.dart';
 import 'kantor_actions.dart';
