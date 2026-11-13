@@ -1,5 +1,121 @@
 part of 'kantor_session_page.dart';
 
+class _ProfilePersona extends StatefulWidget {
+  const _ProfilePersona({required this.text, required this.colors});
+  final String text;
+  final ChatStyleColors colors;
+  @override
+  State<_ProfilePersona> createState() => _ProfilePersonaState();
+}
+
+class _ProfilePersonaState extends State<_ProfilePersona> {
+  bool _expanded = false;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final style = GhinaType.body.copyWith(color: widget.colors.ink);
+        final measure = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+          maxLines: 3,
+        )..layout(maxWidth: constraints.maxWidth);
+        final truncated = measure.didExceedMaxLines;
+        measure.dispose();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.text,
+              key: const ValueKey('profile-persona'),
+              style: style,
+              maxLines: _expanded ? null : 3,
+              overflow: _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
+            ),
+            if (truncated)
+              TextButton(
+                key: const ValueKey('profile-persona-expand'),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(_expanded ? 'Lebih sedikit' : 'Selengkapnya'),
+              ),
+            const SizedBox(height: 3),
+            Text(
+              'Kepribadian',
+              style: GhinaType.caption.copyWith(color: widget.colors.muted),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+/// A labelled file-kind tile stays useful for HTML bundles, missing thumbnails,
+/// and files whose generated thumbnail is an otherwise blank white image.
+class _ProfilePreviewTile extends StatelessWidget {
+  const _ProfilePreviewTile({
+    required this.item,
+    required this.colors,
+    required this.onTap,
+  });
+  final PratinjauItem item;
+  final ChatStyleColors colors;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final kind =
+        item.files.firstOrNull?.kind ??
+        (item.mode == 'bundle' ? 'html' : 'other');
+    return Tooltip(
+      message: item.title,
+      child: Material(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('profile-preview-${item.id}'),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Icon(
+                        pratinjauKindIcon(kind),
+                        size: 28,
+                        color: colors.accent,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Flexible(
+                  flex: 2,
+                  child: Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: GhinaType.caption.copyWith(
+                      color: colors.ink,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 final _profileFilesProvider = FutureProvider.autoDispose
     .family<List<KantorAttachment>, (String, String)>((ref, key) async {
       final api = ref.watch(kantorApiProvider);
@@ -368,19 +484,20 @@ class _AgentProfileState extends ConsumerState<KantorAgentProfilePage> {
                           ].where((x) => x.isNotEmpty).join(' · '),
                         ),
                       if ('${role?['persona'] ?? ''}'.trim().isNotEmpty)
-                        fact('${role!['persona']}', 'Kepribadian'),
+                        _ProfilePersona(text: '${role!['persona']}', colors: c),
                       if (kantorSessionModelText(role, sess).isNotEmpty)
                         fact(
                           kantorSessionModelText(role, sess),
                           'Model',
-                          trailing: controllable && tmux && !busy
-                              ? TextButton(
-                                  onPressed: () => menu._codex
+                          trailing: TextButton(
+                            key: const ValueKey('profile-change-model'),
+                            onPressed: controllable && tmux && !busy
+                                ? () => menu._codex
                                       ? menu._codexSettings(context)
-                                      : menu._model(context),
-                                  child: const Text('Ganti'),
-                                )
-                              : null,
+                                      : menu._model(context)
+                                : null,
+                            child: const Text('Ganti'),
+                          ),
                         ),
                       if ('${sess['cwd'] ?? ''}'.isNotEmpty)
                         fact(
@@ -431,8 +548,16 @@ class _AgentProfileState extends ConsumerState<KantorAgentProfilePage> {
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
+                        key: const ValueKey('profile-chat-view'),
                         title: const Text('Tampilan chat'),
-                        trailing: Text(view.style.label),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(view.style.label),
+                            const SizedBox(width: 6),
+                            Icon(Icons.chevron_right, size: 20, color: c.muted),
+                          ],
+                        ),
                         onTap: () => showChatViewSheet(context),
                       ),
                       if (controllable && tmux)
@@ -516,32 +641,10 @@ class _AgentProfileState extends ConsumerState<KantorAgentProfilePage> {
                       crossAxisSpacing: 3,
                       children: [
                         for (final item in items)
-                          Semantics(
-                            button: true,
-                            label: item.title,
-                            child: InkWell(
-                              onTap: () => openPreview(item),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: item.files.isEmpty
-                                    ? ColoredBox(
-                                        color: c.surface,
-                                        child: Center(
-                                          child: Text(
-                                            item.title,
-                                            maxLines: 3,
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      )
-                                    : PratinjauThumb(
-                                        api: api!,
-                                        file: item.files.first,
-                                        compact: true,
-                                        purged: item.filesPurged,
-                                      ),
-                              ),
-                            ),
+                          _ProfilePreviewTile(
+                            item: item,
+                            colors: c,
+                            onTap: () => openPreview(item),
                           ),
                       ],
                     ),

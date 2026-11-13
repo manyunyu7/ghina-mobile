@@ -12,6 +12,7 @@ import 'package:ghina/presentation/features/kantor/session/chat_style.dart';
 import 'package:ghina/presentation/features/kantor/session/chat_view_prefs.dart';
 import 'package:ghina/presentation/features/kantor/session/kantor_feed.dart';
 import 'package:ghina/presentation/features/kantor/session/kantor_session_page.dart';
+import 'package:ghina/presentation/features/kantor/session/kantor_actions.dart';
 import 'package:ghina/presentation/features/kantor/agents/kantor_agents_tab.dart';
 import 'package:ghina/presentation/features/kantor/session/permission_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,7 +29,9 @@ Future<void> _settle(WidgetTester t) async {
 void main() {
   late HttpServer server;
   late KantorApi api;
+  var previewItems = <Map<String, dynamic>>[];
   setUp(() async {
+    previewItems = [];
     HttpOverrides.global = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((req) {
@@ -40,7 +43,7 @@ void main() {
           ],
         };
       }
-      if (req.uri.path.contains('/pratinjau')) body = {'items': []};
+      if (req.uri.path.contains('/pratinjau')) body = {'items': previewItems};
       req.response
         ..persistentConnection = false
         ..headers.contentType = ContentType.json
@@ -127,6 +130,123 @@ void main() {
     );
     expect(ChatViewPrefs.fromJson({'style': 'future'}).style, ChatStyle.bawaan);
   });
+
+  testWidgets(
+    'profile QA: collapse persona, labelled previews and disabled model action',
+    (t) async {
+      t.view.physicalSize = const Size(390, 1400);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      const title = 'Pratinjau HTML tanpa thumbnail';
+      previewItems = [
+        {
+          'id': 'p1',
+          'office': 'o',
+          'sid': 's',
+          'title': title,
+          'mode': 'bundle',
+          'files': [
+            {
+              'id': 'f1',
+              'name': 'index.html',
+              'kind': 'html',
+              'url': '/pv/o/p1/index.html',
+            },
+          ],
+        },
+      ];
+      SharedPreferences.setMockInitialValues({
+        'kantor.chat.view': jsonEncode(
+          const ChatViewPrefs(style: ChatStyle.telegram).toJson(),
+        ),
+      });
+      final persona = List.filled(
+        40,
+        'Membantu pemilik merapikan berkas dan mengurus pekerjaan kantor.',
+      ).join(' ');
+      final session = <String, dynamic>{
+        'sid': 's',
+        'role': 'mesi',
+        'status': 'working',
+        'tmux': 'test',
+        'model': 'sonnet',
+        'cwd': '/workspace/media',
+      };
+      final feed = KantorOfficeFeed('o', null)
+        ..loading = false
+        ..office = {
+          'roles': [
+            {'id': 'mesi', 'name': 'Mesi', 'persona': persona},
+          ],
+          'sessions': [session],
+        };
+      await t.pumpWidget(
+        ProviderScope(
+          overrides: [
+            kantorApiProvider.overrideWithValue(api),
+            kantorEventsProvider.overrideWith((ref) => const Stream.empty()),
+          ],
+          child: MaterialApp(
+            theme: GhinaTheme.light(),
+            home: KantorAgentProfilePage(
+              feed: feed,
+              sid: 's',
+              actions: KantorActions(api),
+            ),
+          ),
+        ),
+      );
+      await _settle(t);
+      final personaFinder = find.byKey(const ValueKey('profile-persona'));
+      expect(t.widget<Text>(personaFinder).maxLines, 3);
+      expect(find.text('Selengkapnya'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('profile-persona-expand')));
+      await t.pump();
+      expect(t.widget<Text>(personaFinder).maxLines, isNull);
+      expect(find.text('Lebih sedikit'), findsOneWidget);
+      await t.ensureVisible(find.byKey(const ValueKey('profile-persona-expand')));
+      await _settle(t);
+      await t.tap(find.byKey(const ValueKey('profile-persona-expand')));
+      await t.pump();
+      expect(t.widget<Text>(personaFinder).maxLines, 3);
+      final model = find.byKey(const ValueKey('profile-change-model'));
+      expect(model, findsOneWidget);
+      expect(t.widget<TextButton>(model).onPressed, isNull);
+      feed.apply({
+        't': 'session',
+        'office': 'o',
+        'session': {...session, 'status': 'idle'},
+      });
+      await t.pump();
+      expect(t.widget<TextButton>(model).onPressed, isNotNull);
+      final viewRow = find.byKey(const ValueKey('profile-chat-view'));
+      expect(
+        find.descendant(
+          of: viewRow,
+          matching: find.byIcon(Icons.chevron_right),
+        ),
+        findsOneWidget,
+      );
+      final preview = find.byKey(const ValueKey('profile-preview-p1'));
+      await t.ensureVisible(preview);
+      await _settle(t);
+      expect(
+        find.descendant(of: preview, matching: find.text(title)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: preview, matching: find.byType(Icon)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: preview, matching: find.byType(Image)),
+        findsNothing,
+      );
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 4));
+    },
+  );
 
   testWidgets('messenger room filters use real session status and inbox', (
     t,
