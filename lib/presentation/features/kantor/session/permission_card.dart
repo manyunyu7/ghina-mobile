@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../design_system/design_system.dart';
 import 'kantor_feed.dart';
+import 'chat_view_prefs.dart';
 
 class AskOption {
   const AskOption(this.label, this.desc);
@@ -94,10 +95,12 @@ class KantorPermissionCard extends StatelessWidget {
     this.who,
     this.onOpen,
     this.onDismiss,
+    this.style = ChatStyle.bawaan,
   });
 
   /// Tombol ✕: tutup kartu tanpa menjawab. Null = tidak ditampilkan.
   final VoidCallback? onDismiss;
+  final ChatStyle style;
 
   /// Inbox item: `{id, sid, tool, summary, held, who}`.
   final Json item;
@@ -122,6 +125,17 @@ class KantorPermissionCard extends StatelessWidget {
     final g = context.ghina;
     final summary = '${item['summary'] ?? ''}';
     final children = <Widget>[
+      if (style != ChatStyle.bawaan)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            'MENUNGGU IZIN',
+            style: GhinaType.caption.copyWith(
+              color: const Color(0xFF93590B),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       Row(
         children: [
           Icon(
@@ -228,7 +242,29 @@ class KantorPermissionCard extends StatelessWidget {
     if (!_ask) {
       children.add(const SizedBox(height: GhinaSpace.md));
       children.add(
-        _held
+        _held && style != ChatStyle.bawaan
+            ? Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => onDecide('deny'),
+                      child: const Text('Tolak'),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => onDecide('allow'),
+                      child: const Text('Izinkan'),
+                    ),
+                  ),
+                ],
+              )
+            : _held
             ? Row(
                 children: [
                   Expanded(
@@ -264,7 +300,27 @@ class KantorPermissionCard extends StatelessWidget {
         children: children,
       ),
     );
-    return card;
+    if (style == ChatStyle.bawaan) return card;
+    return Material(
+      color: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF3A3020)
+          : const Color(0xFFFFF8EB),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFF5D9A8)),
+      ),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        ),
+      ),
+    );
   }
 }
 

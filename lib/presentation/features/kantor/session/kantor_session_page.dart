@@ -10,10 +10,19 @@ import '../kantor_place.dart';
 import '../pages/kantor_complex_agent_switcher.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../pratinjau/pratinjau_detail.dart';
+import '../pratinjau/pratinjau_widgets.dart';
+import '../board/kantor_card_detail.dart';
+import '../meetings/kantor_meeting.dart';
+import '../meetings/kantor_meeting_form.dart';
+import '../meetings/kantor_meeting_detail.dart';
 import 'chat_tab.dart';
 import 'chat_context.dart';
 import 'kantor_adopt.dart';
 import 'chat_view_prefs.dart';
+import 'chat_style.dart';
+import 'attachment_model.dart';
+import 'attachment_views.dart';
 import 'kantor_actions.dart';
 import 'kantor_feed.dart';
 import 'kantor_konteks.dart';
@@ -21,6 +30,8 @@ import 'profile_tab.dart';
 import 'session_pratinjau_tab.dart';
 import 'stop_choice.dart';
 import 'terminal_tab.dart';
+
+part 'agent_profile_page.dart';
 
 /// One session: header (who, model, status, permission mode) and the tabs
 /// Chat | Terminal | Profil | Subagent. Route `/kantor/o/:office/s/:sid`.
@@ -221,6 +232,8 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
   @override
   Widget build(BuildContext context) {
     final s = widget.feed.session(widget.sid)!;
+    final view = ref.watch(chatViewPrefsProvider);
+    if (view.messenger) return _messengerScaffold(s, view);
     // Only the selected tab is visible and focusable: the others stay mounted
     // (state kept) but are offstage and out of the focus tree, so the terminal
     // can never steal the keyboard from the chat field.
@@ -344,6 +357,102 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
               ),
             ),
       ],
+    );
+  }
+
+  Future<void> _profile() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final selected = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) => KantorAgentProfilePage(
+          feed: widget.feed,
+          sid: widget.sid,
+          actions: widget.actions,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (selected != null) _tabs.animateTo(selected);
+  }
+
+  Widget _messengerScaffold(Json s, ChatViewPrefs view) {
+    final colors = ChatStyleColors.of(context, view.style);
+    return PopScope(
+      canPop: _shown == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          forgetKantorSessionPlace(ref);
+        } else {
+          _tabs.animateTo(0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: colors.wall,
+        appBar: AppBar(
+          backgroundColor: colors.header,
+          foregroundColor: colors.headerInk,
+          surfaceTintColor: Colors.transparent,
+          titleSpacing: 0,
+          leading: _shown == 0
+              ? null
+              : IconButton(
+                  tooltip: 'Kembali ke chat',
+                  onPressed: () => _tabs.animateTo(0),
+                  icon: const Icon(Icons.arrow_back),
+                ),
+          title: KantorMessengerHeader(
+            feed: widget.feed,
+            sess: s,
+            style: view.style,
+            onTap: _profile,
+          ),
+          actions: [
+            if (s['tmux'] != null && s['status'] != 'ended')
+              IconButton(
+                tooltip: _shown == 1 ? 'Chat' : 'Terminal',
+                onPressed: () => _tabs.animateTo(_shown == 1 ? 0 : 1),
+                icon: Icon(
+                  _shown == 1 ? Icons.chat_bubble_outline : Icons.terminal,
+                ),
+              ),
+            _Menu(
+              feed: widget.feed,
+              sess: s,
+              actions: widget.actions,
+              scope: _shown == 1
+                  ? ViewSheetScope.terminal
+                  : ViewSheetScope.chat,
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              if (_shown == 0 || _shown == 1)
+                KantorKonteksBar(
+                  session: s,
+                  onDraft: widget.actions == null
+                      ? null
+                      : (aksi) => widget.actions!.api.post(
+                          '/api/sessions/${widget.sid}/draft-laporan',
+                          {'aksi': aksi},
+                        ),
+                  onLabel: widget.actions == null
+                      ? null
+                      : (text, carry, tell) async {
+                          await widget.actions!.api.post(
+                            '/api/sessions/${widget.sid}/label',
+                            {'text': text, 'carry': carry, 'tell': tell},
+                          );
+                          await widget.feed.load();
+                        },
+                ),
+              Expanded(child: _tabStack(s)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

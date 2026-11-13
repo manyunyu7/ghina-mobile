@@ -419,12 +419,14 @@ class ThemedBubble extends StatelessWidget {
     required this.padding,
     required this.child,
     this.peek = ChatPeek.none,
+    this.fillColor,
   });
 
   final ChatBubbleShape shape;
   final bool mine;
   final ChatMeColor me;
   final ChatPeek peek;
+  final Color? fillColor;
   final EdgeInsetsGeometry padding;
   final Widget child;
 
@@ -454,8 +456,8 @@ class ThemedBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final ai = g.surface;
-    final fill = mine ? me.fill : ai;
-    final grad = mine ? me.gradient : null;
+    final fill = fillColor ?? (mine ? me.fill : ai);
+    final grad = fillColor == null && mine ? me.gradient : null;
 
     Border? border;
     List<BoxShadow>? shadows;
@@ -537,7 +539,7 @@ class ThemedBubble extends StatelessWidget {
               child: CustomPaint(
                 painter: _TailPainter(
                   mine: mine,
-                  color: mine ? (me.fill ?? me.from) : ai,
+                  color: fillColor ?? (mine ? (me.fill ?? me.from) : ai),
                 ),
               ),
             ),

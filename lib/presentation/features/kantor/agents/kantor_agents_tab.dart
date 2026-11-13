@@ -14,6 +14,10 @@ import '../roles/kantor_new_agent_sheet.dart';
 import '../session/start_shift_sheet.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../session/chat_view_prefs.dart';
+import '../session/chat_style.dart';
+import '../meetings/kantor_meeting.dart';
+import '../meetings/kantor_meeting_detail.dart';
 
 /// Agents of one office, grouped by what needs the user: waiting (permission
 /// or question), working, idle, and roles off shift.
@@ -26,6 +30,7 @@ class KantorAgentsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
+    final style = ref.watch(chatViewPrefsProvider.select((p) => p.style));
     return ListenableBuilder(
       listenable: feed,
       builder: (context, _) {
@@ -35,12 +40,194 @@ class KantorAgentsTab extends ConsumerWidget {
         }
         return RefreshIndicator(
           onRefresh: feed.load,
-          child: _AgentList(
-            feed: feed,
-            actions: api == null ? null : KantorActions(api),
-          ),
+          child: style != ChatStyle.bawaan
+              ? _MessengerAgentList(feed: feed, style: style)
+              : _AgentList(
+                  feed: feed,
+                  actions: api == null ? null : KantorActions(api),
+                ),
         );
       },
+    );
+  }
+}
+
+class _MessengerAgentList extends ConsumerStatefulWidget {
+  const _MessengerAgentList({required this.feed, required this.style});
+  final KantorOfficeFeed feed;
+  final ChatStyle style;
+  @override
+  ConsumerState<_MessengerAgentList> createState() =>
+      _MessengerAgentListState();
+}
+
+class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
+  String _filter = 'Semua';
+  String _query = '';
+  @override
+  Widget build(BuildContext context) {
+    final feed = widget.feed;
+    final c = ChatStyleColors.of(context, widget.style);
+    final meetings =
+        ref.watch(kantorMeetingsProvider(feed.officeId)).value ??
+        const <KantorMeetingBrief>[];
+    final waiting = {for (final item in feed.inbox) '${item['sid']}'};
+    final filters = [
+      'Semua',
+      'Aktif',
+      'Menunggu izin',
+      if (meetings.isNotEmpty) 'Rapat',
+    ];
+    final selected = filters.contains(_filter) ? _filter : 'Semua';
+    final sessions = feed.sessions.where((s) {
+      if (selected == 'Rapat') return false;
+      if (selected == 'Aktif' && s['status'] == 'ended') return false;
+      if (selected == 'Menunggu izin' &&
+          s['status'] != 'waiting' &&
+          !waiting.contains(s['sid'])) {
+        return false;
+      }
+      final role = feed.role(s['role'] as String?);
+      return '${sessionName(feed, s)} ${role?['title'] ?? ''} ${KantorKonteks.ofSession(s)?.detail(s) ?? ''}'
+          .toLowerCase()
+          .contains(_query);
+    }).toList();
+    final visibleMeetings = meetings
+        .where((m) => m.topic.toLowerCase().contains(_query))
+        .toList();
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+      children: [
+        TextField(
+          key: const ValueKey('room-search'),
+          onChanged: (value) =>
+              setState(() => _query = value.trim().toLowerCase()),
+          decoration: const InputDecoration(
+            hintText: 'Cari agent, ruangan, atau pesan',
+            prefixIcon: Icon(Icons.search),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final filter in filters)
+                Padding(
+                  padding: const EdgeInsets.only(right: 7),
+                  child: ChoiceChip(
+                    showCheckmark: false,
+                    labelStyle: GhinaType.caption.copyWith(fontSize: 13),
+                    label: Text(filter),
+                    selected: selected == filter,
+                    onSelected: (_) => setState(() => _filter = filter),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (selected == 'Rapat')
+          for (final meeting in visibleMeetings)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: c.mine,
+                child: Icon(Icons.groups_outlined, color: c.accent),
+              ),
+              title: Text(meeting.topic),
+              subtitle: Text(meeting.status),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => KantorMeetingDetailScreen(
+                    officeId: feed.officeId,
+                    meetingId: meeting.id,
+                  ),
+                ),
+              ),
+            ),
+        for (final s in sessions)
+          Builder(
+            builder: (context) {
+              final role = feed.role(s['role'] as String?);
+              final k = KantorKonteks.ofSession(s);
+              final inbox = feed.inbox
+                  .where((i) => i['sid'] == s['sid'])
+                  .toList();
+              final status =
+                  kantorStatusLabel['${s['status']}'] ?? '${s['status']}';
+              final subtitle = inbox.isNotEmpty
+                  ? 'Menunggu izin: ${inbox.first['summary'] ?? inbox.first['tool'] ?? ''}'
+                  : k?.reply?.s ?? k?.step ?? k?.detail(s) ?? status;
+              return Column(
+                children: [
+                  ListTile(
+                    key: ValueKey('room-${s['sid']}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 24,
+                      backgroundColor: c.mine,
+                      child: KantorSprite(
+                        look: role ?? KantorSprite.guestLook('${s['sid']}'),
+                        size: 40,
+                      ),
+                    ),
+                    title: Text(
+                      [
+                        sessionName(feed, s),
+                        if ('${role?['title'] ?? ''}'.isNotEmpty)
+                          '${role!['title']}',
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GhinaType.body.w(700),
+                    ),
+                    subtitle: Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GhinaType.bodyS.copyWith(color: c.muted),
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (agoText(k?.reply?.at ?? s['lastSeen']).isNotEmpty)
+                          Text(
+                            agoText(k?.reply?.at ?? s['lastSeen']),
+                            style: GhinaType.caption.copyWith(color: c.accent),
+                          ),
+                        if (inbox.isNotEmpty)
+                          Badge(
+                            label: Text('${inbox.length}'),
+                            backgroundColor: c.accent,
+                          ),
+                      ],
+                    ),
+                    onTap: () => context.push(
+                      '/kantor/o/${feed.officeId}/s/${s['sid']}',
+                    ),
+                  ),
+                  Divider(
+                    height: 1,
+                    indent: 64,
+                    color: c.muted.withValues(alpha: .15),
+                  ),
+                ],
+              );
+            },
+          ),
+        if (sessions.isEmpty &&
+            (selected != 'Rapat' || visibleMeetings.isEmpty))
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Tidak ada percakapan pada filter ini.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
     );
   }
 }

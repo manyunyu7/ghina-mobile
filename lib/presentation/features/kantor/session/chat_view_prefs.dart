@@ -26,6 +26,15 @@ const _scaleStep = 0.05;
 /// font plus a large chat font cannot blow the layout up.
 const _totalScaleCap = 2.2;
 
+enum ChatStyle {
+  bawaan('Default'),
+  telegram('Telegram'),
+  whatsapp('WhatsApp');
+
+  const ChatStyle(this.label);
+  final String label;
+}
+
 enum ChatDensity {
   tight('Rapat', 0.6),
   normal('Normal', 1),
@@ -70,6 +79,10 @@ enum ChatBubbleWidth {
 @immutable
 class ChatViewPrefs {
   const ChatViewPrefs({
+    this.style = ChatStyle.bawaan,
+    this.customWall = false,
+    this.customBubble = false,
+    this.customMe = false,
     this.scale = 1,
     this.density = ChatDensity.normal,
     this.tools = ChatToolMode.compact,
@@ -88,6 +101,13 @@ class ChatViewPrefs {
   });
 
   final double scale;
+  final ChatStyle style;
+  final bool customWall, customBubble, customMe;
+  bool get messenger => style != ChatStyle.bawaan;
+  bool get useStyleWall => messenger && !customWall && wall == ChatWall.polos;
+  bool get useStyleBubble =>
+      messenger && !customBubble && bubble == ChatBubbleShape.kantor;
+  bool get useStyleMe => messenger && !customMe && me == ChatMeColor.biru;
   final ChatDensity density;
 
   /// [ChatToolMode.compact] folds long runs of tool calls (the original look),
@@ -120,9 +140,10 @@ class ChatViewPrefs {
 
   /// True when something is painted behind the chat, so loose text and the
   /// bottom bar need a light backing to stay readable.
-  bool get hasWall => wall != ChatWall.polos;
+  bool get hasWall => useStyleWall || wall != ChatWall.polos;
 
   ChatViewPrefs copyWith({
+    ChatStyle? style,
     double? scale,
     ChatDensity? density,
     ChatToolMode? tools,
@@ -139,6 +160,10 @@ class ChatViewPrefs {
     ChatMeColor? me,
     ChatPeek? peek,
   }) => ChatViewPrefs(
+    style: style ?? this.style,
+    customWall: customWall || wall != null,
+    customBubble: customBubble || bubble != null,
+    customMe: customMe || me != null,
     scale: scale ?? this.scale,
     density: density ?? this.density,
     tools: tools ?? this.tools,
@@ -157,6 +182,10 @@ class ChatViewPrefs {
   );
 
   Map<String, dynamic> toJson() => {
+    'style': style.name,
+    'customWall': customWall,
+    'customBubble': customBubble,
+    'customMe': customMe,
     'scale': scale,
     'density': density.name,
     'tools': tools.name,
@@ -180,6 +209,10 @@ class ChatViewPrefs {
     final s = j['scale'];
     final cs = j['codeScale'];
     return ChatViewPrefs(
+      style: pick(ChatStyle.values, j['style'], ChatStyle.bawaan),
+      customWall: j['customWall'] == true,
+      customBubble: j['customBubble'] == true,
+      customMe: j['customMe'] == true,
       scale: s is num ? clampChatScale(s.toDouble()) : 1,
       density: pick(ChatDensity.values, j['density'], ChatDensity.normal),
       tools: pick(ChatToolMode.values, j['tools'], ChatToolMode.compact),
@@ -502,6 +535,12 @@ class _ChatSections {
     final p = prefs;
     final n = notifier;
     return [
+      seg<ChatStyle>(
+        'Gaya',
+        [for (final style in ChatStyle.values) (style, style.label)],
+        p.style,
+        (style) => n.update((p) => p.copyWith(style: style)),
+      ),
       label('Ukuran teks (${(p.scale * 100).round()}%)'),
       Row(
         children: [

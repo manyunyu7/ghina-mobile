@@ -30,6 +30,8 @@ import 'chat_images.dart';
 import 'chat_subagents.dart';
 import 'chat_model.dart';
 import 'chat_view_prefs.dart';
+import 'chat_style.dart';
+import '../board/kantor_card_detail.dart';
 import 'kantor_actions.dart';
 import 'kantor_feed.dart';
 import 'stop_choice.dart';
@@ -444,9 +446,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     ];
     return ChatScope(
       scale: view.scale,
-      child: ChatWallpaper(
-        wall: view.wall,
-        photo: view.wallPhoto,
+      child: MessengerWallpaper(
+        view: view,
         child: ListenableBuilder(
           listenable: widget.feed,
           builder: (context, _) {
@@ -488,6 +489,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                                   bottom: GhinaSpace.sm,
                                 ),
                                 child: KantorPermissionCard(
+                                  style: view.style,
                                   item: p,
                                   who: sessionName(widget.feed, _sess),
                                   onDismiss: () async {
@@ -536,7 +538,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
-                      _StatusLine(feed: widget.feed, sess: _sess),
+                      if (!view.messenger)
+                        _StatusLine(feed: widget.feed, sess: _sess),
                       _Quick(
                         scale: view.scale,
                         shape: view.bubble,
@@ -551,83 +554,86 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                           onCancel: _dictation.cancel,
                         ),
                       AttachmentTray(items: _staged, onRemove: _unstage),
-                      Container(
-                        padding: EdgeInsets.fromLTRB(
-                          GhinaSpace.md,
-                          GhinaSpace.xs,
-                          GhinaSpace.md,
-                          GhinaSpace.sm,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              key: const ValueKey('kantor-attach'),
-                              tooltip: 'Kirim foto, video, atau file',
-                              onPressed: _canAttach ? _attach : null,
-                              icon: const Icon(Icons.attach_file_rounded),
-                            ),
-                            GestureDetector(
-                              onLongPressStart: can
-                                  ? (_) {
-                                      if (_dictation.active) return;
-                                      _holdMic = true;
-                                      HapticFeedback.lightImpact();
-                                      _dictation.start();
-                                    }
-                                  : null,
-                              onLongPressEnd: can
-                                  ? (_) {
-                                      if (_holdMic) _dictation.stop();
-                                      _holdMic = false;
-                                    }
-                                  : null,
-                              child: IconButton(
-                                key: const ValueKey('kantor-mic'),
-                                tooltip: dictating
-                                    ? 'Selesai dikte'
-                                    : 'Dikte (ketuk atau tahan)',
-                                onPressed: can ? _dictation.toggle : null,
-                                icon: Icon(
-                                  dictating
-                                      ? Icons.stop_circle_rounded
-                                      : Icons.mic_rounded,
-                                  color: dictating
-                                      ? GhinaColors.blue.base
-                                      : null,
+                      if (view.messenger)
+                        _messengerComposer(view, can, dictating)
+                      else
+                        Container(
+                          padding: EdgeInsets.fromLTRB(
+                            GhinaSpace.md,
+                            GhinaSpace.xs,
+                            GhinaSpace.md,
+                            GhinaSpace.sm,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                key: const ValueKey('kantor-attach'),
+                                tooltip: 'Kirim foto, video, atau file',
+                                onPressed: _canAttach ? _attach : null,
+                                icon: const Icon(Icons.attach_file_rounded),
+                              ),
+                              GestureDetector(
+                                onLongPressStart: can
+                                    ? (_) {
+                                        if (_dictation.active) return;
+                                        _holdMic = true;
+                                        HapticFeedback.lightImpact();
+                                        _dictation.start();
+                                      }
+                                    : null,
+                                onLongPressEnd: can
+                                    ? (_) {
+                                        if (_holdMic) _dictation.stop();
+                                        _holdMic = false;
+                                      }
+                                    : null,
+                                child: IconButton(
+                                  key: const ValueKey('kantor-mic'),
+                                  tooltip: dictating
+                                      ? 'Selesai dikte'
+                                      : 'Dikte (ketuk atau tahan)',
+                                  onPressed: can ? _dictation.toggle : null,
+                                  icon: Icon(
+                                    dictating
+                                        ? Icons.stop_circle_rounded
+                                        : Icons.mic_rounded,
+                                    color: dictating
+                                        ? GhinaColors.blue.base
+                                        : null,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Expanded(
-                              child: _ThemedField(
-                                shape: view.bubble,
-                                me: view.me,
-                                child: ChunkyTextField(
-                                  controller: _input,
-                                  enabled: can,
-                                  hint: can
-                                      ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
-                                      : _sess['status'] == 'ended'
-                                      ? 'Sesi sudah selesai'
-                                      : 'Tidak bisa mengetik ke sesi ini dari sini',
-                                  minLines: 1,
-                                  maxLines: 5,
-                                  textInputAction: TextInputAction.newline,
+                              Expanded(
+                                child: _ThemedField(
+                                  shape: view.bubble,
+                                  me: view.me,
+                                  child: ChunkyTextField(
+                                    controller: _input,
+                                    enabled: can,
+                                    hint: can
+                                        ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
+                                        : _sess['status'] == 'ended'
+                                        ? 'Sesi sudah selesai'
+                                        : 'Tidak bisa mengetik ke sesi ini dari sini',
+                                    minLines: 1,
+                                    maxLines: 5,
+                                    textInputAction: TextInputAction.newline,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: GhinaSpace.sm),
-                            ChunkyIconButton(
-                              icon: Icons.send_rounded,
-                              tooltip: 'Kirim',
-                              color: can
-                                  ? _meSwatch(view.me)
-                                  : GhinaColors.gray,
-                              onPressed: can && !_sending ? _send : null,
-                            ),
-                          ],
+                              const SizedBox(width: GhinaSpace.sm),
+                              ChunkyIconButton(
+                                icon: Icons.send_rounded,
+                                tooltip: 'Kirim',
+                                color: can
+                                    ? _meSwatch(view.me)
+                                    : GhinaColors.gray,
+                                onPressed: can && !_sending ? _send : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -635,6 +641,103 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _messengerComposer(ChatViewPrefs view, bool can, bool dictating) {
+    final c = ChatStyleColors.of(context, view.style);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _input,
+        builder: (context, value, _) {
+          final hasText = value.text.trim().isNotEmpty || _staged.isNotEmpty;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        key: const ValueKey('kantor-attach'),
+                        tooltip: 'Kirim foto, video, atau file',
+                        onPressed: _canAttach ? _attach : null,
+                        icon: Icon(Icons.attach_file_rounded, color: c.muted),
+                      ),
+                      Expanded(
+                        child: TextField(
+                        key: const ValueKey('messenger-input'),
+                          controller: _input,
+                          enabled: can,
+                          minLines: 1,
+                          maxLines: 5,
+                          textInputAction: TextInputAction.newline,
+                          style: GhinaType.body.copyWith(color: c.ink),
+                          decoration: InputDecoration(
+                            hintText: can
+                                ? 'Pesan ke ${sessionName(widget.feed, _sess)}, atau / untuk perintah'
+                                : 'Sesi tidak bisa dikirimi pesan',
+                            hintStyle: GhinaType.body.copyWith(color: c.muted),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: false,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (hasText)
+                        IconButton(
+                          key: const ValueKey('kantor-mic'),
+                          tooltip: dictating ? 'Selesai dikte' : 'Dikte',
+                          onPressed: can ? _dictation.toggle : null,
+                          icon: Icon(
+                            dictating ? Icons.stop_circle : Icons.mic_none,
+                            color: c.muted,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton.filled(
+                key: ValueKey(hasText ? 'messenger-send' : 'kantor-mic'),
+                style: IconButton.styleFrom(
+                  backgroundColor: c.send,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(44, 44),
+                ),
+                tooltip: hasText
+                    ? 'Kirim'
+                    : dictating
+                    ? 'Selesai dikte'
+                    : 'Dikte',
+                onPressed: can && !_sending
+                    ? (hasText ? _send : _dictation.toggle)
+                    : null,
+                icon: Icon(
+                  hasText
+                      ? Icons.send_rounded
+                      : dictating
+                      ? Icons.stop_rounded
+                      : Icons.mic_rounded,
+                  size: 20,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -756,7 +859,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
         if (i == rev.length) return _oldFiles(view);
         final e = rev[i];
         final last = i == 0;
-        return Padding(
+        final row = Padding(
           padding: EdgeInsets.only(bottom: GhinaSpace.sm * view.density.factor),
           child: switch (e) {
             UserEntry() => _userRow(e, view),
@@ -791,6 +894,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                 children: [
                   if (e.calls.isNotEmpty)
                     _ToolGroup(
+                      style: view.style,
                       key: ValueKey('g${e.at}${e.calls.length}'),
                       entry: e,
                       last: last,
@@ -821,6 +925,31 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
               ),
             ),
           },
+        );
+        final date = DateTime.tryParse(e.at)?.toLocal();
+        final older = i + 1 < rev.length
+            ? DateTime.tryParse(rev[i + 1].at)?.toLocal()
+            : null;
+        if (!view.messenger) return row;
+        final card = asJson(asJson(_sess['konteks'])['card']);
+        return Column(
+          children: [
+            if (date != null && !DateUtils.isSameDay(date, older))
+              MessengerDay(at: date),
+            row,
+            if (i == 0 && card['title'] != null)
+              MessengerBoardCard(
+                card: card,
+                style: view.style,
+                onTap: card['id'] == null
+                    ? null
+                    : () => openKantorCard(
+                        context,
+                        officeId: widget.feed.officeId,
+                        cardId: '${card['id']}',
+                      ),
+              ),
+          ],
         );
       },
     );
@@ -910,6 +1039,46 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    if (view.messenger && (mine || !view.flatClaude)) {
+      final c = ChatStyleColors.of(context, view.style);
+      final body = mine
+          ? SelectableText(
+              text,
+              style: GhinaType.body.copyWith(
+                color: view.useStyleMe ? c.ink : view.me.ink,
+                height: view.lineHeight.value,
+              ),
+            )
+          : KantorMarkdown(
+              text,
+              selectable: true,
+              lineHeight: view.lineHeight.value,
+              codeScale: view.codeScale,
+              wrapCode: view.wrapCode,
+            );
+      return Align(
+        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth:
+                MediaQuery.sizeOf(context).width * view.bubbleWidth.fraction,
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: mine && view.peek != ChatPeek.none ? 16 : 0,
+            ),
+            child: !mine && view.flatClaude
+                ? body
+                : MessengerBubble(
+                    view: view,
+                    mine: mine,
+                    time: hhmm(at),
+                    child: body,
+                  ),
+          ),
+        ),
+      );
+    }
     final w = MediaQuery.sizeOf(context).width;
     final flat = !mine && view.flatClaude;
     final d = view.density.factor;
@@ -1093,11 +1262,13 @@ class _ToolGroup extends StatefulWidget {
     required this.last,
     required this.running,
     this.mode = ChatToolMode.compact,
+    this.style = ChatStyle.bawaan,
     this.codeScale = 1,
     this.onImage,
   });
 
   final ToolsEntry entry;
+  final ChatStyle style;
   final double codeScale;
   final void Function(String path)? onImage;
   final bool last;
@@ -1115,6 +1286,46 @@ class _ToolGroupState extends State<_ToolGroup> {
   Widget build(BuildContext context) {
     final g = context.ghina;
     final calls = widget.entry.calls;
+    if (widget.style != ChatStyle.bawaan &&
+        !_open &&
+        widget.mode == ChatToolMode.compact) {
+      final c = ChatStyleColors.of(context, widget.style);
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Material(
+          color: c.tool,
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => setState(() => _open = true),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    widget.running ? Icons.more_horiz : Icons.check_rounded,
+                    size: 14,
+                    color: c.accent,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      calls.map((c) => c.shortName).join(' · '),
+                      style: GhinaType.caption.copyWith(
+                        color: c.ink,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.expand_more, size: 14),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final fold =
         widget.mode == ChatToolMode.compact &&
         !widget.last &&
@@ -1123,7 +1334,7 @@ class _ToolGroupState extends State<_ToolGroup> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (fold) _foldHeader(g, calls),
+          if (fold || widget.style != ChatStyle.bawaan) _foldHeader(g, calls),
           for (var i = 0; i < calls.length; i++)
             _ToolRow(
               call: calls[i],
