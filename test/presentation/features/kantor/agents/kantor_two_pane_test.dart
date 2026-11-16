@@ -7,6 +7,7 @@ import 'package:ghina/presentation/features/kantor/agents/kantor_two_pane.dart';
 import 'package:ghina/presentation/features/kantor/kantor_data.dart';
 import 'package:ghina/presentation/features/kantor/pages/kantor_shell_page.dart';
 import 'package:ghina/presentation/features/kantor/session/chat_context.dart';
+import 'package:ghina/presentation/features/kantor/session/chat_tab.dart';
 import 'package:ghina/presentation/features/kantor/session/chat_view_prefs.dart';
 import 'package:ghina/presentation/features/kantor/session/kantor_feed.dart';
 import 'package:ghina/presentation/features/kantor/session/kantor_session_page.dart';
@@ -47,6 +48,7 @@ KantorOfficeFeed _feed(String id) => KantorOfficeFeed(id, null)
 Future<(GoRouter, ProviderContainer)> _pump(
   WidgetTester t, {
   ChatStyle style = ChatStyle.bawaan,
+  String initial = '/kantor/o/demo?tab=agen',
 }) async {
   final feeds = {for (final id in _offices.keys) id: _feed(id)};
   for (final f in feeds.values) {
@@ -68,7 +70,7 @@ Future<(GoRouter, ProviderContainer)> _pump(
         .update((p) => p.copyWith(style: style));
   }
   final router = GoRouter(
-    initialLocation: '/kantor/o/demo?tab=agen',
+    initialLocation: initial,
     routes: [
       GoRoute(
         path: '/kantor/o/:office',
@@ -120,6 +122,17 @@ Finder get _paneSession =>
     find.byWidgetPredicate((w) => w is KantorSessionPage && w.embedded);
 
 String _sidOf(WidgetTester t, Finder f) => t.widget<KantorSessionPage>(f).sid;
+
+/// The session content shown by the session route (full page or right pane).
+Finder _view({required bool embedded}) => find.byWidgetPredicate(
+  (w) => w is KantorSessionView && w.embedded == embedded,
+);
+Finder get _sessionTwoPane => find.byKey(const ValueKey('session-two-pane'));
+
+/// Every chat in the tree, also those under a covered route.
+Finder get _allChats => find.byType(KantorChatTab, skipOffstage: false);
+
+String _path(GoRouter r) => r.routerDelegate.currentConfiguration.uri.path;
 
 /// The chat field of the visible chat.
 Finder get _field => find.byType(EditableText).last;
@@ -232,6 +245,7 @@ void main() {
     expect(find.byType(KantorTwoPane), findsOneWidget);
     expect(_sidOf(t, _paneSession), 's1');
     expect(find.text('draf saya'), findsOneWidget);
+    expect(_allChats, findsOneWidget);
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
       '/kantor/o/demo',
@@ -242,6 +256,7 @@ void main() {
     expect(find.byType(KantorTwoPane), findsNothing);
     expect(_sidOf(t, _pageSession), 's1');
     expect(find.text('draf saya'), findsOneWidget);
+    expect(_allChats, findsOneWidget);
     expect(_draftOf(c, 'demo', 's1'), 'draf saya');
 
     // back from the chat at 400dp: the list, and the chat is no longer open
@@ -277,6 +292,7 @@ void main() {
     expect(_pageSession, findsNothing);
     expect(_sidOf(t, _paneSession), 's2');
     expect(find.text('balasan WA'), findsOneWidget);
+    expect(_allChats, findsOneWidget);
     expect(_draftOf(c, 'demo', 's2'), 'balasan WA');
     await _close(t);
   });
@@ -346,4 +362,157 @@ void main() {
       await _close(t);
     },
   );
+  testWidgets(
+    '840dp: a session route opened from anywhere shows the agent list left',
+    (t) async {
+      addTearDown(t.view.reset);
+      await _size(t, 840);
+      final (router, _) = await _pump(t);
+      // like the Kompleks tiles, switchers and notification taps
+      router.go('/kantor/o/demo/s/s1');
+      await _settle(t);
+      expect(_path(router), '/kantor/o/demo/s/s1');
+      expect(_sessionTwoPane, findsOneWidget);
+      final pane = find.descendant(
+        of: _sessionTwoPane,
+        matching: find.byKey(const ValueKey('pane-office')),
+      );
+      expect(
+        find.descendant(of: pane, matching: find.text('Kantor Demo')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: _sessionTwoPane, matching: find.text('Budi')),
+        findsWidgets,
+      );
+      expect(t.widget<KantorSessionView>(_view(embedded: true)).sid, 's1');
+      expect(_view(embedded: false), findsNothing);
+      expect(find.byKey(const ValueKey('tile-open')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pane-back')), findsOneWidget);
+      expect(_allChats, findsOneWidget);
+      await _close(t);
+    },
+  );
+
+  testWidgets('840dp: a notification for the chat already in the right pane '
+      'does not open it twice', (t) async {
+    addTearDown(t.view.reset);
+    await _size(t, 840);
+    final (router, _) = await _pump(t);
+    await t.tap(find.text('Ayu').first);
+    await _settle(t);
+    expect(_sidOf(t, _paneSession), 's1');
+    await t.enterText(_field, 'draf panel');
+    await t.pump();
+
+    router.push('/kantor/o/demo/s/s1');
+    await _settle(t);
+    expect(_sessionTwoPane, findsOneWidget);
+    expect(_allChats, findsOneWidget);
+    expect(find.text('draf panel'), findsOneWidget);
+    await _close(t);
+  });
+
+  testWidgets('840dp: tapping another agent on the left swaps the chat '
+      'without stacking routes', (t) async {
+    addTearDown(t.view.reset);
+    await _size(t, 840);
+    final (router, c) = await _pump(t);
+    router.go('/kantor/o/demo/s/s1');
+    await _settle(t);
+    await t.enterText(_field, 'draf ayu');
+    await t.pump();
+
+    await t.tap(
+      find.descendant(of: _sessionTwoPane, matching: find.text('Budi')).first,
+    );
+    await _settle(t);
+    expect(t.widget<KantorSessionView>(_view(embedded: true)).sid, 's2');
+    expect(_allChats, findsOneWidget);
+    expect(find.byKey(const ValueKey('tile-open')), findsOneWidget);
+    expect(_path(router), '/kantor/o/demo/s/s1'); // no route pushed
+    expect(_draftOf(c, 'demo', 's1'), 'draf ayu');
+
+    // switching office in the left header only swaps the list
+    await t.tap(
+      find.descendant(
+        of: _sessionTwoPane,
+        matching: find.byKey(const ValueKey('pane-office')),
+      ),
+    );
+    await _settle(t);
+    await t.tap(find.text('Kantor Lain').last);
+    await _settle(t);
+    expect(_path(router), '/kantor/o/demo/s/s1');
+    expect(
+      find.descendant(of: _sessionTwoPane, matching: find.text('Citra')),
+      findsWidgets,
+    );
+    expect(t.widget<KantorSessionView>(_view(embedded: true)).sid, 's2');
+    expect(find.byKey(const ValueKey('tile-open')), findsNothing);
+    await t.tap(
+      find.descendant(of: _sessionTwoPane, matching: find.text('Citra')).first,
+    );
+    await _settle(t);
+    final v = t.widget<KantorSessionView>(_view(embedded: true));
+    expect((v.officeId, v.sid), ('lain', 's3'));
+
+    // back leaves the session page, not the previous chat
+    await t.tap(find.byKey(const ValueKey('pane-back')));
+    await _settle(t);
+    expect(_path(router), '/kantor/o/demo');
+    expect(_sessionTwoPane, findsNothing);
+    expect(_pageSession, findsNothing);
+    expect(find.byType(KantorSessionView), findsNothing);
+    await _close(t);
+  });
+
+  testWidgets('400dp: a session route stays a full page', (t) async {
+    addTearDown(t.view.reset);
+    await _size(t, 400);
+    final (router, _) = await _pump(t);
+    router.go('/kantor/o/demo/s/s1');
+    await _settle(t);
+    expect(_sessionTwoPane, findsNothing);
+    expect(find.byKey(const ValueKey('pane-office')), findsNothing);
+    expect(t.widget<KantorSessionView>(_view(embedded: false)).sid, 's1');
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(_allChats, findsOneWidget);
+    router.pop();
+    await _settle(t);
+    expect(_path(router), '/kantor/o/demo');
+    await _close(t);
+  });
+
+  testWidgets('session route 840 -> 400 -> 840: one chat, draft kept, '
+      'page stays open', (t) async {
+    addTearDown(t.view.reset);
+    await _size(t, 840);
+    final (router, c) = await _pump(t, initial: '/kantor/o/demo/s/s1');
+    expect(_sessionTwoPane, findsOneWidget);
+    await t.enterText(_field, 'draf lipat');
+    await t.pump();
+    final chat = t.state(find.byType(KantorChatTab));
+
+    await _size(t, 400);
+    expect(_sessionTwoPane, findsNothing);
+    expect(t.widget<KantorSessionView>(_view(embedded: false)).sid, 's1');
+    expect(_allChats, findsOneWidget);
+    expect(t.state(find.byType(KantorChatTab)), same(chat));
+    expect(find.text('draf lipat'), findsOneWidget);
+    expect(_path(router), '/kantor/o/demo/s/s1');
+
+    await _size(t, 840);
+    expect(_sessionTwoPane, findsOneWidget);
+    expect(t.widget<KantorSessionView>(_view(embedded: true)).sid, 's1');
+    expect(_allChats, findsOneWidget);
+    expect(t.state(find.byType(KantorChatTab)), same(chat));
+    expect(find.text('draf lipat'), findsOneWidget);
+    expect(_draftOf(c, 'demo', 's1'), 'draf lipat');
+    // settled: no page closing or reopening by itself
+    await _settle(t);
+    expect(_path(router), '/kantor/o/demo/s/s1');
+    expect(_allChats, findsOneWidget);
+    await _close(t);
+  });
 }

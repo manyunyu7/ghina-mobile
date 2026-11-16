@@ -37,7 +37,12 @@ part 'agent_profile_page.dart';
 
 /// One session: header (who, model, status, permission mode) and the tabs
 /// Chat | Terminal | Profil | Subagent. Route `/kantor/o/:office/s/:sid`.
-class KantorSessionPage extends ConsumerWidget {
+///
+/// Sebagai route (bukan [embedded]) halaman ini memakai [KantorSessionHost]:
+/// di layar >= [kKantorTwoPaneMin] daftar agen kantornya tampil di kiri dan
+/// chat di kanan, dari jalur mana pun route ini dibuka. Di bawahnya tetap satu
+/// halaman penuh.
+class KantorSessionPage extends StatelessWidget {
   const KantorSessionPage({
     super.key,
     required this.officeId,
@@ -57,10 +62,36 @@ class KantorSessionPage extends ConsumerWidget {
   final String? tab;
 
   @override
+  Widget build(BuildContext context) => embedded
+      ? KantorSessionView(
+          officeId: officeId,
+          sid: sid,
+          tab: tab,
+          embedded: true,
+        )
+      : KantorSessionHost(officeId: officeId, sid: sid, tab: tab);
+}
+
+/// Isi satu sesi (header, tab, chat), tanpa urusan tata letak layar lebar.
+class KantorSessionView extends ConsumerWidget {
+  const KantorSessionView({
+    super.key,
+    required this.officeId,
+    required this.sid,
+    this.tab,
+    this.embedded = false,
+  });
+
+  final String officeId;
+  final String sid;
+  final String? tab;
+
+  /// Tanpa tombol kembali dan tanpa pindah agen lewat header (lihat
+  /// [KantorSessionPage.embedded]).
+  final bool embedded;
+
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // dibuka dari daftar agen di layar sempit, lalu Fold dibuka: pindah ke
-    // panel kanan daftar agen
-    if (!embedded) kantorDockIfWide(context, ref, officeId: officeId, sid: sid);
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
     final complex = ref.watch(kantorActiveComplexProvider);

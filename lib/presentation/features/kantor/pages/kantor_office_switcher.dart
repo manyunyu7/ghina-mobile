@@ -6,10 +6,13 @@ import '../../../design_system/design_system.dart';
 import '../kantor_data.dart';
 
 /// "Pindah kantor" sheet: jump to another office, keeping the active tab.
+/// With [onOffice], picking an office calls it instead of navigating (the
+/// left pane of a wide session page only swaps its list).
 Future<void> showKantorOfficeSwitcher(
   BuildContext context, {
   required String currentId,
   required String tab,
+  void Function(String id)? onOffice,
 }) {
   // The sheet navigates with the page's context; capture the router now.
   final router = GoRouter.of(context);
@@ -20,6 +23,7 @@ Future<void> showKantorOfficeSwitcher(
       currentId: currentId,
       onPick: (id) {
         Navigator.pop(sheet);
+        if (id != null && onOffice != null) return onOffice(id);
         router.go(
           id == null
               ? '/kantor'

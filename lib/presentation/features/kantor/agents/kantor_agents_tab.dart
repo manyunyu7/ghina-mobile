@@ -69,15 +69,7 @@ class _KantorAgentsTabState extends ConsumerState<KantorAgentsTab> {
         }
         final list = KeyedSubtree(
           key: _listKey,
-          child: RefreshIndicator(
-            onRefresh: feed.load,
-            child: style != ChatStyle.bawaan
-                ? _MessengerAgentList(feed: feed, style: style)
-                : _AgentList(
-                    feed: feed,
-                    actions: api == null ? null : KantorActions(api),
-                  ),
-          ),
+          child: kantorAgentList(feed, style, api),
         );
         return LayoutBuilder(
           builder: (context, box) {
@@ -96,6 +88,22 @@ class _KantorAgentsTabState extends ConsumerState<KantorAgentsTab> {
     );
   }
 }
+
+/// Daftar agen satu kantor (tanpa header), sesuai gaya chat. Dipakai tab Agen
+/// dan panel kiri halaman sesi di layar lebar ([KantorSessionHost]).
+Widget kantorAgentList(
+  KantorOfficeFeed feed,
+  ChatStyle style,
+  KantorApi? api,
+) => RefreshIndicator(
+  onRefresh: feed.load,
+  child: style != ChatStyle.bawaan
+      ? _MessengerAgentList(feed: feed, style: style)
+      : _AgentList(
+          feed: feed,
+          actions: api == null ? null : KantorActions(api),
+        ),
+);
 
 class _MessengerAgentList extends ConsumerStatefulWidget {
   const _MessengerAgentList({required this.feed, required this.style});
