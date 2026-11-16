@@ -297,7 +297,8 @@ void main() {
     expect(find.text('Rapat'), findsNothing);
     expect(t.takeException(), isNull);
     await t.pumpWidget(const SizedBox());
-    await t.pump(const Duration(seconds: 4));
+    // the agent list prefetches chats; let that request's timeout lapse
+    await t.pump(const Duration(seconds: 31));
   });
 
   testWidgets('messenger permission actions keep allow and deny callbacks', (
