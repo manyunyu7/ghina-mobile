@@ -37,6 +37,11 @@ final kantorStateProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
     );
   }
   _refetchOnEvents(ref, _touchesState);
+  // the office picker opens often: keep the last answer for a while (it is
+  // refetched on events anyway) instead of starting from empty every time
+  final link = ref.keepAlive();
+  final release = Timer(const Duration(minutes: 5), link.close);
+  ref.onDispose(release.cancel);
   return Map<String, dynamic>.from(await api.get('/api/state') as Map);
 });
 

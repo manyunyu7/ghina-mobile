@@ -119,6 +119,52 @@ void main() {
     });
   });
 
+  group('kantorPrefetchChats', () {
+    test('fills free room only and never evicts opened chats', () async {
+      HttpOverrides.global = null;
+      final hits = <String>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((req) {
+        hits.add(req.uri.path);
+        req.response
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode({
+              'items': [_text('pre')],
+              'cursor': 'p1',
+              'reset': true,
+              'size': 1,
+            }),
+          )
+          ..close();
+      });
+      final api = KantorApi(
+        KantorConfig(baseUrl: 'http://127.0.0.1:${server.port}', token: 't'),
+      );
+      final conn = kantorConnectionKey(api.config);
+      final cache = KantorTranscriptCache(maxChats: 2);
+      final opened = (connection: conn, office: 'o', sid: 'opened');
+      cache.put(
+        opened,
+        KantorTranscriptSnap(
+          items: [_text('mine')],
+          cursor: 'm',
+          size: 1,
+          at: DateTime(2026),
+        ),
+      );
+      await kantorPrefetchChats(api, cache, 'o', ['a', 'b', 'opened']);
+      expect(hits.length, 1, reason: 'one free slot, opened chat skipped');
+      expect(
+        cache.peek((connection: conn, office: 'o', sid: 'a'))!.cursor,
+        'p1',
+      );
+      expect(cache.peek(opened)!.items.single['s'], 'mine');
+      expect(cache.length, 2);
+    });
+  });
+
   group('chat opened from cache', () {
     late HttpServer server;
     late KantorConfig config;

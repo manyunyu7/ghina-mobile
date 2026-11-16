@@ -93,6 +93,54 @@ class KantorTranscriptCache {
   }
 
   void clear() => _chats.clear();
+
+  /// Like [get] but without marking the chat as recently used.
+  KantorTranscriptSnap? peek(KantorChatKey key) => _chats[key];
+
+  bool get hasRoom => _chats.length < maxChats;
+}
+
+final _prefetching = <KantorChatKey>{};
+
+/// Fetches the recent transcript of [sids] ahead of time (the agents shown
+/// first in a list), so opening one of those chats for the first time shows
+/// its history at once. Only fills free room in [cache]: it never pushes out a
+/// chat the owner actually opened. Status, permissions and actions are not
+/// part of this and still come fresh from the office feed.
+Future<void> kantorPrefetchChats(
+  KantorApi api,
+  KantorTranscriptCache cache,
+  String office,
+  Iterable<String> sids,
+) async {
+  final connection = kantorConnectionKey(api.config);
+  for (final sid in sids) {
+    final key = (connection: connection, office: office, sid: sid);
+    if (!cache.hasRoom) return;
+    if (cache.peek(key) != null || !_prefetching.add(key)) continue;
+    try {
+      final raw = await api.get(
+        '/api/sessions/${Uri.encodeComponent(sid)}/transcript',
+        query: {'n': cache.maxItems, 'delta': 1},
+      );
+      if (raw is! Map || cache.peek(key) != null || !cache.hasRoom) continue;
+      final data = Map<String, dynamic>.from(raw);
+      final merged = mergeTranscript(null, data, keep: cache.maxItems);
+      cache.put(
+        key,
+        KantorTranscriptSnap(
+          items: merged.items,
+          cursor: merged.cursor,
+          size: data['size'],
+          at: DateTime.now(),
+        ),
+      );
+    } catch (_) {
+      // best effort: the chat simply loads normally when opened
+    } finally {
+      _prefetching.remove(key);
+    }
+  }
 }
 
 class _MemoryPressure with WidgetsBindingObserver {

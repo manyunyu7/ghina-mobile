@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../session/kantor_feed.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -65,6 +66,23 @@ class _SwitcherBody extends ConsumerStatefulWidget {
 
 class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
   String _query = '';
+  bool _prefetched = false;
+
+  /// Favourites and offices with live agents are loaded as soon as the picker
+  /// shows them, so the pick itself has nothing left to wait for.
+  void _prefetch(List<Map<String, dynamic>> offices) {
+    if (_prefetched || offices.isEmpty) return;
+    _prefetched = true;
+    final ids = [
+      for (final o in offices)
+        if (o['fav'] == true) '${o['id']}',
+      for (final o in offices)
+        if (o['fav'] != true && _live(o).isNotEmpty) '${o['id']}',
+    ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) kantorPrefetchFeeds(ref, ids);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +91,7 @@ class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
     final offices = (async.value?['offices'] as List? ?? const [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+    _prefetch(offices);
     final q = _query.trim().toLowerCase();
     bool match(Map<String, dynamic> o) =>
         q.isEmpty || '${o['name']}'.toLowerCase().contains(q);
@@ -88,57 +107,65 @@ class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
       onTap: () => widget.onPick('${o['id']}'),
     );
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChunkyTextField(
-          hint: 'Cari kantor…',
-          prefixIcon: Icons.search_rounded,
-          onChanged: (v) => setState(() => _query = v),
-        ),
-        const SizedBox(height: GhinaSpace.sm),
-        Flexible(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              if (q.isEmpty)
-                ChunkyTile(
-                  leading: const Icon(Icons.apartment_rounded),
-                  title: 'Kompleks (semua kantor)',
-                  trailing: widget.currentId == '_kompleks'
-                      ? const Icon(Icons.check_rounded)
-                      : null,
-                  onTap: () {
-                    widget.onComplex();
-                    widget.onPick(null);
-                  },
-                ),
-              if (async.hasError && offices.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(GhinaSpace.md),
-                  child: Text(
-                    'Daftar kantor gagal dimuat.',
-                    style: GhinaType.caption.copyWith(color: g.textMuted),
-                  ),
-                ),
-              if (favs.isNotEmpty) ...[
-                const SectionHeader(title: 'Favorit'),
-                for (final o in favs) row(o),
-              ],
-              if (active.isNotEmpty) ...[
-                const SectionHeader(title: 'Sedang aktif'),
-                for (final o in active) row(o),
-              ],
-              const SectionHeader(title: 'Semua kantor'),
-              if (rest.isEmpty)
-                const EmptyState(title: 'Tidak ada kantor', compact: true)
-              else
-                for (final o in rest) row(o),
-            ],
+    // The sheet itself scrolls (ChunkyBottomSheet) and would give this list
+    // unbounded height: then the list takes the drags but never moves. Bound
+    // it so the search stays on top and the list scrolls to its last office.
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChunkyTextField(
+            hint: 'Cari kantor…',
+            prefixIcon: Icons.search_rounded,
+            onChanged: (v) => setState(() => _query = v),
           ),
-        ),
-      ],
+          const SizedBox(height: GhinaSpace.sm),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                if (q.isEmpty)
+                  ChunkyTile(
+                    leading: const Icon(Icons.apartment_rounded),
+                    title: 'Kompleks (semua kantor)',
+                    trailing: widget.currentId == '_kompleks'
+                        ? const Icon(Icons.check_rounded)
+                        : null,
+                    onTap: () {
+                      widget.onComplex();
+                      widget.onPick(null);
+                    },
+                  ),
+                if (async.hasError && offices.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(GhinaSpace.md),
+                    child: Text(
+                      'Daftar kantor gagal dimuat.',
+                      style: GhinaType.caption.copyWith(color: g.textMuted),
+                    ),
+                  ),
+                if (favs.isNotEmpty) ...[
+                  const SectionHeader(title: 'Favorit'),
+                  for (final o in favs) row(o),
+                ],
+                if (active.isNotEmpty) ...[
+                  const SectionHeader(title: 'Sedang aktif'),
+                  for (final o in active) row(o),
+                ],
+                const SectionHeader(title: 'Semua kantor'),
+                if (rest.isEmpty)
+                  const EmptyState(title: 'Tidak ada kantor', compact: true)
+                else
+                  for (final o in rest) row(o),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

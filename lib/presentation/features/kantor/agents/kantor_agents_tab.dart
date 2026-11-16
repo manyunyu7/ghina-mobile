@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../session/chat_context.dart';
+
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../codex/kantor_codex.dart';
@@ -95,15 +97,90 @@ Widget kantorAgentList(
   KantorOfficeFeed feed,
   ChatStyle style,
   KantorApi? api,
-) => RefreshIndicator(
-  onRefresh: feed.load,
-  child: style != ChatStyle.bawaan
-      ? _MessengerAgentList(feed: feed, style: style)
-      : _AgentList(
-          feed: feed,
-          actions: api == null ? null : KantorActions(api),
-        ),
+) => _ChatPrefetch(
+  feed: feed,
+  api: api,
+  child: RefreshIndicator(
+    onRefresh: feed.load,
+    child: style != ChatStyle.bawaan
+        ? _MessengerAgentList(feed: feed, style: style)
+        : _AgentList(
+            feed: feed,
+            actions: api == null ? null : KantorActions(api),
+          ),
+  ),
 );
+
+/// Once the office is loaded, fetches the chats of the first few live agents
+/// (working or waiting first) into the in-memory transcript cache, so the
+/// first open of those chats is instant. See [kantorPrefetchChats].
+class _ChatPrefetch extends ConsumerStatefulWidget {
+  const _ChatPrefetch({
+    required this.feed,
+    required this.api,
+    required this.child,
+  });
+
+  final KantorOfficeFeed feed;
+  final KantorApi? api;
+  final Widget child;
+
+  @override
+  ConsumerState<_ChatPrefetch> createState() => _ChatPrefetchState();
+}
+
+class _ChatPrefetchState extends ConsumerState<_ChatPrefetch> {
+  String? _done;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.feed.addListener(_maybe);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybe());
+  }
+
+  @override
+  void didUpdateWidget(_ChatPrefetch old) {
+    super.didUpdateWidget(old);
+    if (old.feed != widget.feed) {
+      old.feed.removeListener(_maybe);
+      widget.feed.addListener(_maybe);
+      _maybe();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.feed.removeListener(_maybe);
+    super.dispose();
+  }
+
+  void _maybe() {
+    final api = widget.api;
+    final feed = widget.feed;
+    if (!mounted || api == null || feed.office == null) return;
+    if (_done == feed.officeId) return;
+    _done = feed.officeId;
+    int rank(Json s) => switch ('${s['status']}') {
+      'working' || 'waiting' => 0,
+      'idle' || 'starting' => 1,
+      _ => 2,
+    };
+    final live = [
+      for (final s in feed.sessions)
+        if (s['status'] != 'ended' && s['sid'] is String) s,
+    ]..sort((a, b) => rank(a) - rank(b));
+    kantorPrefetchChats(
+      api,
+      ref.read(kantorTranscriptCacheProvider),
+      feed.officeId,
+      [for (final s in live.take(4)) s['sid'] as String],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
 
 class _MessengerAgentList extends ConsumerStatefulWidget {
   const _MessengerAgentList({required this.feed, required this.style});

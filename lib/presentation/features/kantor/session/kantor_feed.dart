@@ -32,6 +32,9 @@ class KantorOfficeFeed extends ChangeNotifier {
   bool _disposed = false;
   Timer? _debounce;
 
+  /// When the daemon last answered [load]; null before the first answer.
+  DateTime? loadedAt;
+
   List<Json> get sessions => asJsonList(office?['sessions']);
   List<Json> get roles => asJsonList(office?['roles']);
   List<Json> get rooms => asJsonList(asJson(office?['plan'])['rooms']);
@@ -111,6 +114,7 @@ class KantorOfficeFeed extends ChangeNotifier {
           if (i['office'] == officeId) i,
       ];
       error = null;
+      loadedAt = DateTime.now();
     } catch (e) {
       error = e;
     }
@@ -119,7 +123,17 @@ class KantorOfficeFeed extends ChangeNotifier {
   }
 
   void apply(Json? msg) {
-    if (msg == null || office == null) return;
+    if (msg == null) return;
+    if (msg['t'] == 'hello') {
+      // (re)connected /ws: events may have been missed meanwhile, so a feed
+      // kept alive from an earlier visit reloads quietly (data stays shown)
+      if (loadedAt != null) {
+        _debounce?.cancel();
+        _debounce = Timer(const Duration(milliseconds: 300), load);
+      }
+      return;
+    }
+    if (office == null) return;
     switch (msg['t']) {
       case 'session':
         if (msg['office'] != officeId) return;
@@ -175,16 +189,46 @@ class KantorOfficeFeed extends ChangeNotifier {
   }
 }
 
+/// How long an office stays loaded after its last screen closed, so coming
+/// back or switching offices shows it at once (then refreshes quietly).
+const kantorFeedKeep = Duration(minutes: 10);
+
 /// Shared by the agents tab and the session page, so both stay live from the
-/// same snapshot.
+/// same snapshot. Kept for [kantorFeedKeep] after the last listener; reopening
+/// it shows the held snapshot at once and refreshes it quietly in place.
 final kantorOfficeFeedProvider = Provider.autoDispose
     .family<KantorOfficeFeed, String>((ref, officeId) {
       final feed = KantorOfficeFeed(officeId, ref.watch(kantorApiProvider));
       ref.listen(kantorEventsProvider, (_, next) => feed.apply(next.value));
-      ref.onDispose(feed.dispose);
+      final link = ref.keepAlive();
+      Timer? release;
+      ref.onCancel(() {
+        release?.cancel();
+        release = Timer(kantorFeedKeep, link.close);
+      });
+      ref.onResume(() {
+        // Riverpod pauses an unwatched provider, so /ws events may have been
+        // missed: show what is held at once and refresh it quietly in place
+        release?.cancel();
+        if (feed.loadedAt != null) feed.load();
+      });
+      ref.onDispose(() {
+        release?.cancel();
+        feed.dispose();
+      });
       feed.load();
       return feed;
     });
+
+/// Loads [officeIds] ahead (e.g. favourites when the office picker opens) so
+/// picking one shows its agents at once. Each stays for [kantorFeedKeep].
+void kantorPrefetchFeeds(WidgetRef ref, Iterable<String> officeIds) {
+  for (final id in officeIds.take(8)) {
+    if (id.isEmpty || id == '_kompleks') continue;
+    final sub = ref.container.listen(kantorOfficeFeedProvider(id), (_, _) {});
+    sub.close(); // keepAlive above holds it for kantorFeedKeep
+  }
+}
 
 // --- shared labels -------------------------------------------------------
 
