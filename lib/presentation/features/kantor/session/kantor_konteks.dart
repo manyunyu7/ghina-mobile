@@ -137,8 +137,42 @@ class KantorKonteks {
     );
   }
 
-  static KantorKonteks? ofSession(Json? session) =>
-      fromJson(session?['konteks']);
+  /// Konteks sesi, dengan label yang baru disimpan pemilik
+  /// ([kantorLabelPatches]) bila data segar server belum memuatnya.
+  static KantorKonteks? ofSession(Json? session) {
+    final k = fromJson(session?['konteks']);
+    if (k == null || session == null) return k;
+    final p = kantorLabelPatches.of('${session['sid']}');
+    return p == null ? k : k._withLabel(p);
+  }
+
+  /// Salinan dengan label [p]: label menjadi topik dan judul otomatis
+  /// tergeser ke [auto], seperti yang dilakukan server.
+  KantorKonteks _withLabel(KantorLabelPatch p) {
+    final auto0 = label != null ? auto : topic;
+    final text = p.text;
+    return KantorKonteks(
+      stateKey: stateKey,
+      stateLabel: stateLabel,
+      topic: text ?? auto0,
+      step: step,
+      percent: percent,
+      draftTitle: draftTitle,
+      draftReady: draftReady,
+      draftDetails: draftDetails,
+      ask: ask,
+      reply: reply,
+      err: err,
+      fileNames: fileNames,
+      fileCount: fileCount,
+      cardTitle: cardTitle,
+      branch: branch,
+      label: text,
+      labelForRole: text != null && p.forRole,
+      labelTell: text != null && p.tell,
+      auto: text == null ? null : auto0,
+    );
+  }
 
   bool get needsOwner => stateKey == 'izin' || stateKey == 'tanya';
 
@@ -168,6 +202,59 @@ class KantorKonteks {
     return clip(reply?.s ?? '', 80);
   }
 }
+
+/// Label yang baru disimpan pemilik ([text] null = dihapus).
+@immutable
+class KantorLabelPatch {
+  KantorLabelPatch(this.text, {this.forRole = false, this.tell = false})
+    : at = DateTime.now();
+  final String? text;
+  final bool forRole;
+  final bool tell;
+  final DateTime at;
+}
+
+/// Tampilan optimistis label: dipasang saat pemilik menyimpan label, dilepas
+/// begitu data segar dari server tiba (atau gagal disimpan). Hanya untuk
+/// tampilan; status dan izin tetap dari server. Disimpan global (bukan
+/// provider) supaya widget tanpa ProviderScope pun ikut memakainya.
+class KantorLabelPatches extends ChangeNotifier {
+  /// Patch yang tertinggal (mis. muat ulang gagal) tidak dipakai lagi.
+  static const maxAge = Duration(seconds: 45);
+
+  final _bySid = <String, KantorLabelPatch>{};
+
+  KantorLabelPatch? of(String sid) {
+    final p = _bySid[sid];
+    if (p == null) return null;
+    return DateTime.now().difference(p.at) > maxAge ? null : p;
+  }
+
+  void put(String sid, KantorLabelPatch p) {
+    _bySid[sid] = p;
+    notifyListeners();
+  }
+
+  /// Lepas patch [sid]; bila [only] diberikan, hanya bila patch itu masih
+  /// yang terpasang (simpanan yang lebih baru tidak ikut terlepas).
+  void drop(String sid, [KantorLabelPatch? only]) {
+    final p = _bySid[sid];
+    if (p == null || (only != null && !identical(p, only))) return;
+    _bySid.remove(sid);
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void clear() {
+    _bySid.clear();
+    notifyListeners();
+  }
+}
+
+final kantorLabelPatches = KantorLabelPatches();
+
+/// Label pemilik untuk [session] (sudah termasuk patch optimistis), atau null.
+String? kantorLabelOf(Json? session) => KantorKonteks.ofSession(session)?.label;
 
 /// Label pemilik bergaya stiker kuning yang ditempel miring (gaya A di web).
 class KantorLabelSticker extends StatelessWidget {
@@ -204,6 +291,103 @@ class KantorLabelSticker extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Stiker label [session] yang ikut berubah saat label disimpan
+/// (optimistis); tanpa label tidak menampilkan apa pun ([empty]).
+class KantorSessionLabel extends StatelessWidget {
+  const KantorSessionLabel({
+    super.key,
+    required this.session,
+    this.maxLines = 2,
+    this.size,
+    this.onTap,
+    this.padding = const EdgeInsets.only(top: 2, bottom: 2),
+    this.empty = const SizedBox.shrink(),
+  });
+
+  final Json session;
+  final int? maxLines;
+  final double? size;
+  final EdgeInsets padding;
+
+  /// Ketuk stiker (mis. membuka form ubah label).
+  final VoidCallback? onTap;
+
+  /// Ditampilkan bila sesi tidak berlabel.
+  final Widget empty;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: kantorLabelPatches,
+    builder: (context, _) {
+      final l = kantorLabelOf(session);
+      if (l == null) return empty;
+      final sticker = Padding(
+        padding: padding,
+        child: KantorLabelSticker(l, maxLines: maxLines, size: size),
+      );
+      if (onTap == null) return sticker;
+      return Semantics(
+        button: true,
+        label: 'Label: $l. Ketuk untuk mengubah',
+        excludeSemantics: true,
+        child: GestureDetector(
+          key: ValueKey('label-sticker-${session['sid']}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: sticker,
+        ),
+      );
+    },
+  );
+}
+
+/// Pojok kertas kuning terlipat, ditempel di avatar agen yang berlabel.
+class KantorLabelCorner extends StatelessWidget {
+  const KantorLabelCorner({super.key, this.size = 13});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: Size.square(size), painter: const _CornerPainter());
+}
+
+class _CornerPainter extends CustomPainter {
+  const _CornerPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height, fold = w * .42;
+    // kertas: persegi dengan pojok kanan bawah terlipat
+    final paper = Path()
+      ..moveTo(0, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w, h - fold)
+      ..lineTo(w - fold, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawShadow(paper, KantorLabelSticker.edge, 1, false);
+    canvas.drawPath(paper, Paint()..color = KantorLabelSticker.paper);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w, h - fold)
+        ..lineTo(w - fold, h - fold)
+        ..lineTo(w - fold, h)
+        ..close(),
+      Paint()..color = KantorLabelSticker.edge,
+    );
+    canvas.drawPath(
+      paper,
+      Paint()
+        ..color = KantorLabelSticker.edge
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CornerPainter oldDelegate) => false;
 }
 
 ChunkySwatch kantorKonteksColor(String k) => switch (k) {
@@ -254,7 +438,12 @@ class KantorKonteksLines extends StatelessWidget {
   final bool showTopic;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: kantorLabelPatches,
+    builder: (context, _) => _lines(context),
+  );
+
+  Widget _lines(BuildContext context) {
     final g = context.ghina;
     final k = KantorKonteks.ofSession(session);
     if (k == null) {
@@ -424,7 +613,12 @@ class _KantorKonteksBarState extends State<KantorKonteksBar> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: kantorLabelPatches,
+    builder: (context, _) => _bar(context),
+  );
+
+  Widget _bar(BuildContext context) {
     final k = KantorKonteks.ofSession(widget.session);
     if (k == null) return const SizedBox.shrink();
     if (MediaQuery.viewInsetsOf(context).bottom > 0) {
@@ -502,10 +696,7 @@ class _KantorKonteksBarState extends State<KantorKonteksBar> {
                       ),
                       onPressed: () => showKantorLabelSheet(
                         context,
-                        konteks: k,
-                        name:
-                            '${asJson(widget.session['look'] ?? {})['name'] ?? 'sesi ini'}',
-                        canCarry: _str(widget.session['role']) != null,
+                        widget.session,
                         onSave: widget.onLabel!,
                       ),
                     ),
@@ -589,33 +780,48 @@ class _KantorKonteksBarState extends State<KantorKonteksBar> {
 }
 
 /// Subtitle satu baris untuk daftar berbasis teks: "topik · keadaan: detail".
-/// Tanpa konteks, memakai [fallback] apa adanya.
-String kantorKonteksSubtitle(Json? session, String fallback) {
+/// Tanpa konteks, memakai [fallback] apa adanya. [withLabel] false: topik
+/// dilewati bila itu label pemilik (labelnya sudah tampil sebagai stiker).
+String kantorKonteksSubtitle(
+  Json? session,
+  String fallback, {
+  bool withLabel = true,
+}) {
   final k = KantorKonteks.ofSession(session);
   if (k == null) return fallback;
   final d = k.detail(session);
   return [
-    if (k.topic != null) k.topic!,
+    if (k.topic != null && (withLabel || k.label == null)) k.topic!,
     d.isEmpty ? k.stateLabel : '${k.stateLabel}: $d',
   ].join(' · ');
 }
 
-/// Form label pemilik (web `labelFormHTML`). Opsi "bawa ke sesi berikutnya"
-/// hanya untuk sesi ber-role.
+/// Form label pemilik untuk [session] (web `labelFormHTML`): kolom teks,
+/// "Bawa ke sesi berikutnya agen ini" (hanya sesi ber-role), "Kabari
+/// agennya", lalu Simpan / Hapus label / Batal. [onSave] menerima teks yang
+/// sudah dirapikan; teks kosong = hapus. [name] menimpa nama agen di judul
+/// kolom (default `look.name` sesi).
 Future<void> showKantorLabelSheet(
-  BuildContext context, {
-  required KantorKonteks konteks,
-  required String name,
-  required bool canCarry,
+  BuildContext context,
+  Json session, {
   required Future<void> Function(String text, bool carry, bool tell) onSave,
+  String? name,
 }) {
+  final konteks =
+      KantorKonteks.ofSession(session) ??
+      const KantorKonteks(stateKey: '', stateLabel: '');
+  final look = session['look'];
   return showChunkyBottomSheet<void>(
     context,
     title: konteks.label != null ? 'Ubah label' : 'Beri label',
     builder: (c) => _LabelForm(
       konteks: konteks,
-      name: name,
-      canCarry: canCarry,
+      name:
+          name ??
+          (look is Map && _str(look['name']) != null
+              ? _str(look['name'])!
+              : 'sesi ini'),
+      canCarry: _str(session['role']) != null,
       onSave: onSave,
     ),
   );
@@ -656,8 +862,14 @@ class _LabelFormState extends State<_LabelForm> {
       _busy = true;
       _error = null;
     });
+    final clear = text.trim().isEmpty;
     try {
-      await widget.onSave(text.trim(), widget.canCarry && _carry, _tell);
+      // hapus label: opsi ikut dimatikan, sama seperti web
+      await widget.onSave(
+        text.trim(),
+        !clear && widget.canCarry && _carry,
+        !clear && _tell,
+      );
       if (!mounted) return;
       final m = ScaffoldMessenger.maybeOf(context);
       Navigator.of(context).pop();
@@ -674,6 +886,13 @@ class _LabelFormState extends State<_LabelForm> {
           _busy = false;
           _error = '$e';
         });
+        showToastBadge(
+          context,
+          message: clear ? 'Label gagal dihapus' : 'Label gagal disimpan',
+          icon: Icons.error_outline_rounded,
+          color: GhinaColors.red,
+          tag: 'kantor-label',
+        );
       }
     }
   }
@@ -739,15 +958,30 @@ class _LabelFormState extends State<_LabelForm> {
             loading: _busy,
             onPressed: _busy ? null : () => _save(_text.text),
           ),
-          if (k.label != null) ...[
-            GhinaSpace.gapSm,
-            ChunkyButton(
-              key: const ValueKey('label-delete'),
-              label: 'Hapus label',
-              variant: ChunkyButtonVariant.ghost,
-              onPressed: _busy ? null : () => _save(''),
-            ),
-          ],
+          GhinaSpace.gapSm,
+          Row(
+            children: [
+              if (k.label != null) ...[
+                Expanded(
+                  child: ChunkyButton(
+                    key: const ValueKey('label-delete'),
+                    label: 'Hapus label',
+                    variant: ChunkyButtonVariant.ghost,
+                    onPressed: _busy ? null : () => _save(''),
+                  ),
+                ),
+                const SizedBox(width: GhinaSpace.sm),
+              ],
+              Expanded(
+                child: ChunkyButton(
+                  key: const ValueKey('label-cancel'),
+                  label: 'Batal',
+                  variant: ChunkyButtonVariant.ghost,
+                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

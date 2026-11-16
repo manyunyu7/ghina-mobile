@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_sprite.dart';
 import 'kantor_feed.dart';
+import 'kantor_konteks.dart';
 import 'permission_card.dart';
 
 /// Mode meja (tabletop): Fold setengah terbuka dengan engsel MENDATAR, HP
@@ -186,11 +187,15 @@ class KantorTabletopHeader extends StatelessWidget {
     this.onBack,
     this.onSwap,
     this.onTerminal = false,
+    this.onLabel,
   });
 
   final KantorOfficeFeed feed;
   final Json sess;
   final VoidCallback? onBack;
+
+  /// Ketuk stiker label: buka form ubah label.
+  final VoidCallback? onLabel;
 
   /// Pindah ke tab lain (Terminal bila di Chat, Chat bila di Terminal).
   final VoidCallback? onSwap;
@@ -237,17 +242,28 @@ class KantorTabletopHeader extends StatelessWidget {
                 style: GhinaType.body.w(800).copyWith(color: g.textPrimary),
               ),
             ),
-            if (feed.office?['name'] != null) ...[
-              const SizedBox(width: GhinaSpace.sm),
-              Flexible(
-                child: Text(
-                  '${feed.office!['name']}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.caption.copyWith(color: g.textSecondary),
-                ),
+            // berlabel: stiker satu baris menggantikan nama kantor
+            const SizedBox(width: GhinaSpace.sm),
+            Flexible(
+              child: KantorSessionLabel(
+                key: const ValueKey('tabletop-label'),
+                session: sess,
+                maxLines: 1,
+                size: 13,
+                padding: EdgeInsets.zero,
+                onTap: onLabel,
+                empty: feed.office?['name'] == null
+                    ? const SizedBox.shrink()
+                    : Text(
+                        '${feed.office!['name']}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GhinaType.caption.copyWith(
+                          color: g.textSecondary,
+                        ),
+                      ),
               ),
-            ],
+            ),
             const Spacer(),
             if (label.isNotEmpty)
               ChunkyPill(

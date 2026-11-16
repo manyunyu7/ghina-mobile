@@ -194,7 +194,11 @@ class _RavelServicesState extends ConsumerState<_RavelServices> {
           final config = ref.read(kantorConfigProvider).value;
           if (config != null && config.ready) {
             unawaited(
-              RavelNotifications.showInbox(item, baseUrl: config.baseUrl),
+              RavelNotifications.showInbox(
+                item,
+                baseUrl: config.baseUrl,
+                label: RavelNotifications.inboxLabel(state, item),
+              ),
             );
           }
         }

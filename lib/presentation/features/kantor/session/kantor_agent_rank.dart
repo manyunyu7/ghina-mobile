@@ -13,6 +13,8 @@ import '../pages/kantor_complex_agent_switcher.dart';
 import '../widgets/kantor_sprite.dart';
 import 'chat_context.dart';
 import 'kantor_feed.dart';
+import 'kantor_konteks.dart';
+import 'kantor_label.dart';
 import 'kantor_snapshot_store.dart';
 
 /// Peringkat semua agen hidup dari semua kantor dan semua koneksi server
@@ -344,8 +346,10 @@ bool _atNewest(ScrollMetrics m) {
 /// - [chips]: pil avatar + nama sebaris (mode meja).
 ///
 /// Cincin merah = perlu tindakan, biru = bekerja, garis aksen = [currentSid].
-/// Garis tipis memisahkan kelompok. Ketuk = [onOpen], atau bila null pindah
-/// lewat [kantorOpenRankedAgent]. Tidak tampil bila tidak ada agen lain.
+/// Pojok kertas kuning di avatar = agen berlabel. Garis tipis memisahkan
+/// kelompok. Ketuk = [onOpen], atau bila null pindah lewat
+/// [kantorOpenRankedAgent]. Tahan = label lengkap + "Beri/Ubah label".
+/// Tidak tampil bila tidak ada agen lain.
 class KantorAgentStrip extends ConsumerStatefulWidget {
   const KantorAgentStrip({
     super.key,
@@ -390,6 +394,15 @@ class _KantorAgentStripState extends ConsumerState<KantorAgentStrip> {
       );
     }
   }
+
+  /// Tahan avatar: label lengkap dan aksi ubah label.
+  void _label(KantorRankedAgent a) => showKantorLabelMenu(
+    context,
+    a.session,
+    name: a.name,
+    officeId: a.officeId,
+    connection: a.active ? null : a.connection,
+  );
 
   /// Sekali per daftar: hangatkan chat beberapa agen teratas, dan geser strip
   /// supaya agen saat ini terlihat.
@@ -442,12 +455,18 @@ class _KantorAgentStripState extends ConsumerState<KantorAgentStrip> {
         KeyedSubtree(
           key: cur ? _currentKey : null,
           child: widget.chips
-              ? _Chip(agent: a, current: cur, onTap: () => _open(a))
+              ? _Chip(
+                  agent: a,
+                  current: cur,
+                  onTap: () => _open(a),
+                  onLongPress: () => _label(a),
+                )
               : _Avatar(
                   agent: a,
                   current: cur,
                   dense: widget.dense,
                   onTap: () => _open(a),
+                  onLongPress: () => _label(a),
                 ),
         ),
       );
@@ -492,8 +511,9 @@ Color? _ringColor(BuildContext context, KantorRankedAgent a) => a.needsAction
     ? GhinaColors.blue.base
     : null;
 
-/// Lingkaran avatar: sprite agen di atas latar lembut, cincin status, dan
-/// garis aksen di luar bila agen ini yang sedang dibuka.
+/// Lingkaran avatar: sprite agen di atas latar lembut, cincin status, garis
+/// aksen di luar bila agen ini yang sedang dibuka, dan pojok kertas kuning
+/// bila agen berlabel (ikut berubah saat label disimpan).
 class _Face extends StatelessWidget {
   const _Face({required this.agent, required this.size, this.current = false});
 
@@ -502,7 +522,29 @@ class _Face extends StatelessWidget {
   final bool current;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: kantorLabelPatches,
+    builder: (context, _) {
+      final face = _face(context);
+      if (kantorLabelOf(agent.session) == null) return face;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          face,
+          Positioned(
+            right: -1,
+            top: -1,
+            child: KantorLabelCorner(
+              key: ValueKey('label-corner-${agent.identity}'),
+              size: size < 30 ? 10 : 13,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  Widget _face(BuildContext context) {
     final g = context.ghina;
     final ring = _ringColor(context, agent);
     final accent = Theme.of(context).colorScheme.primary;
@@ -542,6 +584,7 @@ String _semantic(KantorRankedAgent a) => [
   a.officeName,
   if (!a.active && a.connectionName.isNotEmpty) a.connectionName,
   if (a.needsAction) 'perlu tindakan' else if (a.working) 'bekerja',
+  if (kantorLabelOf(a.session) case final l?) 'label: $l',
 ].join(', ');
 
 class _Avatar extends StatelessWidget {
@@ -550,12 +593,14 @@ class _Avatar extends StatelessWidget {
     required this.current,
     required this.dense,
     required this.onTap,
+    this.onLongPress,
   });
 
   final KantorRankedAgent agent;
   final bool current;
   final bool dense;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -570,6 +615,7 @@ class _Avatar extends StatelessWidget {
         key: ValueKey('strip-agent-${agent.identity}'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: SizedBox(
           width: size + 14,
           child: Column(
@@ -603,11 +649,13 @@ class _Chip extends StatelessWidget {
     required this.agent,
     required this.current,
     required this.onTap,
+    this.onLongPress,
   });
 
   final KantorRankedAgent agent;
   final bool current;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -631,6 +679,7 @@ class _Chip extends StatelessWidget {
             key: ValueKey('strip-agent-${agent.identity}'),
             customBorder: const StadiumBorder(),
             onTap: onTap,
+            onLongPress: onLongPress,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(4, 3, 10, 3),
               child: Row(

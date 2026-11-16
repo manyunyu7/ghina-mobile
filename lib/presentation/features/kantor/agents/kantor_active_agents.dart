@@ -11,6 +11,7 @@ import '../kantor_data.dart';
 import '../kantor_format.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_konteks.dart';
+import '../session/kantor_label.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
 
@@ -96,7 +97,10 @@ class KantorAgentRef {
     codex ? 'codex' : 'claude',
     toolFull(session['tool']),
     (session['waiting'] as Map?)?['summary'],
-    KantorKonteks.ofSession(session)?.topic,
+    // label pemilik, topik, dan judul otomatis yang tergeser label
+    ?KantorKonteks.ofSession(session)?.label,
+    ?KantorKonteks.ofSession(session)?.topic,
+    ?KantorKonteks.ofSession(session)?.auto,
   ].join(' ').toLowerCase();
 }
 
@@ -229,6 +233,12 @@ class KantorActiveAgentTile extends ConsumerWidget {
         depth: GhinaDepth.sm,
         tinted: current ? GhinaColors.blue : null,
         onTap: () => onOpen(null),
+        onLongPress: () => showKantorLabelMenu(
+          context,
+          a.session,
+          name: a.name,
+          officeId: a.officeId,
+        ),
         semanticLabel: 'Buka ${a.name}',
         child: Row(
           children: [
@@ -506,7 +516,10 @@ class KantorActiveAgentsStrip extends StatelessWidget {
           ],
         ),
         SizedBox(
-          height: 92,
+          // kartu agen berlabel memuat satu baris stiker lagi
+          height: all.take(12).any((a) => kantorLabelOf(a.session) != null)
+              ? 112
+              : 92,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: all.length > 12 ? 12 : all.length,
@@ -536,6 +549,12 @@ class KantorActiveAgentsStrip extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GhinaType.bodyS.w(800),
+                            ),
+                            KantorSessionLabel(
+                              session: a.session,
+                              maxLines: 1,
+                              size: 13,
+                              padding: const EdgeInsets.only(bottom: 1),
                             ),
                             KantorKonteksLines(
                               session: a.session,

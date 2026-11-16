@@ -423,12 +423,16 @@ class KantorMessengerHeader extends StatelessWidget {
     required this.style,
     required this.onTap,
     this.onLongPress,
+    this.onLabel,
   });
   final KantorOfficeFeed feed;
   final Json sess;
   final ChatStyle style;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+
+  /// Ketuk stiker label: buka form ubah label.
+  final VoidCallback? onLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -466,15 +470,24 @@ class KantorMessengerHeader extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    _messengerStatus(sess, role),
+                  // berlabel: status diganti stiker kecil satu baris
+                  KantorSessionLabel(
+                    key: const ValueKey('header-label'),
+                    session: sess,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GhinaType.caption.copyWith(
-                      fontSize: 12,
-                      color: style == ChatStyle.whatsapp
-                          ? Colors.white
-                          : c.accent,
+                    size: 13,
+                    padding: const EdgeInsets.only(top: 1, bottom: 1),
+                    onTap: onLabel,
+                    empty: Text(
+                      _messengerStatus(sess, role),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GhinaType.caption.copyWith(
+                        fontSize: 12,
+                        color: style == ChatStyle.whatsapp
+                            ? Colors.white
+                            : c.accent,
+                      ),
                     ),
                   ),
                 ],

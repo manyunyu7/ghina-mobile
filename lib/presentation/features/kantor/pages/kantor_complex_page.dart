@@ -14,6 +14,8 @@ import '../kantor_format.dart';
 import '../kantor_place.dart';
 import '../agents/kantor_active_agents.dart';
 import '../search/kantor_search.dart';
+import '../session/kantor_konteks.dart';
+import '../session/kantor_label.dart';
 import '../shows/shows_button.dart';
 import '../usage/kantor_limits_card.dart';
 import '../widgets/kantor_inbox.dart';
@@ -1186,10 +1188,38 @@ class _SessionTile extends StatelessWidget {
             : 'Sesi manual');
     final waiting = session['waiting'] != null;
     final working = session['status'] == 'working';
+    final g = context.ghina;
     return ChunkyTile(
+      key: ValueKey('complex-session-${session['sid']}'),
       dense: dense,
       leading: KantorSprite(look: _look(session), size: dense ? 28 : 32),
       title: '$name',
+      // stiker label (maks 2 baris) di bawah nama agen
+      titleWidget: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$name',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: (dense ? GhinaType.body.w(800) : GhinaType.h3).copyWith(
+              color: g.textPrimary,
+            ),
+          ),
+          KantorSessionLabel(
+            session: session,
+            maxLines: 2,
+            size: dense ? 13 : 14,
+          ),
+        ],
+      ),
+      onLongPress: () => showKantorLabelMenu(
+        context,
+        session,
+        name: '$name',
+        officeId: '${office['id']}',
+      ),
       subtitle:
           '${office['name']} · ${kantorShort(kantorSessionLabel(session), 44)}',
       trailing: Icon(

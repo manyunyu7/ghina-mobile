@@ -11,6 +11,7 @@ import '../session/kantor_actions.dart';
 import '../session/kantor_agent_rank.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_konteks.dart';
+import '../session/kantor_label.dart';
 import '../session/start_shift_sheet.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
@@ -20,7 +21,9 @@ import '../widgets/kantor_states.dart';
 /// server tersimpan, dibagi: "Perlu tindakan", "Terakhir dibuka", "Bekerja",
 /// "Semua agen · N", lalu "Libur" (role kantor ini yang belum shift; ketuk
 /// untuk mulai shift). Kolom cari ada di bawah (zona jempol); ketik untuk
-/// menyaring nama agen / kantor / mesin, Enter membuka hasil teratas.
+/// menyaring nama agen / kantor / mesin / label, Enter membuka hasil teratas.
+/// Agen berlabel menampilkan stiker label; tahan baris agen untuk memberi atau
+/// mengubah label.
 Future<void> showKantorAgentSwitcher(
   BuildContext context, {
   required String officeId,
@@ -289,6 +292,20 @@ class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
                   current: _isCurrent(item.agent!),
                   opening: _opening == item.agent!.identity,
                   onTap: _opening != null ? null : () => _tap(feed, item),
+                  onLongPress: () => showKantorLabelMenu(
+                    context,
+                    item.agent!.session,
+                    name: item.agent!.name,
+                    officeId: item.agent!.officeId,
+                    connection: item.agent!.active
+                        ? null
+                        : item.agent!.connection,
+                    feed:
+                        item.agent!.active &&
+                            item.agent!.officeId == widget.officeId
+                        ? feed
+                        : null,
+                  ),
                 )
               : _OffRow(
                   role: item.role!,
@@ -376,12 +393,14 @@ class _AgentRow extends StatelessWidget {
     required this.current,
     required this.opening,
     required this.onTap,
+    this.onLongPress,
   });
 
   final KantorRankedAgent agent;
   final bool current;
   final bool opening;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -393,16 +412,31 @@ class _AgentRow extends StatelessWidget {
         : a.doing == 'diam' && ago.isNotEmpty
         ? 'diam $ago'
         : a.doing;
+    final title = job.isEmpty ? a.name : '${a.name} · $job';
     return Padding(
       padding: const EdgeInsets.only(bottom: GhinaSpace.xs),
       child: ChunkyTile(
         key: ValueKey('switch-${a.identity}'),
         leading: KantorSprite(look: a.look, size: 36),
-        title: job.isEmpty ? a.name : '${a.name} · $job',
+        title: title,
+        // stiker label (maks 2 baris) di bawah nama agen
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GhinaType.h3.copyWith(color: context.ghina.textPrimary),
+            ),
+            KantorSessionLabel(session: a.session, maxLines: 2, size: 14),
+          ],
+        ),
         subtitle: [
           a.officeName,
           if (!a.active && a.connectionName.isNotEmpty) a.connectionName,
-          kantorKonteksSubtitle(a.session, what),
+          kantorKonteksSubtitle(a.session, what, withLabel: false),
         ].join(' · '),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -437,6 +471,7 @@ class _AgentRow extends StatelessWidget {
           ],
         ),
         onTap: onTap,
+        onLongPress: onLongPress,
       ),
     );
   }

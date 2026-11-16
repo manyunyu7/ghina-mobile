@@ -29,6 +29,7 @@ import 'kantor_actions.dart';
 import 'kantor_agent_rank.dart';
 import 'kantor_feed.dart';
 import 'kantor_konteks.dart';
+import 'kantor_label.dart';
 import 'kantor_tabletop.dart';
 import 'profile_tab.dart';
 import 'session_pratinjau_tab.dart';
@@ -303,6 +304,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                 onSwap: s['tmux'] != null && s['status'] != 'ended'
                     ? () => _tabs.animateTo(_shown == _terminalTab ? 0 : 1)
                     : null,
+                onLabel: widget.actions == null ? null : () => _editLabel(s),
               )
             : null,
         agents: table
@@ -367,7 +369,13 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                     child: Row(
                       children: [
                         Flexible(
-                          child: _Header(feed: widget.feed, sess: s),
+                          child: _Header(
+                            feed: widget.feed,
+                            sess: s,
+                            onLabel: widget.actions == null
+                                ? null
+                                : () => _editLabel(s),
+                          ),
                         ),
                         if (!widget.embedded)
                           const Icon(Icons.expand_more_rounded, size: 20),
@@ -423,15 +431,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                           '/api/sessions/${widget.sid}/draft-laporan',
                           {'aksi': aksi},
                         ),
-                  onLabel: widget.actions == null
-                      ? null
-                      : (text, carry, tell) async {
-                          await widget.actions!.api.post(
-                            '/api/sessions/${widget.sid}/label',
-                            {'text': text, 'carry': carry, 'tell': tell},
-                          );
-                          await widget.feed.load();
-                        },
+                  onLabel: widget.actions == null ? null : _saveLabel,
                 ),
               Expanded(child: _tabStack(s)),
             ],
@@ -521,6 +521,27 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     }
   }
 
+  /// Simpan label sesi ini (optimistis), lalu muat ulang feed dan state.
+  Future<void> _saveLabel(String text, bool carry, bool tell) =>
+      kantorSaveLabel(
+        ProviderScope.containerOf(context, listen: false),
+        sid: widget.sid,
+        text: text,
+        carry: carry,
+        tell: tell,
+        officeId: widget.officeId,
+        api: widget.actions?.api,
+        feed: widget.feed,
+      );
+
+  /// Form ubah label (ketuk stiker di judul chat).
+  void _editLabel(Json s) => showKantorLabelSheet(
+    context,
+    s,
+    name: sessionName(widget.feed, s),
+    onSave: _saveLabel,
+  );
+
   /// Hidden load meter of this chat (long-press on the header).
   void _timings() {
     final api = ref.read(kantorApiProvider);
@@ -580,6 +601,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                   style: view.style,
                   onTap: _profile,
                   onLongPress: _timings,
+                  onLabel: widget.actions == null ? null : () => _editLabel(s),
                 ),
                 actions: [
                   // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
@@ -623,15 +645,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                           '/api/sessions/${widget.sid}/draft-laporan',
                           {'aksi': aksi},
                         ),
-                  onLabel: widget.actions == null
-                      ? null
-                      : (text, carry, tell) async {
-                          await widget.actions!.api.post(
-                            '/api/sessions/${widget.sid}/label',
-                            {'text': text, 'carry': carry, 'tell': tell},
-                          );
-                          await widget.feed.load();
-                        },
+                  onLabel: widget.actions == null ? null : _saveLabel,
                 ),
               Expanded(child: _tabStack(s)),
             ],
@@ -707,10 +721,13 @@ class _OutsideNote extends ConsumerWidget {
 }
 
 class _Header extends ConsumerWidget {
-  const _Header({required this.feed, required this.sess});
+  const _Header({required this.feed, required this.sess, this.onLabel});
 
   final KantorOfficeFeed feed;
   final Json sess;
+
+  /// Ketuk stiker label: buka form ubah label. Null = stiker tidak bisa diketuk.
+  final VoidCallback? onLabel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -779,15 +796,24 @@ class _Header extends ConsumerWidget {
                   ],
                 ],
               ),
-              Text(
-                [
-                  if (complex != null) complex.name,
-                  if (feed.office?['name'] != null) '${feed.office!['name']}',
-                  sub,
-                ].join(' · '),
+              // berlabel: subjudul jadi stiker kecil satu baris
+              KantorSessionLabel(
+                key: const ValueKey('header-label'),
+                session: sess,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GhinaType.caption.copyWith(color: g.textSecondary),
+                size: 13,
+                padding: const EdgeInsets.only(top: 1, bottom: 1),
+                onTap: onLabel,
+                empty: Text(
+                  [
+                    if (complex != null) complex.name,
+                    if (feed.office?['name'] != null) '${feed.office!['name']}',
+                    sub,
+                  ].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GhinaType.caption.copyWith(color: g.textSecondary),
+                ),
               ),
               if (mode != null && mode != 'default')
                 Text(
@@ -959,15 +985,17 @@ class _Menu extends StatelessWidget {
         ],
       ),
     );
-    if (picked == null || picked == sess['permMode'] || !context.mounted)
+    if (picked == null || picked == sess['permMode'] || !context.mounted) {
       return;
+    }
     try {
       await actions?.setMode(_sid, picked);
-      if (context.mounted)
+      if (context.mounted) {
         _toast(
           context,
           'Mode izin: ${codex ? kantorCodexModeLabel(picked) : kantorModeLabel[picked] ?? picked}',
         );
+      }
     } catch (e) {
       if (context.mounted) _toast(context, '$e', bad: true);
     }
@@ -1027,11 +1055,12 @@ class _Menu extends StatelessWidget {
     }
     try {
       final m = await actions?.selectModel(_sid, picked);
-      if (context.mounted)
+      if (context.mounted) {
         _toast(
           context,
           'Model diganti ke ${m == null || m.isEmpty ? 'pilihan baru' : m}',
         );
+      }
     } catch (e) {
       if (context.mounted) _toast(context, '$e', bad: true);
     }

@@ -10,6 +10,7 @@ import '../dm/kantor_dm_screen.dart';
 import '../session/kantor_actions.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_konteks.dart';
+import '../session/kantor_label.dart';
 import '../session/permission_card.dart';
 import '../roles/kantor_new_agent_sheet.dart';
 import '../session/start_shift_sheet.dart';
@@ -262,13 +263,22 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
 
   Future<void> _roomSheet(BuildContext context, _Room r) async {
     final marks = ref.read(kantorRoomMarksProvider.notifier);
-    await showModalBottomSheet<void>(
+    final label = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // label lengkap + "Beri label" / "Ubah label"
+            if (r.live)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: KantorLabelMenuBody(
+                  session: r.s,
+                  onEdit: () => Navigator.pop(ctx, true),
+                ),
+              ),
             ListTile(
               leading: Icon(
                 r.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
@@ -308,6 +318,8 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
         ),
       ),
     );
+    if (label != true || !context.mounted) return;
+    await kantorEditLabel(context, r.s, name: r.name, feed: widget.feed);
   }
 
   Future<void> _newChat(BuildContext context) async {
@@ -475,7 +487,9 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
               !waiting.contains(r.sid)) {
             return false;
           }
-          return '${r.name} ${r.role?['title'] ?? ''} ${r.preview}'
+          final k = KantorKonteks.ofSession(r.s);
+          return '${r.name} ${r.role?['title'] ?? ''} ${r.preview} '
+                  '${k?.label ?? ''} ${k?.auto ?? ''}'
               .toLowerCase()
               .contains(_query);
         }).toList()..sort((a, b) {
@@ -582,6 +596,12 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
                               ),
                             ),
                           ],
+                        ),
+                        KantorSessionLabel(
+                          session: r.s,
+                          maxLines: 2,
+                          size: 14,
+                          padding: const EdgeInsets.only(top: 3, bottom: 1),
                         ),
                         const SizedBox(height: 3),
                         Row(
@@ -1003,6 +1023,8 @@ class _AgentList extends StatelessWidget {
             KantorPaneScope.maybeOf(context)?.selectedSid ==
                 '${r.session!['sid']}',
         onTap: () => _open(context, '${r.session!['sid']}'),
+        onLongPress: () =>
+            showKantorLabelMenu(context, r.session!, name: r.name, feed: feed),
       ),
     );
 
@@ -1129,11 +1151,19 @@ class _AgentList extends StatelessWidget {
 }
 
 class _AgentTile extends StatelessWidget {
-  const _AgentTile({required this.row, required this.onTap, this.open = false});
+  const _AgentTile({
+    required this.row,
+    required this.onTap,
+    this.onLongPress,
+    this.open = false,
+  });
 
   final _Row row;
   final bool open;
   final VoidCallback? onTap;
+
+  /// Tahan: menu label (hanya agen yang sedang shift).
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1151,8 +1181,10 @@ class _AgentTile extends StatelessWidget {
         ? GhinaColors.green.base
         : g.textMuted;
     final card = ChunkyCard(
+      key: s == null ? null : ValueKey('agent-tile-${s['sid']}'),
       tinted: waiting ? GhinaColors.orange : null,
       onTap: onTap,
+      onLongPress: onLongPress,
       padding: const EdgeInsets.symmetric(
         horizontal: GhinaSpace.md,
         vertical: GhinaSpace.sm,
