@@ -10,6 +10,7 @@ import 'package:xterm/xterm.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import 'terminal_prefs.dart';
+import 'terminal_scroll.dart';
 import 'terminal_themes.dart';
 
 /// Live terminal of a session (`{kind: 'session', sid}`) or a room shell
@@ -52,7 +53,9 @@ class KantorTerminalPanel extends ConsumerStatefulWidget {
 
 class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     with AutomaticKeepAliveClientMixin {
-  final _terminal = Terminal(maxLines: 5000);
+  // a swipe scrolls the tmux pane (copy mode): see TermWheelHandler
+  final _wheel = TermWheelHandler();
+  late final _terminal = Terminal(maxLines: 5000, mouseHandler: _wheel);
   final _controller = TerminalController();
   final _focus = FocusNode();
   WebSocket? _ws;
@@ -117,8 +120,13 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   }
 
   void _onOutput(String data) {
+    final mouse = _wheel.isOwn(data);
     final ws = _ws;
     if (ws == null || ws.readyState != WebSocket.open) return;
+    if (mouse) {
+      ws.add(data);
+      return;
+    }
     var out = data;
     if (_ctrl) {
       setState(() => _ctrl = false);
@@ -126,12 +134,16 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
         out = String.fromCharCode(data.toUpperCase().codeUnitAt(0) - 64);
       }
     }
-    ws.add(out);
+    ws.add(_live(out));
   }
+
+  /// [input] preceded by the wheel-downs that bring a scrolled-back pane to
+  /// the live end, so typing never lands in tmux copy mode.
+  String _live(String input) => '${_wheel.release()}$input';
 
   void _send(String seq) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open) ws.add(seq);
+    if (ws != null && ws.readyState == WebSocket.open) ws.add(_live(seq));
     if (_ctrl) setState(() => _ctrl = false);
   }
 
@@ -148,6 +160,7 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
         query: {...widget.query, 'cols': '$_cols', 'rows': '$_rows'},
       );
       _ws = ws;
+      _wheel.reset();
       _bytes?.close();
       _bytes = const Utf8Decoder(
         allowMalformed: true,
