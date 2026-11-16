@@ -116,12 +116,22 @@ class KantorOfficeFeed extends ChangeNotifier {
       ];
       error = null;
       loadedAt = DateTime.now();
+      _retries = 0;
     } catch (e) {
       error = e;
+      // nothing to show yet: try again shortly instead of parking on an error
+      if (office == null && _retries < 2 && !_disposed) {
+        _retries++;
+        _debounce?.cancel();
+        _debounce = Timer(Duration(seconds: 2 * _retries), load);
+        return; // keep the loading state while retrying
+      }
     }
     loading = false;
     _notify();
   }
+
+  int _retries = 0;
 
   void apply(Json? msg) {
     if (msg == null) return;

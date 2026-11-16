@@ -277,7 +277,10 @@ void main() {
       expect(find.textContaining('Pesan baru'), findsOneWidget);
       expect(find.byKey(const ValueKey('chat-sync-badge')), findsNothing);
       await t.pumpWidget(const SizedBox.shrink());
-      await t.pump(const Duration(seconds: 7)); // let HTTP timeouts lapse
+      await t.pump(const Duration(seconds: 7));
+      await t.pump(
+        const Duration(seconds: 7),
+      ); // reads retry once // let HTTP timeouts lapse
     });
 
     testWidgets('says plainly when the cached history could not be refreshed', (
@@ -296,7 +299,10 @@ void main() {
       expect(badge.data, contains('Belum tersinkron'));
       expect(badge.data, contains('09:05'));
       await t.pumpWidget(const SizedBox.shrink());
-      await t.pump(const Duration(seconds: 7)); // let HTTP timeouts lapse
+      await t.pump(const Duration(seconds: 7));
+      await t.pump(
+        const Duration(seconds: 7),
+      ); // reads retry once // let HTTP timeouts lapse
     });
 
     testWidgets('a transcript event fetches the delta right away', (t) async {
@@ -316,6 +322,7 @@ void main() {
       expect(queries.length, before + 1, reason: 'other chats are ignored');
       await t.pumpWidget(const SizedBox.shrink());
       await t.pump(const Duration(seconds: 7));
+      await t.pump(const Duration(seconds: 7)); // reads retry once
     });
 
     testWidgets('no polling in the background, delta at once on resume', (
@@ -336,9 +343,9 @@ void main() {
       await _settle(t);
       expect(queries.length, before + 1);
       await t.pumpWidget(const SizedBox.shrink());
-      await t.pump(
-        const Duration(seconds: 31),
-      ); // receive timeout of the resume fetch
+      // receive timeout of the resume fetch, then of its one retry
+      await t.pump(const Duration(seconds: 31));
+      await t.pump(const Duration(seconds: 31));
     });
   });
 }

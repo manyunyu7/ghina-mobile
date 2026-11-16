@@ -204,7 +204,9 @@ void main() {
       await t.pump();
       expect(t.widget<Text>(personaFinder).maxLines, isNull);
       expect(find.text('Lebih sedikit'), findsOneWidget);
-      await t.ensureVisible(find.byKey(const ValueKey('profile-persona-expand')));
+      await t.ensureVisible(
+        find.byKey(const ValueKey('profile-persona-expand')),
+      );
       await _settle(t);
       await t.tap(find.byKey(const ValueKey('profile-persona-expand')));
       await t.pump();
@@ -299,6 +301,7 @@ void main() {
     await t.pumpWidget(const SizedBox());
     // the agent list prefetches chats; let that request's timeout lapse
     await t.pump(const Duration(seconds: 31));
+    await t.pump(const Duration(seconds: 31)); // reads retry once
   });
 
   testWidgets('messenger permission actions keep allow and deny callbacks', (

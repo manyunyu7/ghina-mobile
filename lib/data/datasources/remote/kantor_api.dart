@@ -270,6 +270,8 @@ final class KantorApi {
     : _dio = Dio(
         BaseOptions(
           baseUrl: config.baseUrl,
+          // a phone's Tailscale tunnel can take a few seconds to wake up after
+          // the screen was off, so reads are retried once (see [get])
           connectTimeout: const Duration(seconds: 6),
           receiveTimeout: const Duration(seconds: 30),
           headers: {'Authorization': 'Bearer ${config.token}'},
@@ -279,8 +281,20 @@ final class KantorApi {
   final KantorConfig config;
   final Dio _dio;
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) =>
-      _call(() => _dio.get<dynamic>(path, queryParameters: query));
+  /// Reads are idempotent: a request that never reached the daemon (tunnel
+  /// waking up, a pooled socket the network silently dropped) is tried once
+  /// more on a fresh connection before giving up.
+  Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
+    try {
+      return await _call(() => _dio.get<dynamic>(path, queryParameters: query));
+    } on KantorException catch (e) {
+      if (e.kind != KantorFailure.unreachable) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      // the failed socket is not reused, so this goes out on a new one
+      return _call(() => _dio.get<dynamic>(path, queryParameters: query));
+    }
+  }
+
   Future<dynamic> post(String path, [Object? body]) =>
       _call(() => _dio.post<dynamic>(path, data: body ?? const {}));
   Future<dynamic> patch(String path, [Object? body]) =>
