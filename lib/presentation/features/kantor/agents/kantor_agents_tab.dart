@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
@@ -19,16 +18,45 @@ import '../session/chat_style.dart';
 import 'kantor_room_marks.dart';
 import '../meetings/kantor_meeting.dart';
 import '../meetings/kantor_meeting_detail.dart';
+import 'kantor_two_pane.dart';
 
 /// Agents of one office, grouped by what needs the user: waiting (permission
 /// or question), working, idle, and roles off shift.
-class KantorAgentsTab extends ConsumerWidget {
+///
+/// Lebar >= [kKantorTwoPaneMin] (Fold terbuka): daftar di kiri, chat di kanan
+/// ([KantorTwoPane]). Di bawahnya tetap satu panel, ketuk agen membuka halaman
+/// sesi seperti biasa.
+class KantorAgentsTab extends ConsumerStatefulWidget {
   const KantorAgentsTab({super.key, required this.officeId});
 
   final String officeId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KantorAgentsTab> createState() => _KantorAgentsTabState();
+}
+
+class _KantorAgentsTabState extends ConsumerState<KantorAgentsTab> {
+  /// Daftar dipindah (bukan dibuat ulang) antara satu dan dua panel, jadi
+  /// filter, pencarian, dan posisi scroll daftar tetap saat Fold dilipat/dibuka.
+  final _listKey = GlobalKey(debugLabel: 'kantor-agent-list');
+
+  /// Tata letak pada build sebelumnya; null sebelum layout pertama.
+  bool? _wasWide;
+
+  void _onLayout(bool wide) {
+    final was = _wasWide;
+    _wasWide = wide;
+    if (was == true && !wide) {
+      // dua panel -> satu panel: chat di panel kanan jadi halaman penuh
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _wasWide == false) kantorUndockToRoute(context, ref);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final officeId = widget.officeId;
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
     final style = ref.watch(chatViewPrefsProvider.select((p) => p.style));
@@ -39,14 +67,30 @@ class KantorAgentsTab extends ConsumerWidget {
         if (feed.error != null && feed.office == null) {
           return KantorErrorView(error: feed.error!, onRetry: feed.load);
         }
-        return RefreshIndicator(
-          onRefresh: feed.load,
-          child: style != ChatStyle.bawaan
-              ? _MessengerAgentList(feed: feed, style: style)
-              : _AgentList(
-                  feed: feed,
-                  actions: api == null ? null : KantorActions(api),
-                ),
+        final list = KeyedSubtree(
+          key: _listKey,
+          child: RefreshIndicator(
+            onRefresh: feed.load,
+            child: style != ChatStyle.bawaan
+                ? _MessengerAgentList(feed: feed, style: style)
+                : _AgentList(
+                    feed: feed,
+                    actions: api == null ? null : KantorActions(api),
+                  ),
+          ),
+        );
+        return LayoutBuilder(
+          builder: (context, box) {
+            final wide = box.maxWidth >= kKantorTwoPaneMin;
+            _onLayout(wide);
+            if (!wide) return list;
+            return KantorTwoPane(
+              officeId: officeId,
+              officeName: '${feed.office?['name'] ?? officeId}',
+              list: list,
+              width: box.maxWidth,
+            );
+          },
         );
       },
     );
@@ -117,7 +161,8 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
   Future<void> _open(BuildContext context, String sid) async {
     final marks = ref.read(kantorRoomMarksProvider.notifier);
     marks.markRead(sid);
-    await context.push('/kantor/o/${widget.feed.officeId}/s/$sid');
+    // dua panel: ganti panel kanan; layar sempit: push halaman sesi
+    await kantorOpenFromList(context, widget.feed.officeId, sid);
     marks.markRead(sid);
   }
 
@@ -358,177 +403,184 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
         _ => c.muted,
       };
       final stamp = messengerStamp(r.at);
+      final open = KantorPaneScope.maybeOf(context)?.selectedSid == r.sid;
       return InkWell(
         key: ValueKey('room-${r.sid}'),
         onTap: () => _open(context, r.sid),
         onLongPress: () => _roomSheet(context, r),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  CircleAvatar(
-                    radius: 27,
-                    backgroundColor: _tintFor(
-                      r.role?['id']?.toString() ?? r.sid,
+        child: Container(
+          key: open ? ValueKey('room-open-${r.sid}') : null,
+          color: open ? c.mine : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleAvatar(
+                      radius: 27,
+                      backgroundColor: _tintFor(
+                        r.role?['id']?.toString() ?? r.sid,
+                      ),
+                      child: KantorSprite(
+                        look: r.role ?? KantorSprite.guestLook(r.sid),
+                        size: 44,
+                      ),
                     ),
-                    child: KantorSprite(
-                      look: r.role ?? KantorSprite.guestLook(r.sid),
-                      size: 44,
-                    ),
-                  ),
-                  if (r.live)
-                    Positioned(
-                      right: 0,
-                      bottom: 1,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            width: 2,
+                    if (r.live)
+                      Positioned(
+                        right: 0,
+                        bottom: 1,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.only(bottom: 12, top: 4),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(color: c.muted.withValues(alpha: .12)),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              r.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GhinaType.body.copyWith(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                                color: c.ink,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            stamp,
-                            style: GhinaType.caption.copyWith(
-                              fontSize: 12,
-                              color: r.unread && !r.muted ? badge : c.muted,
-                              fontWeight: r.unread
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ],
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.only(bottom: 12, top: 4),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: c.muted.withValues(alpha: .12),
+                        ),
                       ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          if (r.mine) ...[
-                            Icon(
-                              Icons.done_all_rounded,
-                              size: 17,
-                              color: c.tick,
-                            ),
-                            const SizedBox(width: 3),
-                          ],
-                          Expanded(
-                            child: Text.rich(
-                              TextSpan(
-                                children: [
-                                  if (r.mine)
-                                    TextSpan(
-                                      text: 'Kamu: ',
-                                      style: TextStyle(color: c.muted),
-                                    ),
-                                  TextSpan(text: r.preview),
-                                ],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GhinaType.bodyS.copyWith(
-                                fontSize: 14,
-                                color: previewColor,
-                                fontWeight: r.kind == 'pesan'
-                                    ? FontWeight.w400
-                                    : FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (r.muted) ...[
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.volume_off_rounded,
-                              size: 17,
-                              color: c.muted,
-                              semanticLabel: 'Dibisukan',
-                            ),
-                          ],
-                          if (r.pinned) ...[
-                            const SizedBox(width: 6),
-                            Transform.rotate(
-                              angle: .6,
-                              child: Icon(
-                                Icons.push_pin_rounded,
-                                size: 16,
-                                color: c.muted,
-                                semanticLabel: 'Disematkan',
-                              ),
-                            ),
-                          ],
-                          if (r.unread || r.kind == 'izin') ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                              ),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: r.muted
-                                    ? c.muted.withValues(alpha: .6)
-                                    : r.kind == 'izin'
-                                    ? const Color(0xFFEA580C)
-                                    : badge,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
                               child: Text(
-                                r.kind == 'izin' ? '!' : '1',
-                                style: GhinaType.caption.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
+                                r.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GhinaType.body.copyWith(
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: c.ink,
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            Text(
+                              stamp,
+                              style: GhinaType.caption.copyWith(
+                                fontSize: 12,
+                                color: r.unread && !r.muted ? badge : c.muted,
+                                fontWeight: r.unread
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                              ),
+                            ),
                           ],
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            if (r.mine) ...[
+                              Icon(
+                                Icons.done_all_rounded,
+                                size: 17,
+                                color: c.tick,
+                              ),
+                              const SizedBox(width: 3),
+                            ],
+                            Expanded(
+                              child: Text.rich(
+                                TextSpan(
+                                  children: [
+                                    if (r.mine)
+                                      TextSpan(
+                                        text: 'Kamu: ',
+                                        style: TextStyle(color: c.muted),
+                                      ),
+                                    TextSpan(text: r.preview),
+                                  ],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GhinaType.bodyS.copyWith(
+                                  fontSize: 14,
+                                  color: previewColor,
+                                  fontWeight: r.kind == 'pesan'
+                                      ? FontWeight.w400
+                                      : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (r.muted) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.volume_off_rounded,
+                                size: 17,
+                                color: c.muted,
+                                semanticLabel: 'Dibisukan',
+                              ),
+                            ],
+                            if (r.pinned) ...[
+                              const SizedBox(width: 6),
+                              Transform.rotate(
+                                angle: .6,
+                                child: Icon(
+                                  Icons.push_pin_rounded,
+                                  size: 16,
+                                  color: c.muted,
+                                  semanticLabel: 'Disematkan',
+                                ),
+                              ),
+                            ],
+                            if (r.unread || r.kind == 'izin') ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: r.muted
+                                      ? c.muted.withValues(alpha: .6)
+                                      : r.kind == 'izin'
+                                      ? const Color(0xFFEA580C)
+                                      : badge,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  r.kind == 'izin' ? '!' : '1',
+                                  style: GhinaType.caption.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -685,7 +737,7 @@ class _AgentList extends StatelessWidget {
   );
 
   void _open(BuildContext context, String sid) =>
-      context.push('/kantor/o/${feed.officeId}/s/$sid');
+      kantorOpenFromList(context, feed.officeId, sid);
 
   Future<void> _decide(BuildContext context, Json item, String behavior) async {
     try {
@@ -848,6 +900,10 @@ class _AgentList extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
       child: _AgentTile(
         row: r,
+        open:
+            r.session != null &&
+            KantorPaneScope.maybeOf(context)?.selectedSid ==
+                '${r.session!['sid']}',
         onTap: () => _open(context, '${r.session!['sid']}'),
       ),
     );
@@ -971,9 +1027,10 @@ class _AgentList extends StatelessWidget {
 }
 
 class _AgentTile extends StatelessWidget {
-  const _AgentTile({required this.row, required this.onTap});
+  const _AgentTile({required this.row, required this.onTap, this.open = false});
 
   final _Row row;
+  final bool open;
   final VoidCallback onTap;
 
   @override
@@ -991,7 +1048,7 @@ class _AgentTile extends StatelessWidget {
         : working
         ? GhinaColors.green.base
         : g.textMuted;
-    return ChunkyCard(
+    final card = ChunkyCard(
       tinted: waiting ? GhinaColors.orange : null,
       onTap: onTap,
       padding: const EdgeInsets.symmetric(
@@ -1067,6 +1124,19 @@ class _AgentTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+    if (!open) return card;
+    return DecoratedBox(
+      key: const ValueKey('tile-open'),
+      decoration: BoxDecoration(
+        borderRadius:
+            GhinaRadii.rLg + const BorderRadius.all(Radius.circular(4)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary,
+          width: 2,
+        ),
+      ),
+      child: card,
     );
   }
 }

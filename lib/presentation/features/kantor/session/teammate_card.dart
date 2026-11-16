@@ -50,7 +50,9 @@ class _TeammateCardState extends State<TeammateCard> {
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: w * view.bubbleWidth.fraction),
+        constraints: BoxConstraints(
+          maxWidth: kantorBubbleMaxWidth(w, view.bubbleWidth.fraction),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

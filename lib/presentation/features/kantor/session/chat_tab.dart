@@ -175,8 +175,10 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     _bump?.cancel();
     widget.feed.removeListener(_onFeed);
     _dictation.dispose();
-    _saveDraft();
-    _saveScroll();
+    // Draf dan scroll sudah disimpan oleh listener di setiap perubahan. Tidak
+    // disimpan ulang di sini: di layar lebar chat yang sama bisa terbuka dua
+    // kali (panel kanan di bawah + halaman penuh di atas), dan yang dibuang
+    // belakangan tidak boleh menimpa draf terbaru dengan isinya yang basi.
     _scroll.dispose();
     final open = (kantorOpenChats[_openKey] ?? 1) - 1;
     if (open <= 0) {
@@ -1186,8 +1188,10 @@ class _Bubble extends StatelessWidget {
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth:
-                MediaQuery.sizeOf(context).width * view.bubbleWidth.fraction,
+            maxWidth: kantorBubbleMaxWidth(
+              MediaQuery.sizeOf(context).width,
+              view.bubbleWidth.fraction,
+            ),
           ),
           child: Padding(
             padding: EdgeInsets.only(
@@ -1232,7 +1236,9 @@ class _Bubble extends StatelessWidget {
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: flat ? double.infinity : w * view.bubbleWidth.fraction,
+          maxWidth: flat
+              ? double.infinity
+              : kantorBubbleMaxWidth(w, view.bubbleWidth.fraction),
         ),
         child: Padding(
           // room for the mascot sitting on the bubble

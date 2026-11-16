@@ -42,7 +42,9 @@ class _CompactCardState extends State<CompactCard> {
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: w * view.bubbleWidth.fraction),
+        constraints: BoxConstraints(
+          maxWidth: kantorBubbleMaxWidth(w, view.bubbleWidth.fraction),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

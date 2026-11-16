@@ -75,6 +75,14 @@ enum ChatBubbleWidth {
   final double fraction;
 }
 
+/// Lebar maksimum bubble (dp): pecahan lebar layar sesuai pengaturan, tetapi
+/// tidak lebih dari 560dp supaya tetap enak dibaca di layar lebar (Fold
+/// terbuka, tablet). Di ponsel biasa batas ini tidak pernah tercapai.
+const kKantorBubbleCapDp = 560.0;
+
+double kantorBubbleMaxWidth(double screenWidth, double fraction) =>
+    (screenWidth * fraction).clamp(0.0, kKantorBubbleCapDp);
+
 /// How the Kantor chat looks on this phone.
 @immutable
 class ChatViewPrefs {

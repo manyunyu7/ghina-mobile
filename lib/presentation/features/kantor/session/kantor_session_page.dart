@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
+import '../agents/kantor_two_pane.dart';
 import '../codex/kantor_codex.dart';
 import '../pages/kantor_agent_switcher.dart';
 import '../kantor_place.dart';
@@ -42,16 +43,24 @@ class KantorSessionPage extends ConsumerWidget {
     required this.officeId,
     required this.sid,
     this.tab,
+    this.embedded = false,
   });
 
   final String officeId;
   final String sid;
+
+  /// Dipasang di panel kanan (dua panel): tanpa tombol kembali dan tanpa
+  /// pindah agen lewat header, karena daftar agen ada di panel kiri.
+  final bool embedded;
 
   /// Opening tab: chat | terminal | profil | subagent (kept when switching agents).
   final String? tab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // dibuka dari daftar agen di layar sempit, lalu Fold dibuka: pindah ke
+    // panel kanan daftar agen
+    if (!embedded) kantorDockIfWide(context, ref, officeId: officeId, sid: sid);
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
     final complex = ref.watch(kantorActiveComplexProvider);
@@ -118,6 +127,7 @@ class KantorSessionPage extends ConsumerWidget {
               .indexOf(tab ?? '')
               .clamp(0, _tabNames.length - 1),
           actions: api == null ? null : KantorActions(api),
+          embedded: embedded,
         );
       },
     );
@@ -135,8 +145,10 @@ class _SessionScaffold extends ConsumerStatefulWidget {
     required this.sid,
     required this.initialTab,
     required this.actions,
+    this.embedded = false,
   });
 
+  final bool embedded;
   final String? complexId;
   final KantorOfficeFeed feed;
   final String officeId;
@@ -245,12 +257,14 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
+          automaticallyImplyLeading: !widget.embedded,
           titleSpacing: 0,
           // tap the agent to switch (this office or all); swipe the header to
           // step to the previous/next active agent, staying on the same tab
           title: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onHorizontalDragEnd: (d) {
+              if (widget.embedded) return;
               final v = d.primaryVelocity ?? 0;
               if (v.abs() < 400) return;
               kantorStepAgent(
@@ -262,18 +276,21 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             },
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => showKantorAgentSwitcher(
-                context,
-                officeId: widget.officeId,
-                currentSid: widget.sid,
-                tab: _tabNames[_shown],
-              ),
+              onTap: widget.embedded
+                  ? null
+                  : () => showKantorAgentSwitcher(
+                      context,
+                      officeId: widget.officeId,
+                      currentSid: widget.sid,
+                      tab: _tabNames[_shown],
+                    ),
               child: Row(
                 children: [
                   Flexible(
                     child: _Header(feed: widget.feed, sess: s),
                   ),
-                  const Icon(Icons.expand_more_rounded, size: 20),
+                  if (!widget.embedded)
+                    const Icon(Icons.expand_more_rounded, size: 20),
                 ],
               ),
             ),
@@ -393,6 +410,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
           backgroundColor: colors.header,
           foregroundColor: colors.headerInk,
           surfaceTintColor: Colors.transparent,
+          automaticallyImplyLeading: !widget.embedded,
           titleSpacing: 0,
           leading: _shown == 0
               ? null
@@ -408,6 +426,13 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             onTap: _profile,
           ),
           actions: [
+            // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
+            // Telegram tidak punya pemilih agen di judul seperti gaya bawaan)
+            KantorComplexSwitcherButton(
+              officeId: widget.officeId,
+              currentSid: widget.sid,
+              tab: _tabNames[_shown],
+            ),
             if (s['tmux'] != null && s['status'] != 'ended')
               IconButton(
                 tooltip: _shown == 1 ? 'Chat' : 'Terminal',
