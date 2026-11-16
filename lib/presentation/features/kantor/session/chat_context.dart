@@ -42,6 +42,9 @@ class KantorTranscriptSnap {
     required this.cursor,
     required this.size,
     required this.at,
+    this.first,
+    this.gen,
+    this.older = false,
   });
 
   final List<Map<String, dynamic>> items;
@@ -52,6 +55,44 @@ class KantorTranscriptSnap {
 
   /// When the daemon last confirmed this snapshot.
   final DateTime at;
+
+  /// Daemon sequence number of `items.first` and the transcript generation it
+  /// belongs to, for paging back (`?before=<first>&gen=<gen>`). Null on
+  /// daemons without paging.
+  final int? first;
+  final String? gen;
+
+  /// The daemon holds lines older than `items.first`.
+  final bool older;
+
+  Map<String, dynamic> toJson() => {
+    'items': items,
+    'cursor': cursor,
+    'size': size,
+    'at': at.millisecondsSinceEpoch,
+    'first': first,
+    'gen': gen,
+    'older': older,
+  };
+
+  static KantorTranscriptSnap? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final items = j['items'];
+    final at = j['at'];
+    if (items is! List || at is! int) return null;
+    return KantorTranscriptSnap(
+      items: [
+        for (final e in items)
+          if (e is Map) Map<String, dynamic>.from(e),
+      ],
+      cursor: j['cursor'] is String ? j['cursor'] as String : null,
+      size: j['size'],
+      at: DateTime.fromMillisecondsSinceEpoch(at),
+      first: j['first'] is int ? j['first'] as int : null,
+      gen: j['gen'] is String ? j['gen'] as String : null,
+      older: j['older'] == true,
+    );
+  }
 }
 
 /// Recently opened chats, held in memory only (never written to disk) so that
@@ -86,6 +127,11 @@ class KantorTranscriptCache {
             cursor: snap.cursor,
             size: snap.size,
             at: snap.at,
+            first: snap.first == null
+                ? null
+                : snap.first! + (snap.items.length - items.length),
+            gen: snap.gen,
+            older: snap.older || items.length < snap.items.length,
           );
     while (_chats.length > maxChats) {
       _chats.remove(_chats.keys.first);
