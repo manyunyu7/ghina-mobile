@@ -101,7 +101,8 @@ class KantorSessionView extends ConsumerWidget {
         // setelah /clear atau /resume percakapan pindah ke id sesi baru
         final cur = feed.follow(sid);
         final s = feed.session(cur);
-        if (feed.loading) {
+        // from the disk snapshot a chat it does not list may still exist
+        if (feed.loading || (s == null && feed.fromDisk)) {
           return Scaffold(
             appBar: AppBar(
               actions: [
@@ -618,6 +619,7 @@ class _Header extends ConsumerWidget {
       'starting' => (GhinaColors.green, kantorStatusLabel[status] ?? status),
       'waiting' => (GhinaColors.orange, 'Menunggu izin'),
       'ended' => (GhinaColors.gray, 'Selesai'),
+      '' => (GhinaColors.gray, kantorStatusLabel[status] ?? status),
       _ => (GhinaColors.blue, kantorStatusLabel[status] ?? status),
     };
     final mode = sess['permMode'] as String?;
@@ -923,7 +925,8 @@ class _Menu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final alive = sess['status'] != 'ended';
+    // from the disk snapshot nothing about the session is known yet
+    final alive = sess['status'] != 'ended' && !feed.fromDisk;
     final tmux = sess['tmux'] != null;
     final busy = sess['status'] == 'working' || sess['status'] == 'starting';
     return PopupMenuButton<String>(

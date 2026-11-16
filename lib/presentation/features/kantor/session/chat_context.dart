@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../di/kantor_providers.dart';
+import 'kantor_snapshot_store.dart';
 
 /// Stable routing identity without exposing an authentication token in keys or
 /// the persisted outbox. A different account on the same URL is a different chat.
@@ -95,11 +96,11 @@ class KantorTranscriptSnap {
   }
 }
 
-/// Recently opened chats, held in memory only (never written to disk) so that
-/// reopening a chat or coming back from another office shows its history at
+/// Recently opened chats, held in memory so that reopening a chat or coming back from another office shows its history at
 /// once while only the new lines are fetched. Bounded: [maxChats] chats of at
 /// most [maxItems] items each, least recently used dropped first, and all of it
-/// dropped when the system reports memory pressure.
+/// dropped when the system reports memory pressure. A small tail of each chat
+/// is also kept on disk by [KantorSnapshotStore] (through [onPut] and [seed]).
 class KantorTranscriptCache {
   KantorTranscriptCache({this.maxChats = 8, this.maxItems = 200});
 
@@ -109,13 +110,47 @@ class KantorTranscriptCache {
 
   int get length => _chats.length;
 
+  /// Called after every [put] with what was stored (the disk snapshot).
+  void Function(KantorChatKey key, KantorTranscriptSnap snap)? onPut;
+
+  /// Adds chats read from disk, given least recently used first, as older
+  /// than anything already held (which was opened in this run, so newer);
+  /// chats already held are kept as they are. Does not call [onPut].
+  void seed(Iterable<(KantorChatKey, KantorTranscriptSnap)> chats) {
+    final held = Map.of(_chats);
+    _chats.clear();
+    for (final (key, snap) in chats) {
+      if (!held.containsKey(key)) _store(key, snap);
+    }
+    for (final e in held.entries) {
+      _chats.remove(e.key);
+      _chats[e.key] = e.value;
+    }
+    while (_chats.length > maxChats) {
+      _chats.remove(_chats.keys.first);
+    }
+  }
+
   KantorTranscriptSnap? get(KantorChatKey key) {
     final snap = _chats.remove(key);
     if (snap != null) _chats[key] = snap; // most recently used goes last
     return snap;
   }
 
-  void put(KantorChatKey key, KantorTranscriptSnap snap) {
+  /// [persist] false: already on disk (read back by [KantorSnapshotStore]).
+  void put(
+    KantorChatKey key,
+    KantorTranscriptSnap snap, {
+    bool persist = true,
+  }) {
+    _store(key, snap);
+    while (_chats.length > maxChats) {
+      _chats.remove(_chats.keys.first);
+    }
+    if (persist) onPut?.call(key, _chats[key]!);
+  }
+
+  void _store(KantorChatKey key, KantorTranscriptSnap snap) {
     _chats.remove(key);
     final items = snap.items.length > maxItems
         ? snap.items.sublist(snap.items.length - maxItems)
@@ -133,9 +168,6 @@ class KantorTranscriptCache {
             gen: snap.gen,
             older: snap.older || items.length < snap.items.length,
           );
-    while (_chats.length > maxChats) {
-      _chats.remove(_chats.keys.first);
-    }
   }
 
   void clear() => _chats.clear();
@@ -202,7 +234,9 @@ class _MemoryPressure with WidgetsBindingObserver {
 }
 
 final kantorTranscriptCacheProvider = Provider<KantorTranscriptCache>((ref) {
-  final cache = KantorTranscriptCache();
+  // ~20 chats come back from disk at start ([kantorSnapshotWarmChats]); the
+  // rest leaves room for prefetching the chats of the office being opened
+  final cache = KantorTranscriptCache(maxChats: kantorSnapshotWarmChats + 4);
   WidgetsBinding? binding;
   try {
     binding = WidgetsBinding.instance;
@@ -215,6 +249,9 @@ final kantorTranscriptCacheProvider = Provider<KantorTranscriptCache>((ref) {
     ref.onDispose(() => binding!.removeObserver(watcher));
   }
   ref.onDispose(cache.clear);
+  // chats kept on disk from an earlier run; later puts are written there too
+  ref.read(kantorSnapshotStoreProvider).attachCache(cache);
+  ref.onDispose(() => cache.onPut = null);
   return cache;
 });
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show KeepAliveLink;
 
 import '../../../../di/kantor_providers.dart';
+import 'kantor_snapshot_store.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -35,6 +36,28 @@ class KantorOfficeFeed extends ChangeNotifier {
 
   /// When the daemon last answered [load]; null before the first answer.
   DateTime? loadedAt;
+
+  /// [office] came from the disk snapshot ([hydrate]) and [load] has not
+  /// succeeded yet: sessions carry no status (shown as "Menyinkronkan…"),
+  /// the inbox is empty and status-dependent actions are off.
+  bool fromDisk = false;
+
+  /// Called with each fresh [office] after a successful [load].
+  void Function(Json office)? onFresh;
+
+  /// Called when a live event says a session ended.
+  void Function(String sid)? onSessionEnded;
+
+  /// Shows [snapshot] (already neutral, see [kantorNeutralOffice]) until the
+  /// daemon answers. Ignored once real data is there.
+  void hydrate(Json snapshot) {
+    if (_disposed || office != null || loadedAt != null) return;
+    office = kantorNeutralOffice(snapshot);
+    inbox = const [];
+    fromDisk = true;
+    loading = false;
+    _notify();
+  }
 
   List<Json> get sessions => asJsonList(office?['sessions']);
   List<Json> get roles => asJsonList(office?['roles']);
@@ -117,6 +140,8 @@ class KantorOfficeFeed extends ChangeNotifier {
       error = null;
       loadedAt = DateTime.now();
       _retries = 0;
+      fromDisk = false;
+      onFresh?.call(office!);
     } catch (e) {
       error = e;
       // nothing to show yet: try again shortly instead of parking on an error
@@ -138,7 +163,7 @@ class KantorOfficeFeed extends ChangeNotifier {
     if (msg['t'] == 'hello') {
       // (re)connected /ws: events may have been missed meanwhile, so a feed
       // kept alive from an earlier visit reloads quietly (data stays shown)
-      if (loadedAt != null) {
+      if (loadedAt != null || fromDisk) {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 300), load);
       }
@@ -157,11 +182,15 @@ class KantorOfficeFeed extends ChangeNotifier {
           list[i] = s;
         }
         office!['sessions'] = list;
+        if (s['status'] == 'ended' && s['sid'] is String) {
+          onSessionEnded?.call(s['sid'] as String);
+        }
       case 'session-gone':
         if (msg['office'] != officeId) return;
         final list = sessions;
         final i = list.indexWhere((x) => x['sid'] == msg['sid']);
         if (i >= 0) list[i] = {...list[i], 'status': 'ended', 'waiting': null};
+        if (msg['sid'] is String) onSessionEnded?.call(msg['sid'] as String);
         final next = msg['next'];
         if (next is String && next.isNotEmpty && msg['sid'] is String) {
           _next[msg['sid'] as String] = next;
@@ -233,6 +262,18 @@ final _feedKeeperProvider = Provider<_FeedKeeper>((ref) => _FeedKeeper());
 final kantorOfficeFeedProvider = Provider.autoDispose
     .family<KantorOfficeFeed, String>((ref, officeId) {
       final feed = KantorOfficeFeed(officeId, ref.watch(kantorApiProvider));
+      // the last snapshot on disk shows the agents at once (neutral, see
+      // [KantorOfficeFeed.fromDisk]); fresh answers are written back
+      final store = ref.read(kantorSnapshotStoreProvider);
+      feed.onFresh = (office) => store.putOffice(officeId, office);
+      feed.onSessionEnded = (sid) => store.markEnded(officeId, sid);
+      void fromDisk() {
+        final snap = store.office(officeId);
+        if (snap != null) feed.hydrate(snap);
+      }
+
+      fromDisk();
+      if (feed.office == null) store.ready.then((_) => fromDisk());
       ref.listen(kantorEventsProvider, (_, next) => feed.apply(next.value));
       final keeper = ref.read(_feedKeeperProvider);
       final link = ref.keepAlive();
@@ -264,6 +305,7 @@ void kantorPrefetchFeeds(WidgetRef ref, Iterable<String> officeIds) {
 // --- shared labels -------------------------------------------------------
 
 const kantorStatusLabel = {
+  '': 'Menyinkronkan…', // from the disk snapshot, before the daemon answered
   'starting': 'Memulai',
   'working': 'Bekerja',
   'idle': 'Idle',
