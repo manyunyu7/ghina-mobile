@@ -37,7 +37,9 @@ import 'kantor_feed.dart';
 import 'stop_choice.dart';
 import 'permission_card.dart';
 
-const _pollEvery = Duration(seconds: 2, milliseconds: 500);
+/// Fallback only: new lines normally arrive through the daemon's `transcript`
+/// event on /ws. The poll covers a dropped or reconnecting socket.
+const _pollEvery = Duration(seconds: 15);
 const _toolFold = 3;
 
 /// Conversation of one session from its transcript: user bubbles on the right,
@@ -53,7 +55,8 @@ class KantorChatTab extends ConsumerStatefulWidget {
   ConsumerState<KantorChatTab> createState() => _KantorChatTabState();
 }
 
-class _KantorChatTabState extends ConsumerState<KantorChatTab> {
+class _KantorChatTabState extends ConsumerState<KantorChatTab>
+    with WidgetsBindingObserver {
   final _input = TextEditingController();
   late final KantorApi? _api;
   late final String _connection;
@@ -93,6 +96,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   bool _syncFailed = false;
   DateTime? _syncedAt;
   bool _loading = false;
+  bool _loadAgain = false;
   bool _sending = false;
   List<KantorAttachment> _atts = const [];
   bool _loadingAtts = false;
@@ -151,6 +155,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     _load();
     _loadAtts();
     _timer = Timer.periodic(_pollEvery, (_) => _load());
+    WidgetsBinding.instance.addObserver(this);
     widget.feed.addListener(_onFeed);
   }
 
@@ -171,6 +176,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _bump?.cancel();
     widget.feed.removeListener(_onFeed);
@@ -192,7 +198,11 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
 
   Future<void> _load() async {
     final api = _api;
-    if (!_active || api == null || _loading) return;
+    if (!_active || api == null) return;
+    if (_loading) {
+      _loadAgain = true; // an event arrived mid-fetch: fetch once more after
+      return;
+    }
     _loading = true;
     try {
       final data = asJson(
@@ -248,6 +258,10 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
       }
     } finally {
       _loading = false;
+      if (_loadAgain) {
+        _loadAgain = false;
+        unawaited(_load());
+      }
     }
   }
 
@@ -296,7 +310,30 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
               n[i].note == _atts[i].note,
       ].every((x) => x);
 
+  /// No fetching while the app is in the background or the screen is off;
+  /// coming back fetches the delta at once and restarts the fallback poll.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _timer?.cancel();
+      _timer = Timer.periodic(_pollEvery, (_) => _load());
+      _load();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _timer?.cancel();
+      _timer = null;
+      _bump?.cancel();
+    }
+  }
+
   void _onEvent(Json? msg) {
+    if (_active &&
+        msg != null &&
+        msg['t'] == 'transcript' &&
+        msg['sid'] == widget.sid) {
+      _bumpLoad(150); // the daemon says this transcript grew: fetch the delta
+      return;
+    }
     if (!_active ||
         msg == null ||
         msg['t'] != 'attachment' ||

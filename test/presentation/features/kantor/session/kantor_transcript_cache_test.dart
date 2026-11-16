@@ -166,7 +166,10 @@ void main() {
     });
     tearDown(() => server.close(force: true));
 
-    Future<ProviderContainer> pumpChat(WidgetTester t) async {
+    Future<ProviderContainer> pumpChat(
+      WidgetTester t, {
+      Stream<Map<String, dynamic>>? events,
+    }) async {
       t.view.physicalSize = const Size(400, 800);
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
@@ -181,7 +184,9 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           kantorApiProvider.overrideWith((ref) => KantorApi(config)),
-          kantorEventsProvider.overrideWith((ref) => const Stream.empty()),
+          kantorEventsProvider.overrideWith(
+            (ref) => events ?? const Stream.empty(),
+          ),
         ],
       );
       addTearDown(c.dispose);
@@ -246,6 +251,48 @@ void main() {
       expect(badge.data, contains('09:05'));
       await t.pumpWidget(const SizedBox.shrink());
       await t.pump(const Duration(seconds: 7)); // let HTTP timeouts lapse
+    });
+
+    testWidgets('a transcript event fetches the delta right away', (t) async {
+      final events = StreamController<Map<String, dynamic>>.broadcast();
+      addTearDown(events.close);
+      await pumpChat(t, events: events.stream);
+      await _settle(t);
+      final before = queries.length;
+      events.add({'t': 'transcript', 'office': 'o', 'sid': 's1', 'size': 3});
+      await t.pump(const Duration(milliseconds: 200));
+      await _settle(t);
+      expect(queries.length, before + 1);
+      expect(queries.last['after'], 'c2');
+      events.add({'t': 'transcript', 'office': 'o', 'sid': 'other'});
+      await t.pump(const Duration(milliseconds: 200));
+      await _settle(t);
+      expect(queries.length, before + 1, reason: 'other chats are ignored');
+      await t.pumpWidget(const SizedBox.shrink());
+      await t.pump(const Duration(seconds: 7));
+    });
+
+    testWidgets('no polling in the background, delta at once on resume', (
+      t,
+    ) async {
+      await pumpChat(t);
+      await _settle(t);
+      final before = queries.length;
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await t.pump(const Duration(seconds: 40));
+      await _settle(t);
+      expect(queries.length, before, reason: 'paused: no fetches');
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _settle(t);
+      expect(queries.length, before + 1);
+      await t.pumpWidget(const SizedBox.shrink());
+      await t.pump(
+        const Duration(seconds: 31),
+      ); // receive timeout of the resume fetch
     });
   });
 }
