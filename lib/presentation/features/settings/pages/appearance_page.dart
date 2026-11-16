@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/appearance_provider.dart';
 
@@ -217,12 +218,14 @@ class AppearancePage extends ConsumerWidget {
 
 /// A mini mock of the app in the current look: mascot, money, chip,
 /// progress bar and a primary button.
-class _Preview extends StatelessWidget {
+class _Preview extends ConsumerWidget {
   const _Preview();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final g = context.ghina;
+    // Ravel has no money: preview Kantor-ish content instead.
+    final ravel = ref.watch(kantorOnlyProvider);
     return ChunkyCard(
       key: const ValueKey('appearance-preview'),
       child: Column(
@@ -242,23 +245,37 @@ class _Preview extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Saldo kamu',
+                      ravel ? 'Kantor kamu' : 'Saldo kamu',
                       style: GhinaType.bodyS
                           .w(800)
                           .copyWith(color: g.textSecondary),
                     ),
-                    const MoneyText(
-                      key: ValueKey('appearance-preview-money'),
-                      amount: 1250000,
-                      tone: MoneyTone.neutral,
-                    ),
-                    const SizedBox(height: 2),
-                    MoneyText(
-                      key: const ValueKey('appearance-preview-income'),
-                      amount: 350000,
-                      tone: MoneyTone.income,
-                      style: GhinaType.body,
-                    ),
+                    if (ravel) ...[
+                      Text(
+                        '3 agen lagi kerja',
+                        key: const ValueKey('appearance-preview-ravel'),
+                        style: GhinaType.h3
+                            .w(900)
+                            .copyWith(color: g.textPrimary),
+                      ),
+                      Text(
+                        '2 kartu menunggu kamu',
+                        style: GhinaType.body.copyWith(color: g.textSecondary),
+                      ),
+                    ] else ...[
+                      const MoneyText(
+                        key: ValueKey('appearance-preview-money'),
+                        amount: 1250000,
+                        tone: MoneyTone.neutral,
+                      ),
+                      const SizedBox(height: 2),
+                      MoneyText(
+                        key: const ValueKey('appearance-preview-income'),
+                        amount: 350000,
+                        tone: MoneyTone.income,
+                        style: GhinaType.body,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -269,8 +286,16 @@ class _Preview extends StatelessWidget {
             spacing: GhinaSpace.sm,
             runSpacing: GhinaSpace.sm,
             children: [
-              ChunkyChip(label: 'Makan', selected: true, onTap: () {}),
-              ChunkyChip(label: 'Jajan', selected: false, onTap: () {}),
+              ChunkyChip(
+                label: ravel ? 'Board' : 'Makan',
+                selected: true,
+                onTap: () {},
+              ),
+              ChunkyChip(
+                label: ravel ? 'Wiki' : 'Jajan',
+                selected: false,
+                onTap: () {},
+              ),
             ],
           ),
           GhinaSpace.gapMd,

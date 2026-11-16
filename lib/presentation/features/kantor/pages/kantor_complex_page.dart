@@ -19,6 +19,7 @@ import '../usage/kantor_limits_card.dart';
 import '../widgets/kantor_inbox.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 
 /// Home of Kantor ("Kompleks"): every office, the combined permission inbox,
 /// active agents and the monthly cost.
@@ -199,7 +200,6 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
   }
 
   Widget _content(Map<String, dynamic> st) {
-    final g = context.ghina;
     final offices = (st['offices'] as List? ?? const [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
@@ -234,265 +234,530 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
             : '${b['lastSeen'] ?? ''}'.compareTo('${a['lastSeen'] ?? ''}');
       });
     final ended = ref.watch(kantorEndedProvider).value ?? const [];
+    final d = _ComplexData(
+      state: st,
+      offices: offices,
+      inbox: inbox,
+      loose: loose,
+      sess: sess,
+      working: working,
+      cost: cost,
+      favs: favs,
+      active: active,
+      rest: rest,
+      ended: ended,
+    );
 
-    // Phones (< 600dp) keep the single-column list. Wide screens (Fold inner
-    // display, tablets) center the content at <= 1100dp and lay the office
-    // cards and session tiles out in 2-3 top-aligned columns.
+    // Ponsel (< 600dp) tetap daftar satu kolom seperti semula. Layar lebar
+    // (layar dalam Fold, tablet, mendatar) memakai kartu ringkas dalam grid;
+    // bila cukup lebar, halaman dibagi dua: kiri daftar kantor, kanan
+    // ringkasan, izin, dan agen yang butuh perhatian.
     return LayoutBuilder(
       builder: (context, box) {
-        final wide = box.maxWidth >= kantorComplexWideBreakpoint;
-        final side = wide
-            ? math.max(
-                GhinaSpace.page,
-                (box.maxWidth - kantorComplexMaxContentWidth) / 2,
-              )
-            : GhinaSpace.page;
-        final cols = wide ? kantorComplexColumns(box.maxWidth - side * 2) : 1;
-        List<Widget> cards(Iterable<Widget> items) => wide
-            ? [_KantorColumns(columns: cols, children: items.toList())]
-            : items.toList();
-        List<Widget> tiles(Iterable<Widget> items) => wide
-            ? [
-                _KantorColumns(
-                  columns: cols,
-                  runSpacing: GhinaSpace.sm,
-                  children: items.toList(),
-                ),
-              ]
-            : items.toList();
-        return ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          // side == GhinaSpace.page below the wide breakpoint, as before.
-          padding: EdgeInsets.fromLTRB(side, GhinaSpace.sm, side, 96),
-          children: [
-            ChunkyCard(
-              key: const ValueKey('kantor-search-bar'),
-              padding: const EdgeInsets.symmetric(
-                horizontal: GhinaSpace.md,
-                vertical: GhinaSpace.md,
-              ),
-              onTap: _openSearch,
-              semanticLabel: 'Cari kantor',
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded, color: g.textMuted),
-                  const SizedBox(width: GhinaSpace.sm),
-                  Expanded(
-                    child: Text(
-                      'Cari kantor, agen, atau sesi…',
-                      overflow: TextOverflow.ellipsis,
-                      style: GhinaType.body.copyWith(color: g.textMuted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: GhinaSpace.md),
-            KantorLimitsCard(
-              key: const ValueKey('kantor-limits-card'),
-              onTap: () => context.push('/kantor/o/_kompleks?tab=pemakaian'),
-            ),
-            const SizedBox(height: GhinaSpace.md),
-            KantorActiveAgentsStrip(state: st),
-            Row(
-              children: [
-                Expanded(
-                  child: StatTile(
-                    icon: Icons.groups_rounded,
-                    value: '${sess.length}',
-                    label: 'sesi aktif · $working bekerja',
-                    color: GhinaColors.blue,
-                  ),
-                ),
-                const SizedBox(width: GhinaSpace.md),
-                Expanded(
-                  child: StatTile(
-                    icon: Icons.lock_clock_rounded,
-                    value: '${inbox.length}',
-                    label: 'izin menunggu',
-                    color: inbox.isEmpty
-                        ? GhinaColors.green
-                        : GhinaColors.orange,
-                  ),
-                ),
-                const SizedBox(width: GhinaSpace.md),
-                Expanded(
-                  child: StatTile(
-                    icon: Icons.payments_rounded,
-                    value: kantorUsd(cost, 0),
-                    label: 'bulan ini',
-                    color: GhinaColors.purple,
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: GhinaSpace.xs),
-              child: Text(
-                'Biaya = estimasi setara harga API, bukan tagihan langganan.',
-                style: GhinaType.caption.copyWith(color: g.textMuted),
-              ),
-            ),
-            SectionHeader(
-              title: 'Kotak masuk izin',
-              subtitle: inbox.isEmpty ? null : '${inbox.length} menunggu',
-            ),
-            KantorInboxList(items: inbox, offices: offices),
-            if (favs.isNotEmpty) ...[
-              const SectionHeader(title: 'Favorit'),
-              ...cards([for (final o in favs) _OfficeCard(office: o)]),
-            ],
-            if (active.isNotEmpty) ...[
-              const SectionHeader(title: 'Sedang aktif'),
-              ...cards([for (final o in active) _OfficeCard(office: o)]),
-            ],
-            SectionHeader(
-              title: 'Semua kantor',
-              actionLabel: 'Kantor baru',
-              onAction: () => context.push('/kantor/new'),
-            ),
-            if (rest.isEmpty)
-              const EmptyState(title: 'Tidak ada kantor', compact: true)
-            else
-              ...cards([
-                for (final o in rest) _OfficeCard(office: o, compact: true),
-              ]),
-            if (sess.isNotEmpty) ...[
-              SectionHeader(
-                title: 'Agen aktif',
-                subtitle: '${sess.length} sesi',
-              ),
-              ...tiles([
-                for (final (o, s) in sess) _SessionTile(office: o, session: s),
-              ]),
-            ],
-            if (loose.isNotEmpty) ...[
-              SectionHeader(
-                title: 'Di luar kantor',
-                subtitle:
-                    'Sesi yang berjalan di folder induk, bukan di project.',
-                trailing: Text('${loose.length}'),
-              ),
-              ...tiles([
-                for (final s in loose)
-                  ChunkyTile(
-                    onTap: () => showKantorLooseSheet(context, s),
-                    leading: KantorSprite(
-                      look: KantorSprite.guestLook('${s['sid']}'),
-                      size: 32,
-                    ),
-                    title: kantorShort(s['title'] ?? 'Sesi', 30),
-                    subtitle: '${s['cwd'] ?? ''}'.replaceFirst(
-                      RegExp(r'^/Users/[^/]+'),
-                      '~',
-                    ),
-                  ),
-              ]),
-            ],
-            if (ended.isNotEmpty) ...[
-              SectionHeader(
-                title: 'Baru ditutup',
-                subtitle: 'Percakapannya masih tersimpan; lanjutkan dari web.',
-                trailing: Text('${ended.length}'),
-              ),
-              ...tiles([
-                for (final raw in ended.take(8))
-                  Builder(
-                    builder: (_) {
-                      final x = Map<String, dynamic>.from(raw as Map);
-                      final t =
-                          x['title'] != null &&
-                              x['title'] != 'Sesi belum terhubung'
-                          ? '${x['title']}'
-                          : '${x['first_prompt'] ?? 'Sesi tanpa judul'}';
-                      return ChunkyTile(
-                        leading: KantorSprite(
-                          look: KantorSprite.guestLook('${x['sid']}'),
-                          size: 32,
-                        ),
-                        title: kantorShort(t, 34),
-                        subtitle:
-                            '${x['office_name'] ?? ''} · ditutup ${kantorAgo(x['ended_at'])}',
-                      );
-                    },
-                  ),
-              ]),
-            ],
-            const SectionHeader(title: 'Bersama'),
-            Row(
-              children: [
-                Expanded(
-                  child: ChunkyButton(
-                    label: 'Notes',
-                    size: ChunkyButtonSize.small,
-                    variant: ChunkyButtonVariant.secondary,
-                    onPressed: () =>
-                        context.push('/kantor/o/_kompleks?tab=notes'),
-                  ),
-                ),
-                const SizedBox(width: GhinaSpace.sm),
-                Expanded(
-                  child: ChunkyButton(
-                    label: 'Wiki',
-                    size: ChunkyButtonSize.small,
-                    variant: ChunkyButtonVariant.secondary,
-                    onPressed: () =>
-                        context.push('/kantor/o/_kompleks?tab=wiki'),
-                  ),
-                ),
-                const SizedBox(width: GhinaSpace.sm),
-                Expanded(
-                  child: ChunkyButton(
-                    label: 'Payroll',
-                    size: ChunkyButtonSize.small,
-                    variant: ChunkyButtonVariant.secondary,
-                    onPressed: () =>
-                        context.push('/kantor/o/_kompleks?tab=payroll'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        if (box.maxWidth < kantorComplexWideBreakpoint) return _narrow(d);
+        final side = math.max(
+          GhinaSpace.page,
+          (box.maxWidth - kantorComplexMaxContentWidth) / 2,
         );
+        final inner = box.maxWidth - side * 2;
+        return inner >= kantorComplexSplitMin
+            ? _split(d, side, inner)
+            : _stacked(d, side, inner);
       },
     );
   }
+
+  /// Tampilan ponsel: sama persis dengan sebelum ada tata letak lebar.
+  Widget _narrow(_ComplexData d) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        GhinaSpace.page,
+        GhinaSpace.sm,
+        GhinaSpace.page,
+        96,
+      ),
+      children: [
+        _searchBar(dense: false),
+        const SizedBox(height: GhinaSpace.md),
+        _limitsCard(),
+        const SizedBox(height: GhinaSpace.md),
+        KantorActiveAgentsStrip(state: d.state),
+        Row(
+          children: [
+            Expanded(
+              child: StatTile(
+                icon: Icons.groups_rounded,
+                value: '${d.sess.length}',
+                label: 'sesi aktif · ${d.working} bekerja',
+                color: GhinaColors.blue,
+              ),
+            ),
+            const SizedBox(width: GhinaSpace.md),
+            Expanded(
+              child: StatTile(
+                icon: Icons.lock_clock_rounded,
+                value: '${d.inbox.length}',
+                label: 'izin menunggu',
+                color: d.inbox.isEmpty ? GhinaColors.green : GhinaColors.orange,
+              ),
+            ),
+            const SizedBox(width: GhinaSpace.md),
+            Expanded(
+              child: StatTile(
+                icon: Icons.payments_rounded,
+                value: kantorUsd(d.cost, 0),
+                label: 'bulan ini',
+                color: GhinaColors.purple,
+              ),
+            ),
+          ],
+        ),
+        _costNote(),
+        ..._inboxSection(d, dense: false),
+        ..._officeSections(d, columns: 1),
+        if (d.sess.isNotEmpty) ...[
+          _header(
+            false,
+            title: 'Agen aktif',
+            subtitle: '${d.sess.length} sesi',
+          ),
+          for (final (o, s) in d.sess) _SessionTile(office: o, session: s),
+        ],
+        ..._looseSection(d, columns: 1, dense: false),
+        ..._endedSection(d, columns: 1, dense: false),
+        ..._bersama(dense: false),
+      ],
+    );
+  }
+
+  /// Layar lebar tapi belum cukup untuk dua kolom (mis. Fold tegak ±690dp):
+  /// satu kolom di tengah, isi dirapatkan dan kartu kantor jadi grid.
+  Widget _stacked(_ComplexData d, double side, double inner) {
+    final cols = kantorComplexColumns(inner);
+    return ListView(
+      key: const ValueKey('kantor-complex-stacked'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(side, GhinaSpace.sm, side, 96),
+      children: [
+        _searchBar(dense: true),
+        const SizedBox(height: GhinaSpace.sm),
+        _StatsCard(items: _stats(d), vertical: false),
+        _costNote(),
+        const SizedBox(height: GhinaSpace.sm),
+        _limitsCard(),
+        const SizedBox(height: GhinaSpace.sm),
+        KantorActiveAgentsStrip(state: d.state),
+        ..._inboxSection(d, dense: true),
+        ..._officeSections(d, columns: cols),
+        ..._sessionSection(d, columns: math.min(cols, 2)),
+        ..._looseSection(d, columns: math.min(cols, 2), dense: true),
+        ..._endedSection(d, columns: math.min(cols, 2), dense: true),
+        ..._bersama(dense: true),
+      ],
+    );
+  }
+
+  /// Dua kolom yang bisa digulir sendiri-sendiri: kiri pencarian, agen aktif
+  /// (strip) dan grid kantor; kanan ringkasan, izin, daftar agen, dan sesi lain.
+  Widget _split(_ComplexData d, double side, double inner) {
+    final aside = kantorComplexAsideWidth(inner);
+    final main = inner - aside - GhinaSpace.lg;
+    final cols = kantorComplexColumns(main);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: side),
+      child: Row(
+        key: const ValueKey('kantor-complex-split'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              key: const ValueKey('kantor-complex-main'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(0, GhinaSpace.sm, 0, 96),
+              children: [
+                _searchBar(dense: true),
+                const SizedBox(height: GhinaSpace.sm),
+                KantorActiveAgentsStrip(state: d.state),
+                ..._officeSections(d, columns: cols),
+              ],
+            ),
+          ),
+          const SizedBox(width: GhinaSpace.lg),
+          SizedBox(
+            width: aside,
+            child: ListView(
+              key: const ValueKey('kantor-complex-aside'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(0, GhinaSpace.sm, 0, 96),
+              children: [
+                _StatsCard(items: _stats(d), vertical: true),
+                _costNote(),
+                const SizedBox(height: GhinaSpace.sm),
+                _limitsCard(),
+                ..._inboxSection(d, dense: true),
+                ..._sessionSection(d, columns: 1),
+                ..._looseSection(d, columns: 1, dense: true),
+                ..._endedSection(d, columns: 1, dense: true),
+                ..._bersama(dense: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- Potongan yang dipakai bersama oleh ketiga tata letak ----
+
+  Widget _searchBar({required bool dense}) {
+    final g = context.ghina;
+    return ChunkyCard(
+      key: const ValueKey('kantor-search-bar'),
+      padding: EdgeInsets.symmetric(
+        horizontal: GhinaSpace.md,
+        vertical: dense ? GhinaSpace.sm + 2 : GhinaSpace.md,
+      ),
+      onTap: _openSearch,
+      semanticLabel: 'Cari kantor',
+      child: Row(
+        children: [
+          Icon(
+            Icons.search_rounded,
+            color: g.textMuted,
+            size: dense ? 20 : null,
+          ),
+          const SizedBox(width: GhinaSpace.sm),
+          Expanded(
+            child: Text(
+              'Cari kantor, agen, atau sesi…',
+              overflow: TextOverflow.ellipsis,
+              style: (dense ? GhinaType.bodyS : GhinaType.body).copyWith(
+                color: g.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _limitsCard() => KantorLimitsCard(
+    key: const ValueKey('kantor-limits-card'),
+    onTap: () => context.push('/kantor/o/_kompleks?tab=pemakaian'),
+  );
+
+  Widget _costNote() => Padding(
+    padding: const EdgeInsets.only(top: GhinaSpace.xs),
+    child: Text(
+      'Biaya = estimasi setara harga API, bukan tagihan langganan.',
+      style: GhinaType.caption.copyWith(color: context.ghina.textMuted),
+    ),
+  );
+
+  List<_Stat> _stats(_ComplexData d) => [
+    (
+      icon: Icons.groups_rounded,
+      value: '${d.sess.length}',
+      label: 'sesi aktif · ${d.working} bekerja',
+      color: GhinaColors.blue,
+    ),
+    (
+      icon: Icons.lock_clock_rounded,
+      value: '${d.inbox.length}',
+      label: 'izin menunggu',
+      color: d.inbox.isEmpty ? GhinaColors.green : GhinaColors.orange,
+    ),
+    (
+      icon: Icons.payments_rounded,
+      value: kantorUsd(d.cost, 0),
+      label: 'bulan ini',
+      color: GhinaColors.purple,
+    ),
+  ];
+
+  /// Judul bagian: [SectionHeader] biasa di ponsel, versi kecil di layar lebar.
+  Widget _header(
+    bool dense, {
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) => dense
+      ? _CompactHeader(
+          title: title,
+          subtitle: subtitle,
+          trailing: trailing,
+          actionLabel: actionLabel,
+          onAction: onAction,
+        )
+      : SectionHeader(
+          title: title,
+          subtitle: subtitle,
+          trailing: trailing,
+          actionLabel: actionLabel,
+          onAction: onAction,
+        );
+
+  List<Widget> _inboxSection(_ComplexData d, {required bool dense}) => [
+    _header(
+      dense,
+      title: 'Kotak masuk izin',
+      subtitle: d.inbox.isEmpty ? null : '${d.inbox.length} menunggu',
+    ),
+    KantorInboxList(items: d.inbox, offices: d.offices),
+  ];
+
+  /// Favorit, Sedang aktif, Semua kantor. [columns] 1 = daftar ponsel asli
+  /// (kartu penuh); lebih dari 1 = grid kartu ringkas.
+  List<Widget> _officeSections(_ComplexData d, {required int columns}) {
+    final dense = columns > 1;
+    List<Widget> cards(Iterable<Widget> items) => dense
+        ? [
+            _KantorColumns(
+              columns: columns,
+              runSpacing: GhinaSpace.sm,
+              spacing: GhinaSpace.sm,
+              children: items.toList(),
+            ),
+          ]
+        : items.toList();
+    return [
+      if (d.favs.isNotEmpty) ...[
+        _header(dense, title: 'Favorit'),
+        ...cards([
+          for (final o in d.favs) _OfficeCard(office: o, dense: dense),
+        ]),
+      ],
+      if (d.active.isNotEmpty) ...[
+        _header(dense, title: 'Sedang aktif'),
+        ...cards([
+          for (final o in d.active) _OfficeCard(office: o, dense: dense),
+        ]),
+      ],
+      _header(
+        dense,
+        title: 'Semua kantor',
+        actionLabel: 'Kantor baru',
+        onAction: () => context.push('/kantor/new'),
+      ),
+      if (d.rest.isEmpty)
+        const EmptyState(title: 'Tidak ada kantor', compact: true)
+      else
+        ...cards([
+          for (final o in d.rest)
+            _OfficeCard(office: o, compact: true, dense: dense),
+        ]),
+    ];
+  }
+
+  /// Ubin sesi/agen yang rapat di layar lebar: grid [columns] kolom.
+  List<Widget> _tiles(int columns, List<Widget> items) => [
+    _KantorColumns(
+      columns: columns,
+      runSpacing: GhinaSpace.sm,
+      spacing: GhinaSpace.sm,
+      children: items,
+    ),
+  ];
+
+  List<Widget> _sessionSection(_ComplexData d, {required int columns}) => [
+    if (d.sess.isNotEmpty) ...[
+      _header(true, title: 'Agen aktif', subtitle: '${d.sess.length} sesi'),
+      ..._tiles(columns, [
+        for (final (o, s) in d.sess)
+          _SessionTile(office: o, session: s, dense: true),
+      ]),
+    ],
+  ];
+
+  List<Widget> _looseSection(
+    _ComplexData d, {
+    required int columns,
+    required bool dense,
+  }) {
+    if (d.loose.isEmpty) return const [];
+    final items = [
+      for (final s in d.loose)
+        ChunkyTile(
+          dense: dense,
+          onTap: () => showKantorLooseSheet(context, s),
+          leading: KantorSprite(
+            look: KantorSprite.guestLook('${s['sid']}'),
+            size: dense ? 28 : 32,
+          ),
+          title: kantorShort(s['title'] ?? 'Sesi', 30),
+          subtitle: '${s['cwd'] ?? ''}'.replaceFirst(
+            RegExp(r'^/Users/[^/]+'),
+            '~',
+          ),
+        ),
+    ];
+    return [
+      _header(
+        dense,
+        title: 'Di luar kantor',
+        subtitle: 'Sesi yang berjalan di folder induk, bukan di project.',
+        trailing: Text('${d.loose.length}'),
+      ),
+      ...(dense ? _tiles(columns, items) : items),
+    ];
+  }
+
+  List<Widget> _endedSection(
+    _ComplexData d, {
+    required int columns,
+    required bool dense,
+  }) {
+    if (d.ended.isEmpty) return const [];
+    final items = <Widget>[
+      for (final raw in d.ended.take(8))
+        Builder(
+          builder: (_) {
+            final x = Map<String, dynamic>.from(raw as Map);
+            final t = x['title'] != null && x['title'] != 'Sesi belum terhubung'
+                ? '${x['title']}'
+                : '${x['first_prompt'] ?? 'Sesi tanpa judul'}';
+            return ChunkyTile(
+              dense: dense,
+              leading: KantorSprite(
+                look: KantorSprite.guestLook('${x['sid']}'),
+                size: dense ? 28 : 32,
+              ),
+              title: kantorShort(t, 34),
+              subtitle:
+                  '${x['office_name'] ?? ''} · ditutup ${kantorAgo(x['ended_at'])}',
+            );
+          },
+        ),
+    ];
+    return [
+      _header(
+        dense,
+        title: 'Baru ditutup',
+        subtitle: 'Percakapannya masih tersimpan; lanjutkan dari web.',
+        trailing: Text('${d.ended.length}'),
+      ),
+      ...(dense ? _tiles(columns, items) : items),
+    ];
+  }
+
+  List<Widget> _bersama({required bool dense}) {
+    Widget button(String label, String tab) => Expanded(
+      child: ChunkyButton(
+        label: label,
+        size: ChunkyButtonSize.small,
+        variant: ChunkyButtonVariant.secondary,
+        onPressed: () => context.push('/kantor/o/_kompleks?tab=$tab'),
+      ),
+    );
+    return [
+      _header(dense, title: 'Bersama'),
+      Row(
+        children: [
+          button('Notes', 'notes'),
+          const SizedBox(width: GhinaSpace.sm),
+          button('Wiki', 'wiki'),
+          const SizedBox(width: GhinaSpace.sm),
+          button('Payroll', 'payroll'),
+        ],
+      ),
+    ];
+  }
 }
 
-/// From this width the Kompleks page switches to the centered, multi-column
-/// layout; below it the page is the original single-column list.
-const double kantorComplexWideBreakpoint = 600;
+/// Data halaman Kompleks yang sudah diolah dari `/api/state`.
+class _ComplexData {
+  const _ComplexData({
+    required this.state,
+    required this.offices,
+    required this.inbox,
+    required this.loose,
+    required this.sess,
+    required this.working,
+    required this.cost,
+    required this.favs,
+    required this.active,
+    required this.rest,
+    required this.ended,
+  });
 
-/// Max width of the page content on wide screens, so cards do not stretch.
-const double kantorComplexMaxContentWidth = 1100;
+  final Map<String, dynamic> state;
+  final List<Map<String, dynamic>> offices;
+  final List<dynamic> inbox;
+  final List<Map<String, dynamic>> loose;
+  final List<(Map<String, dynamic>, Map<String, dynamic>)> sess;
+  final int working;
+  final double cost;
+  final List<Map<String, dynamic>> favs;
+  final List<Map<String, dynamic>> active;
+  final List<Map<String, dynamic>> rest;
+  final List<dynamic> ended;
+}
 
-const double _kMinColumnWidth = 250;
+/// Mulai lebar ini (dp) halaman Kompleks memakai tata letak lebar; di bawahnya
+/// tetap daftar satu kolom ponsel.
+const double kantorComplexWideBreakpoint = kKantorWideMin;
 
-/// Number of columns for the office grid at content width [width]
-/// (2 on a Fold held upright, 3 on its side or wider).
+/// Lebar maksimal isi halaman di layar sangat lebar, supaya kartu tidak
+/// melebar penuh.
+const double kantorComplexMaxContentWidth = 1280;
+
+/// Mulai lebar isi ini halaman dibagi dua kolom (layar dalam Fold ±830dp,
+/// tablet, mendatar). Di bawahnya (mis. Fold tegak ±690dp) tetap satu kolom.
+const double kantorComplexSplitMin = 740;
+
+/// Lebar kolom kanan (ringkasan, izin, agen) pada tampilan dua kolom.
+double kantorComplexAsideWidth(double inner) => inner >= 1000 ? 360 : 300;
+
+/// Lebar minimal kartu kantor ringkas di grid.
+const double _kMinTile = 200;
+
+/// Jumlah kolom grid kartu kantor untuk lebar [width] (sudah termasuk jarak
+/// antarkartu): 2 di Fold, 3 di tablet, 4 di layar sangat lebar.
 @visibleForTesting
-int kantorComplexColumns(double width) =>
-    ((width + GhinaSpace.md) / (_kMinColumnWidth + GhinaSpace.md))
-        .floor()
-        .clamp(2, 3);
+int kantorComplexColumns(double width) => math.max(
+  2,
+  kantorGridColumns(
+    width + GhinaSpace.sm,
+    minTile: _kMinTile + GhinaSpace.sm,
+    max: 4,
+  ),
+);
 
-/// Simple masonry-ish grid: rows of [columns] top-aligned cells, each as tall
-/// as its own content (no fixed aspect ratio, so nothing gets clipped).
+/// Grid sederhana: baris berisi [columns] sel rata atas, tinggi tiap baris
+/// mengikuti isinya (tanpa rasio tetap, jadi tidak ada yang terpotong).
 class _KantorColumns extends StatelessWidget {
   const _KantorColumns({
     required this.columns,
     required this.children,
     this.runSpacing = 0,
+    this.spacing = GhinaSpace.md,
   });
 
   final int columns;
   final List<Widget> children;
 
-  /// Gap between rows. Office cards already carry their own bottom padding.
+  /// Jarak antarbaris.
   final double runSpacing;
+
+  /// Jarak antarkolom.
+  final double spacing;
 
   @override
   Widget build(BuildContext context) {
+    if (columns <= 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) SizedBox(height: runSpacing),
+            children[i],
+          ],
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -505,7 +770,7 @@ class _KantorColumns extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var j = 0; j < columns; j++) ...[
-                  if (j > 0) const SizedBox(width: GhinaSpace.md),
+                  if (j > 0) SizedBox(width: spacing),
                   Expanded(
                     child: i + j < children.length
                         ? children[i + j]
@@ -520,11 +785,188 @@ class _KantorColumns extends StatelessWidget {
   }
 }
 
+/// Judul bagian versi kecil untuk layar lebar (pengganti [SectionHeader]
+/// yang hurufnya besar). Teks dan aksi sama.
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    return Padding(
+      padding: const EdgeInsets.only(top: GhinaSpace.lg, bottom: GhinaSpace.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GhinaType.body.w(900).copyWith(color: g.textPrimary),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.caption.copyWith(color: g.textSecondary),
+                  ),
+              ],
+            ),
+          ),
+          if (trailing != null)
+            DefaultTextStyle.merge(
+              style: GhinaType.caption.copyWith(color: g.textSecondary),
+              child: trailing!,
+            ),
+          if (actionLabel != null && onAction != null)
+            Semantics(
+              button: true,
+              child: GestureDetector(
+                onTap: onAction,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    actionLabel!.toUpperCase(),
+                    style: GhinaType.button.copyWith(
+                      color: GhinaColors.blue.base,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+typedef _Stat = ({
+  IconData icon,
+  String value,
+  String label,
+  ChunkySwatch color,
+});
+
+/// Ringkasan angka dalam satu kartu kecil (layar lebar), pengganti tiga
+/// [StatTile] besar. [vertical]: satu baris per angka (kolom kanan).
+class _StatsCard extends StatelessWidget {
+  const _StatsCard({required this.items, required this.vertical});
+
+  final List<_Stat> items;
+  final bool vertical;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    Widget cell(_Stat s) => Row(
+      children: [
+        Icon(s.icon, color: s.color.base, size: 20),
+        const SizedBox(width: GhinaSpace.sm),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: s.value,
+                  style: GhinaType.body.w(900).copyWith(color: g.textPrimary),
+                ),
+                TextSpan(
+                  text: '  ${s.label}',
+                  style: GhinaType.caption.copyWith(color: g.textSecondary),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+    return ChunkyCard(
+      key: const ValueKey('kantor-stats-compact'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: GhinaSpace.md,
+        vertical: GhinaSpace.sm + 2,
+      ),
+      borderRadius: GhinaRadii.rLg,
+      depth: GhinaDepth.sm,
+      child: vertical
+          ? Column(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const SizedBox(height: GhinaSpace.xs + 2),
+                  cell(items[i]),
+                ],
+              ],
+            )
+          : Row(
+              children: [
+                for (var i = 0; i < items.length; i++) ...[
+                  if (i > 0) const SizedBox(width: GhinaSpace.md),
+                  Expanded(child: cell(items[i])),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
 class _OfficeCard extends ConsumerWidget {
-  const _OfficeCard({required this.office, this.compact = false});
+  const _OfficeCard({
+    required this.office,
+    this.compact = false,
+    this.dense = false,
+  });
 
   final Map<String, dynamic> office;
   final bool compact;
+
+  /// Versi ringkas untuk grid layar lebar: padding, teks, dan sprite lebih
+  /// kecil. Tap, tombol favorit, dan tujuan navigasi tetap sama.
+  final bool dense;
+
+  Future<void> _toggleFav(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+    bool fav,
+  ) async {
+    final api = ref.read(kantorApiProvider);
+    if (api == null) return;
+    try {
+      await api.post('/api/offices/${Uri.encodeComponent(id)}/fav', {
+        'fav': !fav,
+      });
+      ref.invalidate(kantorStateProvider);
+    } on KantorException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -544,6 +986,20 @@ class _OfficeCard extends ConsumerWidget {
         : sessions.isNotEmpty
         ? ('ada sesi', GhinaColors.blue)
         : ('sepi', GhinaColors.gray);
+    final favButton = IconButton(
+      tooltip: fav ? 'Hapus dari favorit' : 'Jadikan favorit',
+      visualDensity: dense ? VisualDensity.compact : null,
+      iconSize: dense ? 20 : null,
+      icon: Icon(
+        fav ? Icons.star_rounded : Icons.star_border_rounded,
+        color: fav ? GhinaColors.yellow.base : g.textMuted,
+      ),
+      onPressed: () => _toggleFav(context, ref, id, fav),
+    );
+    final meta =
+        '${cards['open'] ?? 0} kartu · ${kantorUsd(office['monthCost'], 0)} bln ini'
+        '${office['lastSeen'] != null ? ' · ${kantorAgo(office['lastSeen'])}' : ''}';
+    if (dense) return _dense(context, sessions, label, color, favButton, meta);
     return Padding(
       padding: const EdgeInsets.only(bottom: GhinaSpace.md),
       child: ChunkyCard(
@@ -573,30 +1029,7 @@ class _OfficeCard extends ConsumerWidget {
                   ),
                 ),
                 ChunkyPill(label: label, color: color, soft: true),
-                IconButton(
-                  tooltip: fav ? 'Hapus dari favorit' : 'Jadikan favorit',
-                  icon: Icon(
-                    fav ? Icons.star_rounded : Icons.star_border_rounded,
-                    color: fav ? GhinaColors.yellow.base : g.textMuted,
-                  ),
-                  onPressed: () async {
-                    final api = ref.read(kantorApiProvider);
-                    if (api == null) return;
-                    try {
-                      await api.post(
-                        '/api/offices/${Uri.encodeComponent(id)}/fav',
-                        {'fav': !fav},
-                      );
-                      ref.invalidate(kantorStateProvider);
-                    } on KantorException catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(e.message)));
-                      }
-                    }
-                  },
-                ),
+                favButton,
               ],
             ),
             if (!compact || sessions.isNotEmpty) ...[
@@ -623,12 +1056,103 @@ class _OfficeCard extends ConsumerWidget {
             ],
             const SizedBox(height: GhinaSpace.sm),
             Text(
-              '${cards['open'] ?? 0} kartu · ${kantorUsd(office['monthCost'], 0)} bln ini'
-              '${office['lastSeen'] != null ? ' · ${kantorAgo(office['lastSeen'])}' : ''}',
+              meta,
               style: GhinaType.caption.copyWith(color: g.textSecondary),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Kartu ringkas untuk grid layar lebar.
+  Widget _dense(
+    BuildContext context,
+    List<Map<String, dynamic>> sessions,
+    String label,
+    ChunkySwatch color,
+    Widget favButton,
+    String meta,
+  ) {
+    final g = context.ghina;
+    final id = '${office['id']}';
+    final style = '${office['style'] ?? ''}';
+    return ChunkyCard(
+      key: ValueKey('kantor-office-card-$id'),
+      padding: const EdgeInsets.fromLTRB(
+        GhinaSpace.md,
+        GhinaSpace.xs,
+        GhinaSpace.xs,
+        GhinaSpace.sm + 2,
+      ),
+      borderRadius: GhinaRadii.rLg,
+      depth: GhinaDepth.sm,
+      onTap: () => context.push('/kantor/o/${Uri.encodeComponent(id)}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${office['name']}',
+                      maxLines: 1,
+                      style: GhinaType.body
+                          .w(800)
+                          .copyWith(color: g.textPrimary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (style.isNotEmpty)
+                      Text(
+                        style,
+                        maxLines: 1,
+                        style: GhinaType.caption.copyWith(color: g.textMuted),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: GhinaSpace.xs),
+              ChunkyPill(label: label, color: color, soft: true),
+              favButton,
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: GhinaSpace.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (sessions.isNotEmpty) ...[
+                  const SizedBox(height: GhinaSpace.xs),
+                  Wrap(
+                    spacing: GhinaSpace.xs,
+                    runSpacing: GhinaSpace.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final s in sessions.take(6))
+                        KantorSprite(look: _look(s), size: 22),
+                      if (sessions.length > 6)
+                        Text(
+                          '+${sessions.length - 6}',
+                          style: GhinaType.caption.copyWith(color: g.textMuted),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: GhinaSpace.xs),
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GhinaType.caption.copyWith(color: g.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -639,10 +1163,17 @@ Map<String, dynamic> _look(Map<String, dynamic> s) => s['look'] is Map
     : KantorSprite.guestLook('${s['sid']}');
 
 class _SessionTile extends StatelessWidget {
-  const _SessionTile({required this.office, required this.session});
+  const _SessionTile({
+    required this.office,
+    required this.session,
+    this.dense = false,
+  });
 
   final Map<String, dynamic> office;
   final Map<String, dynamic> session;
+
+  /// Ubin rapat untuk layar lebar.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -656,13 +1187,14 @@ class _SessionTile extends StatelessWidget {
     final waiting = session['waiting'] != null;
     final working = session['status'] == 'working';
     return ChunkyTile(
-      leading: KantorSprite(look: _look(session), size: 32),
+      dense: dense,
+      leading: KantorSprite(look: _look(session), size: dense ? 28 : 32),
       title: '$name',
       subtitle:
           '${office['name']} · ${kantorShort(kantorSessionLabel(session), 44)}',
       trailing: Icon(
         Icons.circle,
-        size: 12,
+        size: dense ? 10 : 12,
         color: waiting
             ? GhinaColors.orange.base
             : working

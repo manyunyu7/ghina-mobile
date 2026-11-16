@@ -6,6 +6,7 @@ import '../../../design_system/design_system.dart';
 import '../roles/kantor_role.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 
 /// Read-only transcript of one session (the last stretch of the conversation).
 class KantorTranscriptScreen extends ConsumerStatefulWidget {
@@ -79,7 +80,16 @@ class _TranscriptState extends ConsumerState<KantorTranscriptScreen> {
           : ListView.builder(
               padding: const EdgeInsets.all(GhinaSpace.page),
               itemCount: items.length,
-              itemBuilder: (_, i) => _item(context, items[i]),
+              // Tiap item dibatasi lebar baca (di tengah), tapi daftarnya
+              // tetap selebar layar supaya bisa digulir dari mana saja.
+              // SizedBox selebar mungkin agar item tetap mengisi lebar (tidak
+              // menyusut ke isi) seperti sebelumnya.
+              itemBuilder: (_, i) => KantorReadable(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: _item(context, items[i]),
+                ),
+              ),
             ),
     );
   }

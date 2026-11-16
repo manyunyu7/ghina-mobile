@@ -8,6 +8,7 @@ import '../roles/kantor_role.dart';
 import '../roles/kantor_ui.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_files_model.dart';
 
 /// Opens one file: text with line numbers, markdown, or an image.
@@ -147,9 +148,16 @@ class _FileViewerState extends ConsumerState<KantorFileViewerScreen> {
         );
       case 'text':
         if (info.ext == '.md' && !_raw) {
+          // Markdown dibatasi lebar baca supaya baris tidak terlalu panjang
+          // di layar lebar; di layar sempit tidak berpengaruh.
           return SingleChildScrollView(
             padding: const EdgeInsets.all(GhinaSpace.page),
-            child: KantorMarkdown(info.text, selectable: true),
+            child: KantorReadable(
+              child: SizedBox(
+                width: double.infinity,
+                child: KantorMarkdown(info.text, selectable: true),
+              ),
+            ),
           );
         }
         return _code(context, info.text);

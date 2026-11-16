@@ -10,6 +10,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 
 final _usd2 = NumberFormat('#,##0.00', 'en_US');
 final _usd0 = NumberFormat('#,##0', 'en_US');
@@ -84,11 +85,12 @@ class _KantorPayrollTabState extends ConsumerState<KantorPayrollTab> {
           if (_month.isNotEmpty) 'month': _month,
         },
       );
-      if (d is! Map)
+      if (d is! Map) {
         throw const KantorException(
           KantorFailure.server,
           'Jawaban payroll tidak dikenali.',
         );
+      }
       if (_roles.isEmpty && !_global) {
         try {
           final r = await api.get(
@@ -202,18 +204,19 @@ class _KantorPayrollTabState extends ConsumerState<KantorPayrollTab> {
     ref.listen(kantorEventsProvider, (_, next) {
       final m = next.value;
       if (m == null || m['t'] != 'changed' || m['what'] != 'payroll') return;
-      if (m['office'] != '*' && m['office'] != widget.officeId && !_global)
+      if (m['office'] != '*' && m['office'] != widget.officeId && !_global) {
         return;
+      }
       _debounce?.cancel();
       _debounce = Timer(const Duration(milliseconds: 600), () {
         if (mounted) _load(quiet: true);
       });
     });
     if (_loading && _d == null) return const KantorLoading();
-    if (_error != null && _d == null)
+    if (_error != null && _d == null) {
       return KantorErrorView(error: _error!, onRetry: _load);
+    }
     final d = _d!;
-    final g = context.ghina;
     final t = Map<String, dynamic>.from(d['total'] as Map);
     final byDay = [
       for (final x in (d['byDay'] as List? ?? const []))
@@ -226,6 +229,44 @@ class _KantorPayrollTabState extends ConsumerState<KantorPayrollTab> {
     final pct = budget != null && budget > 0 ? cost / budget * 100 : 0.0;
     final months = [for (final m in (d['months'] as List? ?? const [])) '$m'];
     final scan = d['scan'] as Map?;
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Lebar isi; `null` di layar sempit supaya tampilan tetap seperti dulu.
+        final inner = box.maxWidth >= kKantorWideMin
+            ? box.maxWidth - GhinaSpace.page * 2
+            : null;
+        return _page(
+          d: d,
+          t: t,
+          byDay: byDay,
+          activeDays: activeDays,
+          dayTotal: dayTotal,
+          budget: budget,
+          cost: cost,
+          pct: pct,
+          months: months,
+          scan: scan,
+          inner: inner,
+        );
+      },
+    );
+  }
+
+  Widget _page({
+    required Map<String, dynamic> d,
+    required Map<String, dynamic> t,
+    required List<Map<String, dynamic>> byDay,
+    required int activeDays,
+    required double dayTotal,
+    required double? budget,
+    required double cost,
+    required double pct,
+    required List<String> months,
+    required Map? scan,
+    required double? inner,
+  }) {
+    final g = context.ghina;
+    final wide = inner != null;
     return RefreshIndicator(
       onRefresh: () => _load(quiet: true),
       child: ListView(
@@ -287,13 +328,20 @@ class _KantorPayrollTabState extends ConsumerState<KantorPayrollTab> {
               ),
             ),
           const SizedBox(height: GhinaSpace.md),
-          GridView.count(
-            crossAxisCount: 2,
+          GridView(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: GhinaSpace.md,
-            crossAxisSpacing: GhinaSpace.md,
-            childAspectRatio: 1.9,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              // Lebar: kartu ringkasan berjajar (min ±180dp, maks 4) dengan
+              // tinggi tetap supaya tidak membesar ikut lebar. Sempit: seperti dulu.
+              crossAxisCount: wide
+                  ? kantorGridColumns(inner, minTile: 180, max: 4)
+                  : 2,
+              mainAxisSpacing: GhinaSpace.md,
+              crossAxisSpacing: GhinaSpace.md,
+              childAspectRatio: 1.9,
+              mainAxisExtent: wide ? 112 : null,
+            ),
             children: [
               _Kpi(usd(cost), 'Biaya bulan ini'),
               _Kpi(num_(t['sessions'] as num), 'Sesi'),
@@ -349,26 +397,81 @@ class _KantorPayrollTabState extends ConsumerState<KantorPayrollTab> {
           _DayChart(days: byDay),
           const SizedBox(height: GhinaSpace.xl),
           const SectionHeader(title: 'Slip gaji'),
-          ..._slips(d, cost),
+          // Lebar: slip gaji berjajar dalam grid.
+          ..._tiles(
+            wide ? kantorGridColumns(inner, minTile: 340, max: 3) : 1,
+            _slips(d, cost),
+          ),
           const SizedBox(height: GhinaSpace.xl),
-          const SectionHeader(title: 'Per model'),
-          ..._models(d, cost),
-          if (_global) ...[
-            const SizedBox(height: GhinaSpace.xl),
-            const SectionHeader(title: 'Per kantor'),
-            ..._offices(d),
-          ],
-          const SizedBox(height: GhinaSpace.xl),
-          const SectionHeader(title: 'Sesi termahal'),
-          ..._sessions(d),
+          ..._sections([
+            [const SectionHeader(title: 'Per model'), ..._models(d, cost)],
+            if (_global)
+              [const SectionHeader(title: 'Per kantor'), ..._offices(d)],
+            [const SectionHeader(title: 'Sesi termahal'), ..._sessions(d)],
+          ], wide ? kantorGridColumns(inner, minTile: 340, max: 2) : 1),
         ],
       ),
     );
   }
 
+  /// [cols] == 1: ubin apa adanya (layar sempit). Lebih: dikelompokkan per
+  /// baris berisi [cols] ubin sama lebar.
+  List<Widget> _tiles(int cols, List<Widget> tiles) {
+    if (cols <= 1) return tiles;
+    return [
+      for (var i = 0; i < tiles.length; i += cols)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var k = i; k < i + cols; k++) ...[
+              if (k > i) const SizedBox(width: GhinaSpace.md),
+              Expanded(
+                child: k < tiles.length ? tiles[k] : const SizedBox.shrink(),
+              ),
+            ],
+          ],
+        ),
+    ];
+  }
+
+  /// Sempit ([cols] == 1): bagian ditumpuk berjarak xl seperti dulu.
+  /// Lebar: bagian dibagi bergiliran ke [cols] kolom berdampingan.
+  List<Widget> _sections(List<List<Widget>> sections, int cols) {
+    if (cols <= 1) {
+      return [
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i > 0) const SizedBox(height: GhinaSpace.xl),
+          ...sections[i],
+        ],
+      ];
+    }
+    return [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var c = 0; c < cols; c++) ...[
+            if (c > 0) const SizedBox(width: GhinaSpace.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = c; i < sections.length; i += cols) ...[
+                    if (i >= cols) const SizedBox(height: GhinaSpace.xl),
+                    ...sections[i],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    ];
+  }
+
   String _scanText(Map s) {
-    if (s['running'] == true)
+    if (s['running'] == true) {
       return 'Memindai ${num_((s['done'] as num?) ?? 0)} dari ${num_((s['files'] as num?) ?? 0)} berkas…';
+    }
     if (s['error'] != null) return 'Pemindaian gagal: ${s['error']}';
     final t = DateTime.tryParse('${s['lastRun'] ?? ''}')?.toLocal();
     if (t == null) return '';

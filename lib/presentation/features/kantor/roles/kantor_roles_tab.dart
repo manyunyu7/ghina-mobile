@@ -5,6 +5,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import '../codex/kantor_codex.dart';
 import 'kantor_playbooks.dart';
 import 'kantor_role.dart';
@@ -52,6 +53,33 @@ class _KantorRolesTabState extends ConsumerState<KantorRolesTab> {
       }
     });
 
+    // Layar lebar: daftar role di kiri, detail role di kanan. Layar sempit:
+    // daftar saja, detail dibuka sebagai halaman penuh lalu daftar dimuat
+    // ulang setelah ditutup (perilaku lama).
+    return KantorMasterDetail<KantorRole>(
+      key: ValueKey('roles-$id'),
+      keyOf: (r) => r.id,
+      onClosed: _refresh,
+      empty: const KantorPaneEmpty(
+        icon: Icons.badge_outlined,
+        text: 'Pilih role di kiri untuk melihat detailnya.',
+      ),
+      detail: (_, r) => KantorRoleDetailScreen(officeId: id, roleId: r.id),
+      // Consumer: daftar dibangun di dalam LayoutBuilder milik
+      // KantorMasterDetail, jadi butuh `ref` sendiri untuk `watch`.
+      master: (context, selected, open) => Consumer(
+        builder: (context, ref, _) => _master(context, ref, selected, open),
+      ),
+    );
+  }
+
+  Widget _master(
+    BuildContext context,
+    WidgetRef ref,
+    KantorRole? selected,
+    void Function(KantorRole) open,
+  ) {
+    final id = widget.officeId;
     final roles = ref.watch(kantorRolesProvider(id));
     final office = ref.watch(kantorOfficeProvider(id));
     final pbs =
@@ -112,10 +140,11 @@ class _KantorRolesTabState extends ConsumerState<KantorRolesTab> {
                       child: _RoleCard(
                         role: r,
                         office: off,
+                        selected: selected?.id == r.id,
                         playbooks: pbs
                             .where((p) => p.roles.contains(r.id))
                             .length,
-                        onOpen: () => _open(r),
+                        onOpen: () => open(r),
                         onShift: () => showKantorShiftSheet(
                           context,
                           officeId: id,
@@ -139,8 +168,9 @@ class _KantorRolesTabState extends ConsumerState<KantorRolesTab> {
                           child: _RoleCard(
                             role: r,
                             office: off,
+                            selected: selected?.id == r.id,
                             playbooks: 0,
-                            onOpen: () => _open(r),
+                            onOpen: () => open(r),
                           ),
                         ),
                   ],
@@ -161,16 +191,6 @@ class _KantorRolesTabState extends ConsumerState<KantorRolesTab> {
         );
       },
     );
-  }
-
-  Future<void> _open(KantorRole r) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            KantorRoleDetailScreen(officeId: widget.officeId, roleId: r.id),
-      ),
-    );
-    _refresh();
   }
 
   Future<void> _add() async {
@@ -201,10 +221,14 @@ class _RoleCard extends StatelessWidget {
     required this.playbooks,
     required this.onOpen,
     this.onShift,
+    this.selected = false,
   });
 
   final KantorRole role;
   final KantorOffice? office;
+
+  /// Sedang terbuka di panel detail (layar lebar), disorot.
+  final bool selected;
   final int playbooks;
   final VoidCallback onOpen;
   final VoidCallback? onShift;
@@ -217,6 +241,7 @@ class _RoleCard extends StatelessWidget {
       opacity: role.archived ? 0.6 : 1,
       child: ChunkyCard(
         onTap: onOpen,
+        tinted: selected ? GhinaColors.blue : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

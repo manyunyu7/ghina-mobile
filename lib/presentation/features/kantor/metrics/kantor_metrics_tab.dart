@@ -11,6 +11,7 @@ import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/chart_empty.dart';
 import '../payroll/kantor_payroll_tab.dart' show tok, usd, num_;
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_metrics_data.dart';
 
 const _ranges = [
@@ -63,9 +64,67 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final g = context.ghina;
     final async = ref.watch(kantorMetricsProvider(_q));
     final global = widget.officeId == '_kompleks';
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Lebar isi (tanpa padding halaman) menentukan jumlah kolom bagian
+        // di layar lebar; di layar sempit tetap satu kolom seperti dulu.
+        final inner = box.maxWidth - GhinaSpace.page * 2;
+        final cols = box.maxWidth >= kKantorWideMin
+            ? kantorGridColumns(inner, minTile: 340, max: 3)
+            : 1;
+        return _list(context, async, global, cols);
+      },
+    );
+  }
+
+  Widget _list(
+    BuildContext context,
+    AsyncValue<Map<String, dynamic>> async,
+    bool global,
+    int cols,
+  ) {
+    final g = context.ghina;
+    final controls = <Widget>[
+      ChunkySegmented<String>(
+        segments: [
+          for (final r in _ranges) ChunkySegment(value: r.$1, label: r.$2),
+        ],
+        value: _range,
+        onChanged: (v) => setState(() => _range = v),
+      ),
+      if (!global) ...[
+        const SizedBox(height: GhinaSpace.sm),
+        // Wrap, bukan Row: di HP sempit / teks besar tombol turun ke baris
+        // berikutnya alih-alih meluber ke kanan.
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: GhinaSpace.sm,
+          runSpacing: GhinaSpace.xs,
+          children: [
+            DropdownButton<int>(
+              value: _stuck,
+              items: [
+                for (final h in const [1, 2, 3, 6, 12])
+                  DropdownMenuItem(
+                    value: h,
+                    child: Text('Macet setelah $h jam'),
+                  ),
+              ],
+              onChanged: (v) => setState(() => _stuck = v ?? 3),
+            ),
+            ChunkyButton(
+              label: 'Laporan shift',
+              size: ChunkyButtonSize.small,
+              expand: false,
+              onPressed: _reporting ? null : _report,
+            ),
+          ],
+        ),
+      ],
+    ];
     return RefreshIndicator(
       onRefresh: () async => ref.refresh(kantorMetricsProvider(_q).future),
       child: ListView(
@@ -84,38 +143,20 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
                 style: GhinaType.h2.copyWith(color: g.textPrimary),
               ),
             ),
-          ChunkySegmented<String>(
-            segments: [
-              for (final r in _ranges) ChunkySegment(value: r.$1, label: r.$2),
-            ],
-            value: _range,
-            onChanged: (v) => setState(() => _range = v),
-          ),
-          if (!global) ...[
-            const SizedBox(height: GhinaSpace.sm),
-            Row(
-              children: [
-                DropdownButton<int>(
-                  value: _stuck,
-                  items: [
-                    for (final h in const [1, 2, 3, 6, 12])
-                      DropdownMenuItem(
-                        value: h,
-                        child: Text('Macet setelah $h jam'),
-                      ),
-                  ],
-                  onChanged: (v) => setState(() => _stuck = v ?? 3),
+          // Di layar lebar kontrol rentang tidak ikut melebar penuh.
+          if (cols > 1)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: kKantorListMax),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: controls,
                 ),
-                const Spacer(),
-                ChunkyButton(
-                  label: 'Laporan shift',
-                  size: ChunkyButtonSize.small,
-                  expand: false,
-                  onPressed: _reporting ? null : _report,
-                ),
-              ],
-            ),
-          ],
+              ),
+            )
+          else
+            ...controls,
           const SizedBox(height: GhinaSpace.md),
           ...async.when(
             loading: () => const [KantorLoading(count: 3)],
@@ -128,7 +169,7 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
                 ),
               ),
             ],
-            data: (d) => global ? _complex(d) : _office(d),
+            data: (d) => global ? _complex(d, cols) : _office(d, cols),
           ),
         ],
       ),
@@ -137,7 +178,7 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
 
   /* ---------------- complex ---------------- */
 
-  List<Widget> _complex(Map<String, dynamic> d) {
+  List<Widget> _complex(Map<String, dynamic> d, int cols) {
     final t = metricMap(d['total']);
     final g = context.ghina;
     String n(String k) => num_(metricNum(t[k]) ?? 0);
@@ -158,10 +199,9 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
       ]),
       const SizedBox(height: GhinaSpace.lg),
       const SectionHeader(title: 'Per kantor'),
-      for (final o in metricRows(d['offices']))
-        Padding(
-          padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-          child: ChunkyCard(
+      ..._grid(cols, [
+        for (final o in metricRows(d['offices']))
+          ChunkyCard(
             padding: const EdgeInsets.all(GhinaSpace.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,7 +218,7 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
               ],
             ),
           ),
-        ),
+      ]),
       if (metricRows(d['offices']).isEmpty)
         const ChartEmpty(label: 'Tidak ada aktivitas di rentang ini'),
     ];
@@ -186,7 +226,7 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
 
   /* ---------------- one office ---------------- */
 
-  List<Widget> _office(Map<String, dynamic> d) {
+  List<Widget> _office(Map<String, dynamic> d, int cols) {
     final g = context.ghina;
     final cards = metricMap(d['cards']);
     final cycle = metricMap(cards['cycle']);
@@ -211,216 +251,301 @@ class _KantorMetricsTabState extends ConsumerState<KantorMetricsTab> {
     String n(Object? v) => num_(metricNum(v) ?? 0);
     final unit = bucket == 'hour' ? 'jam' : 'hari';
 
-    return [
-      SectionHeader(title: 'Kartu', subtitle: '${range['label'] ?? ''}'),
-      _Kpis([
-        _K(n(cards['done']), 'Kartu selesai', '${n(cards['created'])} dibuat'),
-        _K(
-          metricHours(cycle['avgH']),
-          'Siklus rata-rata',
-          'median ${metricHours(cycle['medianH'])} · p90 ${metricHours(cycle['p90H'])}',
-        ),
-        _K(
-          n(stuck['count']),
-          'Macet > ${n(stuck['hours'])} jam',
-          '',
-          (metricNum(stuck['count']) ?? 0) > 0,
-        ),
-        _K(
-          n(review['bounces']),
-          'Bolak-balik Review',
-          '${n(review['bouncedCards'])} kartu',
-        ),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      _ChartCard(
-        title: 'Kartu selesai per $unit',
-        child: MetricBars(
-          starts: starts,
-          values: vals('done'),
-          hourly: bucket == 'hour',
-          color: GhinaColors.green.base,
-        ),
-      ),
-      for (final c in metricRows(stuck['cards']))
-        Padding(
-          padding: const EdgeInsets.only(top: GhinaSpace.sm),
-          child: ChunkyCard(
-            padding: const EdgeInsets.all(GhinaSpace.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${c['title']}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.bodyS.w(800).copyWith(color: g.textPrimary),
-                ),
-                Text(
-                  '${c['col']} · ${c['who'] ?? '-'} · diam ${metricHours(c['hours'])}${(c['blocked'] ?? '') != '' ? ' · terblokir' : ''}',
-                  style: GhinaType.caption.copyWith(color: g.textMuted),
-                ),
-              ],
-            ),
+    // Tiap bagian (Kartu, DM, Sesi, Biaya, Git, Gesekan) berdiri sendiri
+    // supaya di layar lebar bisa disusun berdampingan.
+    final sections = <List<Widget>>[
+      [
+        SectionHeader(title: 'Kartu', subtitle: '${range['label'] ?? ''}'),
+        _Kpis([
+          _K(
+            n(cards['done']),
+            'Kartu selesai',
+            '${n(cards['created'])} dibuat',
+          ),
+          _K(
+            metricHours(cycle['avgH']),
+            'Siklus rata-rata',
+            'median ${metricHours(cycle['medianH'])} · p90 ${metricHours(cycle['p90H'])}',
+          ),
+          _K(
+            n(stuck['count']),
+            'Macet > ${n(stuck['hours'])} jam',
+            '',
+            (metricNum(stuck['count']) ?? 0) > 0,
+          ),
+          _K(
+            n(review['bounces']),
+            'Bolak-balik Review',
+            '${n(review['bouncedCards'])} kartu',
+          ),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        _ChartCard(
+          title: 'Kartu selesai per $unit',
+          child: MetricBars(
+            starts: starts,
+            values: vals('done'),
+            hourly: bucket == 'hour',
+            color: GhinaColors.green.base,
           ),
         ),
-      const SizedBox(height: GhinaSpace.xl),
-      const SectionHeader(
-        title: 'Pesan langsung',
-        subtitle: 'DM dibuat sampai diketik ke sesi',
-      ),
-      _Kpis([
-        _K(
-          n(dm['total']),
-          'DM',
-          '${n(dm['pesan'])} pesan · ${n(dm['balasan'])} balasan',
-        ),
-        _K(
-          metricDur(metricMap(dm['deliver'])['avgSec']),
-          'Kirim sampai terlihat',
-          'p90 ${metricDur(metricMap(dm['deliver'])['p90Sec'])} · maks ${metricDur(metricMap(dm['deliver'])['maxSec'])}',
-        ),
-        _K(
-          metricDur(metricMap(dm['reply'])['avgSec']),
-          'Sampai dibalas',
-          'p90 ${metricDur(metricMap(dm['reply'])['p90Sec'])}',
-        ),
-        _K(
-          n(dm['slow5']),
-          'DM antre > 5 mnt',
-          '${n(dm['slow1'])} lewat 1 mnt',
-          (metricNum(dm['slow5']) ?? 0) > 0,
-        ),
-        _K(n(dm['askTimeout']), 'Tanya timeout'),
-        _K(
-          n(metricMap(dm['waitingNow'])['count']),
-          'Menunggu sekarang',
-          '',
-          (metricNum(metricMap(dm['waitingNow'])['count']) ?? 0) > 0,
-        ),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      _BarList(
-        rows: [
-          for (final p in metricRows(dm['perRole']))
-            _BarRow(
-              '${p['name']}',
-              metricNum(metricMap(p['deliver'])['avgSec']) ?? 0,
-              '${metricDur(metricMap(p['deliver'])['avgSec'])} · maks ${metricDur(metricMap(p['deliver'])['maxSec'])} · ${n(p['n'])} DM',
-              GhinaColors.blue,
+        for (final c in metricRows(stuck['cards']))
+          Padding(
+            padding: const EdgeInsets.only(top: GhinaSpace.sm),
+            child: ChunkyCard(
+              padding: const EdgeInsets.all(GhinaSpace.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${c['title']}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.bodyS
+                        .w(800)
+                        .copyWith(color: g.textPrimary),
+                  ),
+                  Text(
+                    '${c['col']} · ${c['who'] ?? '-'} · diam ${metricHours(c['hours'])}${(c['blocked'] ?? '') != '' ? ' · terblokir' : ''}',
+                    style: GhinaType.caption.copyWith(color: g.textMuted),
+                  ),
+                ],
+              ),
             ),
+          ),
+      ],
+      [
+        const SectionHeader(
+          title: 'Pesan langsung',
+          subtitle: 'DM dibuat sampai diketik ke sesi',
+        ),
+        _Kpis([
+          _K(
+            n(dm['total']),
+            'DM',
+            '${n(dm['pesan'])} pesan · ${n(dm['balasan'])} balasan',
+          ),
+          _K(
+            metricDur(metricMap(dm['deliver'])['avgSec']),
+            'Kirim sampai terlihat',
+            'p90 ${metricDur(metricMap(dm['deliver'])['p90Sec'])} · maks ${metricDur(metricMap(dm['deliver'])['maxSec'])}',
+          ),
+          _K(
+            metricDur(metricMap(dm['reply'])['avgSec']),
+            'Sampai dibalas',
+            'p90 ${metricDur(metricMap(dm['reply'])['p90Sec'])}',
+          ),
+          _K(
+            n(dm['slow5']),
+            'DM antre > 5 mnt',
+            '${n(dm['slow1'])} lewat 1 mnt',
+            (metricNum(dm['slow5']) ?? 0) > 0,
+          ),
+          _K(n(dm['askTimeout']), 'Tanya timeout'),
+          _K(
+            n(metricMap(dm['waitingNow'])['count']),
+            'Menunggu sekarang',
+            '',
+            (metricNum(metricMap(dm['waitingNow'])['count']) ?? 0) > 0,
+          ),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        _BarList(
+          rows: [
+            for (final p in metricRows(dm['perRole']))
+              _BarRow(
+                '${p['name']}',
+                metricNum(metricMap(p['deliver'])['avgSec']) ?? 0,
+                '${metricDur(metricMap(p['deliver'])['avgSec'])} · maks ${metricDur(metricMap(p['deliver'])['maxSec'])} · ${n(p['n'])} DM',
+                GhinaColors.blue,
+              ),
+          ],
+          empty: 'Belum ada DM di rentang ini.',
+        ),
+      ],
+      [
+        const SectionHeader(
+          title: 'Sesi',
+          subtitle: 'perkiraan dari jejak aktivitas',
+        ),
+        _Kpis([
+          _K(metricDur(totals['workSec']), 'Bekerja'),
+          _K(metricDur(totals['idleSec']), 'Idle'),
+          _K(metricDur(totals['waitSec']), 'Menunggu izin'),
+          _K(
+            n(sess['compactions']),
+            'Kompaksi',
+            '${n(sess['interrupts'])} interrupt',
+          ),
+          _K(
+            n(perms['toTerminal']),
+            'Izin jatuh ke terminal',
+            'dari ${n(perms['total'])} izin',
+            (metricNum(perms['toTerminal']) ?? 0) > 0,
+          ),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        for (final p in metricRows(sess['perRole']))
+          Padding(
+            padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+            child: _WorkBar(row: p),
+          ),
+      ],
+      [
+        SectionHeader(
+          title: 'Biaya',
+          subtitle: 'per hari penuh, estimasi setara API',
+        ),
+        _Kpis([
+          _K(usd(metricNum(cost['total']) ?? 0), 'Biaya'),
+          _K(
+            metricNum(cost['perDoneCard']) == null
+                ? '-'
+                : usd(metricNum(cost['perDoneCard'])!),
+            'Per kartu selesai',
+          ),
+          _K(
+            metricNum(cost['perCommit']) == null
+                ? '-'
+                : usd(metricNum(cost['perCommit'])!),
+            'Per commit',
+          ),
+          if ((metricNum(cost['tokenOnlyTokens']) ?? 0) > 0)
+            _K(
+              tok(metricNum(cost['tokenOnlyTokens'])!),
+              'Token Codex',
+              'tanpa harga',
+            ),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        _BarList(
+          rows: [
+            for (final p in metricRows(cost['perRole']))
+              _BarRow(
+                '${p['name']}',
+                metricNum(p['cost']) ?? 0,
+                (metricNum(p['tokenOnlyTokens']) ?? 0) > 0 &&
+                        (metricNum(p['cost']) ?? 0) == 0
+                    ? '${tok(metricNum(p['tokenOnlyTokens'])!)} token'
+                    : usd(metricNum(p['cost']) ?? 0),
+                GhinaColors.green,
+              ),
+          ],
+          empty: 'Belum ada pemakaian.',
+        ),
+      ],
+      [
+        const SectionHeader(title: 'Git'),
+        _Kpis([
+          _K(n(git['total']), 'Commit'),
+          _K(
+            n(git['reverts']),
+            'Revert',
+            '',
+            (metricNum(git['reverts']) ?? 0) > 0,
+          ),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        _ChartCard(
+          title: 'Commit per $unit',
+          child: MetricBars(
+            starts: starts,
+            values: vals('commits'),
+            hourly: bucket == 'hour',
+            color: GhinaColors.blue.base,
+          ),
+        ),
+      ],
+      [
+        const SectionHeader(title: 'Gesekan'),
+        _Kpis([
+          _K(n(metricMap(fr['toolErrors'])['total']), 'Tool gagal'),
+          _K(n(fr['announcements']), 'Pengumuman'),
+        ]),
+        const SizedBox(height: GhinaSpace.md),
+        _BarList(
+          rows: [
+            for (final e in metricRows(metricMap(fr['toolErrors'])['byTool']))
+              _BarRow('${e['tool']}', metricNum(e['n']) ?? 0, () {
+                final r = metricRows(e['reasons']);
+                return r.isEmpty
+                    ? '${n(e['n'])}x · alasan tidak tercatat'
+                    : '${n(e['n'])}x · ${r.first['text']}';
+              }(), GhinaColors.orange),
+          ],
+          empty: 'Tidak ada tool yang gagal.',
+        ),
+      ],
+    ];
+    return _sections(sections, cols);
+  }
+
+  /// Layar sempit ([cols] == 1): bagian ditumpuk dengan jarak seperti dulu.
+  /// Layar lebar: bagian dibagi bergiliran ke [cols] kolom berdampingan.
+  List<Widget> _sections(List<List<Widget>> sections, int cols) {
+    if (cols <= 1) {
+      return [
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i > 0) const SizedBox(height: GhinaSpace.xl),
+          ...sections[i],
         ],
-        empty: 'Belum ada DM di rentang ini.',
+      ];
+    }
+    final lanes = [
+      for (var c = 0; c < cols; c++)
+        [
+          for (var i = c; i < sections.length; i += cols) ...[
+            if (i >= cols) const SizedBox(height: GhinaSpace.xl),
+            ...sections[i],
+          ],
+        ],
+    ];
+    return [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var c = 0; c < cols; c++) ...[
+            if (c > 0) const SizedBox(width: GhinaSpace.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: lanes[c],
+              ),
+            ),
+          ],
+        ],
       ),
-      const SizedBox(height: GhinaSpace.xl),
-      const SectionHeader(
-        title: 'Sesi',
-        subtitle: 'perkiraan dari jejak aktivitas',
-      ),
-      _Kpis([
-        _K(metricDur(totals['workSec']), 'Bekerja'),
-        _K(metricDur(totals['idleSec']), 'Idle'),
-        _K(metricDur(totals['waitSec']), 'Menunggu izin'),
-        _K(
-          n(sess['compactions']),
-          'Kompaksi',
-          '${n(sess['interrupts'])} interrupt',
-        ),
-        _K(
-          n(perms['toTerminal']),
-          'Izin jatuh ke terminal',
-          'dari ${n(perms['total'])} izin',
-          (metricNum(perms['toTerminal']) ?? 0) > 0,
-        ),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      for (final p in metricRows(sess['perRole']))
+    ];
+  }
+
+  /// Ubin bertinggi bebas: satu per baris (jarak bawah sm) di layar sempit,
+  /// [cols] per baris di layar lebar.
+  List<Widget> _grid(int cols, List<Widget> tiles) {
+    if (cols <= 1) {
+      return [
+        for (final t in tiles)
+          Padding(
+            padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+            child: t,
+          ),
+      ];
+    }
+    return [
+      for (var i = 0; i < tiles.length; i += cols)
         Padding(
           padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-          child: _WorkBar(row: p),
-        ),
-      const SizedBox(height: GhinaSpace.xl),
-      SectionHeader(
-        title: 'Biaya',
-        subtitle: 'per hari penuh, estimasi setara API',
-      ),
-      _Kpis([
-        _K(usd(metricNum(cost['total']) ?? 0), 'Biaya'),
-        _K(
-          metricNum(cost['perDoneCard']) == null
-              ? '-'
-              : usd(metricNum(cost['perDoneCard'])!),
-          'Per kartu selesai',
-        ),
-        _K(
-          metricNum(cost['perCommit']) == null
-              ? '-'
-              : usd(metricNum(cost['perCommit'])!),
-          'Per commit',
-        ),
-        if ((metricNum(cost['tokenOnlyTokens']) ?? 0) > 0)
-          _K(
-            tok(metricNum(cost['tokenOnlyTokens'])!),
-            'Token Codex',
-            'tanpa harga',
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var k = i; k < i + cols; k++) ...[
+                if (k > i) const SizedBox(width: GhinaSpace.sm),
+                Expanded(
+                  child: k < tiles.length ? tiles[k] : const SizedBox.shrink(),
+                ),
+              ],
+            ],
           ),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      _BarList(
-        rows: [
-          for (final p in metricRows(cost['perRole']))
-            _BarRow(
-              '${p['name']}',
-              metricNum(p['cost']) ?? 0,
-              (metricNum(p['tokenOnlyTokens']) ?? 0) > 0 &&
-                      (metricNum(p['cost']) ?? 0) == 0
-                  ? '${tok(metricNum(p['tokenOnlyTokens'])!)} token'
-                  : usd(metricNum(p['cost']) ?? 0),
-              GhinaColors.green,
-            ),
-        ],
-        empty: 'Belum ada pemakaian.',
-      ),
-      const SizedBox(height: GhinaSpace.xl),
-      const SectionHeader(title: 'Git'),
-      _Kpis([
-        _K(n(git['total']), 'Commit'),
-        _K(
-          n(git['reverts']),
-          'Revert',
-          '',
-          (metricNum(git['reverts']) ?? 0) > 0,
         ),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      _ChartCard(
-        title: 'Commit per $unit',
-        child: MetricBars(
-          starts: starts,
-          values: vals('commits'),
-          hourly: bucket == 'hour',
-          color: GhinaColors.blue.base,
-        ),
-      ),
-      const SizedBox(height: GhinaSpace.xl),
-      const SectionHeader(title: 'Gesekan'),
-      _Kpis([
-        _K(n(metricMap(fr['toolErrors'])['total']), 'Tool gagal'),
-        _K(n(fr['announcements']), 'Pengumuman'),
-      ]),
-      const SizedBox(height: GhinaSpace.md),
-      _BarList(
-        rows: [
-          for (final e in metricRows(metricMap(fr['toolErrors'])['byTool']))
-            _BarRow('${e['tool']}', metricNum(e['n']) ?? 0, () {
-              final r = metricRows(e['reasons']);
-              return r.isEmpty
-                  ? '${n(e['n'])}x · alasan tidak tercatat'
-                  : '${n(e['n'])}x · ${r.first['text']}';
-            }(), GhinaColors.orange),
-        ],
-        empty: 'Tidak ada tool yang gagal.',
-      ),
     ];
   }
 }
@@ -437,16 +562,36 @@ class _Kpis extends StatelessWidget {
   const _Kpis(this.items);
   final List<_K> items;
 
+  /// Tinggi tetap ubin di layar lebar: cukup untuk angka, label, dan dua
+  /// baris keterangan walau ubinnya sempit (di dalam kolom bagian).
+  static const _wideTileH = 124.0;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      // Layar sempit: 2 kolom rasio 1.7, sama persis seperti dulu.
+      if (!kantorIsWide(context)) return _grid(context, 2, null);
+      // Layar lebar: ubin minimal ±180dp (maks 4) bila ruangnya lebar,
+      // 2 kolom di dalam kolom bagian; tingginya tetap supaya tidak gepeng.
+      final cols = box.maxWidth >= kKantorWideMin
+          ? kantorGridColumns(box.maxWidth, minTile: 180, max: 4)
+          : 2;
+      return _grid(context, cols, _wideTileH);
+    },
+  );
+
+  Widget _grid(BuildContext context, int cols, double? tileH) {
     final g = context.ghina;
-    return GridView.count(
-      crossAxisCount: 2,
+    return GridView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: GhinaSpace.md,
-      crossAxisSpacing: GhinaSpace.md,
-      childAspectRatio: 1.7,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: cols,
+        mainAxisSpacing: GhinaSpace.md,
+        crossAxisSpacing: GhinaSpace.md,
+        childAspectRatio: 1.7,
+        mainAxisExtent: tileH,
+      ),
       children: [
         for (final k in items)
           ChunkyCard(

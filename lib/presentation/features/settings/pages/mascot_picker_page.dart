@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/mascot_kind_provider.dart';
 
@@ -24,6 +25,13 @@ class MascotPickerPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(mascotKindProvider);
+    // Ravel keeps its own launcher icon (no mascot aliases), so the icon
+    // note is Ghina-only.
+    final ravel = ref.watch(kantorOnlyProvider);
+    final iconNote =
+        !ravel && Theme.of(context).platform == TargetPlatform.android
+        ? ' Ikon & layar pembuka Ghina ikut ganti begitu kamu keluar dari aplikasi.'
+        : '';
     return Scaffold(
       appBar: AppBar(title: const Text('Pilih maskot')),
       body: SafeArea(
@@ -45,8 +53,8 @@ class MascotPickerPage extends ConsumerWidget {
                   title: 'Halo, aku ${current.label}!',
                   message:
                       'Pilih teman yang paling cocok buat nemenin kamu '
-                      'nabung. Ketuk salah satu buat lihat ekspresinya.'
-                      '${Theme.of(context).platform == TargetPlatform.android ? ' Ikon & layar pembuka Ghina ikut ganti begitu kamu keluar dari aplikasi.' : ''}',
+                      '${ravel ? 'di kantor' : 'nabung'}. Ketuk salah satu '
+                      'buat lihat ekspresinya.$iconNote',
                 ),
               ),
             ),
@@ -222,6 +230,131 @@ class _MascotPreviewState extends ConsumerState<MascotPreview> {
           icon: inUse ? Icons.check_rounded : Icons.favorite_rounded,
           expand: true,
           onPressed: inUse ? null : _use,
+        ),
+      ],
+    );
+  }
+}
+
+/// First-run "Pilih maskotmu" as a layer above the app's navigator, so
+/// startup redirects (go/push) can neither sweep it away nor cover it.
+/// A tap on the dimmed backdrop counts as "Nanti saja".
+class MascotWelcomeLayer extends StatelessWidget {
+  const MascotWelcomeLayer({super.key, required this.onDone});
+
+  /// Called after a pick or "Nanti saja".
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    final height = MediaQuery.sizeOf(context).height;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            key: const ValueKey('mascot-welcome-barrier'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onDone,
+            child: ColoredBox(color: Colors.black.withValues(alpha: 0.45)),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 640, maxHeight: height * 0.9),
+            child: Material(
+              color: g.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(GhinaRadii.xl),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SafeArea(
+                top: false,
+                child: ChunkyBottomSheet(
+                  title: 'Pilih maskotmu',
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                  child: MascotWelcome(onDone: onDone),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The grid, "Pakai `maskot`" and "Nanti saja" of [MascotWelcomeLayer].
+class MascotWelcome extends ConsumerStatefulWidget {
+  const MascotWelcome({super.key, required this.onDone});
+
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<MascotWelcome> createState() => _MascotWelcomeState();
+}
+
+class _MascotWelcomeState extends ConsumerState<MascotWelcome> {
+  late MascotKind _picked = ref.read(mascotKindProvider);
+  bool _saving = false;
+
+  Future<void> _use() async {
+    setState(() => _saving = true);
+    await ref.read(mascotKindProvider.notifier).select(_picked);
+    if (mounted) widget.onDone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Siapa yang mau nemenin kamu? Bisa diganti kapan saja di '
+          'Pengaturan.',
+          style: GhinaType.body.w(700).copyWith(color: g.textSecondary),
+        ),
+        GhinaSpace.gapMd,
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 132,
+            mainAxisExtent: 150,
+            mainAxisSpacing: GhinaSpace.sm,
+            crossAxisSpacing: GhinaSpace.sm,
+          ),
+          itemCount: MascotKind.values.length,
+          itemBuilder: (context, i) {
+            final kind = MascotKind.values[i];
+            return _MascotTile(
+              kind: kind,
+              selected: kind == _picked,
+              onTap: () => setState(() => _picked = kind),
+            );
+          },
+        ),
+        GhinaSpace.gapLg,
+        ChunkyButton(
+          key: const ValueKey('mascot-welcome-use'),
+          label: 'Pakai ${_picked.label}',
+          icon: Icons.favorite_rounded,
+          expand: true,
+          loading: _saving,
+          onPressed: _saving ? null : _use,
+        ),
+        GhinaSpace.gapSm,
+        ChunkyButton(
+          key: const ValueKey('mascot-welcome-later'),
+          label: 'Nanti saja',
+          variant: ChunkyButtonVariant.ghost,
+          expand: true,
+          onPressed: _saving ? null : widget.onDone,
         ),
       ],
     );

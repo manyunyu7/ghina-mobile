@@ -156,7 +156,7 @@ Finder get _bar => find.byKey(const ValueKey('kantor-office-bar'));
 Finder _chip(String id) => find.byKey(ValueKey('office-chip-$id'));
 
 bool _chipSelected(WidgetTester t, String id) => t
-    .widget<ChunkyChip>(
+    .widget<KantorOfficeChip>(
       find.byKey(ValueKey('office-chip-$id'), skipOffstage: false),
     )
     .selected;
@@ -166,6 +166,105 @@ void _expectApart(WidgetTester t, Finder a, Finder b) {
   final rb = t.getRect(b);
   expect(ra.overlaps(rb), isFalse, reason: '$ra overlaps $rb');
   expect(ra.bottom, lessThanOrEqualTo(rb.top));
+}
+
+/// Badge chip kantor [id] (null finder bila tidak ada).
+Finder _badgeOf(String id) => find.descendant(
+  of: _chip(id),
+  matching: find.byKey(const ValueKey('office-chip-badge')),
+);
+
+/// Badge harus utuh: min 18dp, di dalam chip dan bilah, tidak terpotong.
+void _expectBadgeWhole(WidgetTester t, String id, {Finder? bar}) {
+  final badge = _badgeOf(id);
+  expect(badge, findsOneWidget, reason: 'badge $id');
+  final r = t.getRect(badge);
+  expect(r.height, greaterThanOrEqualTo(18), reason: 'badge $id $r');
+  expect(r.width, greaterThanOrEqualTo(18), reason: 'badge $id $r');
+  final chip = t.getRect(_chip(id));
+  expect(
+    chip.contains(r.topLeft) &&
+        chip.contains(r.bottomRight - const Offset(0.01, 0.01)),
+    isTrue,
+    reason: 'badge $r keluar dari chip $chip',
+  );
+  final b = t.getRect(bar ?? _bar);
+  expect(r.top, greaterThanOrEqualTo(b.top), reason: 'badge $r vs bar $b');
+  expect(r.bottom, lessThanOrEqualTo(b.bottom), reason: 'badge $r vs bar $b');
+  // teks badge memakai 11sp tebal
+  final text = t.widget<Text>(
+    find.descendant(of: badge, matching: find.byType(Text)),
+  );
+  expect(text.style?.fontSize, 11);
+  expect(text.style?.fontWeight, FontWeight.w800);
+}
+
+/// Bilah saja (tanpa halaman) di lebar [w], untuk kantor dengan nama panjang
+/// dan banyak agen menunggu.
+Future<void> _pumpBar(WidgetTester t, double w) async {
+  final offices = [
+    {
+      'id': 'demo',
+      'name': 'Kantor Demo',
+      'sessions': [
+        {'status': 'working'},
+        {'status': 'idle'},
+      ],
+    },
+    {
+      'id': 'panjang',
+      'name': 'Kantor Dengan Nama Yang Sangat Panjang Sekali Untuk Diuji',
+      'fav': true,
+      'sessions': [
+        for (var i = 0; i < 150; i++) {'status': 'idle', 'waiting': 'izin'},
+      ],
+    },
+    {
+      'id': 'sepi',
+      'name': 'Sepi',
+      'fav': true,
+      'sessions': [
+        {'status': 'idle'},
+      ],
+    },
+  ];
+  final feeds = <KantorOfficeFeed>[];
+  final c = ProviderContainer(
+    overrides: [
+      kantorOfficeFeedProvider.overrideWith((ref, id) {
+        final f = KantorOfficeFeed(id, null)..loading = false;
+        feeds.add(f);
+        return f;
+      }),
+      kantorStateProvider.overrideWith(
+        (ref) async => {'offices': offices, 'inbox': []},
+      ),
+    ],
+  );
+  addTearDown(() {
+    c.dispose();
+    for (final f in feeds) {
+      f.dispose();
+    }
+  });
+  await t.pumpWidget(
+    UncontrolledProviderScope(
+      container: c,
+      child: MaterialApp(
+        theme: GhinaTheme.light(),
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomLeft,
+            child: SizedBox(
+              width: w,
+              child: const KantorOfficeBar(currentId: 'demo'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await _settle(t);
 }
 
 Finder get _newAgent => find.widgetWithText(FloatingActionButton, 'Agen baru');
@@ -335,6 +434,64 @@ void main() {
       find.descendant(of: _sessionTwoPane, matching: find.text('Budi')),
       findsWidgets,
     );
+    await _close(t);
+  });
+  for (final w in [360.0, 330.0]) {
+    testWidgets('${w.toInt()}dp: badges readable and whole, long name '
+        'ellipsised, big counts "99+"', (t) async {
+      addTearDown(t.view.reset);
+      await _size(t, w);
+      await _pumpBar(t, w);
+      expect(t.takeException(), isNull); // tidak ada overflow
+      expect(t.getSize(_bar).height, kKantorOfficeBarHeight);
+      // nama panjang: chip dibatasi, nama dielipsis, badge tetap utuh
+      _expectBadgeWhole(t, 'panjang');
+      expect(
+        find.descendant(of: _badgeOf('panjang'), matching: find.text('99+')),
+        findsOneWidget,
+      );
+      final name = t.widget<Text>(
+        find.descendant(
+          of: _chip('panjang'),
+          matching: find.textContaining('Sangat Panjang'),
+        ),
+      );
+      expect(name.overflow, TextOverflow.ellipsis);
+      expect(t.getSize(_chip('panjang')).width, lessThanOrEqualTo(240));
+      // "Semua…" tetap terlihat di kanan, di dalam bilah
+      expect(_chip('all'), findsOneWidget);
+      expect(t.getRect(_chip('all')).right, lessThanOrEqualTo(w));
+      // bisa digulir: chip berikutnya tercapai
+      final list = find.descendant(
+        of: find.byKey(const ValueKey('kantor-office-bar-list')),
+        matching: find.byType(Scrollable),
+      );
+      await t.scrollUntilVisible(_chip('sepi'), 80, scrollable: list);
+      await _settle(t);
+      _expectBadgeWhole(t, 'sepi');
+      await t.scrollUntilVisible(_chip('demo'), 80, scrollable: list);
+      await _settle(t);
+      // kantor aktif (bukan menunggu, ada yang bekerja): jumlah agen hidup
+      _expectBadgeWhole(t, 'demo');
+      expect(
+        find.descendant(of: _badgeOf('demo'), matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(_chipSelected(t, 'demo'), isTrue);
+      expect(t.takeException(), isNull);
+    });
+  }
+
+  testWidgets('830dp two-pane: badges whole in the 330dp left pane', (t) async {
+    addTearDown(t.view.reset);
+    await _size(t, 830);
+    await _pump(t);
+    expect(find.byType(KantorTwoPane), findsOneWidget);
+    expect(t.getSize(_bar).width, lessThanOrEqualTo(330));
+    expect(t.takeException(), isNull);
+    _expectBadgeWhole(t, 'demo');
+    _expectBadgeWhole(t, 'lain');
+    expect(_chipSelected(t, 'demo'), isTrue);
     await _close(t);
   });
 }

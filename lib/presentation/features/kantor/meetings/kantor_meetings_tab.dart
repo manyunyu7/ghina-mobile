@@ -7,6 +7,7 @@ import '../roles/kantor_role.dart';
 import '../roles/kantor_ui.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_meeting.dart';
 import 'kantor_meeting_detail.dart';
 import 'kantor_meeting_form.dart';
@@ -28,6 +29,32 @@ class KantorMeetingsTab extends ConsumerWidget {
         ref.invalidate(kantorMeetingsProvider(officeId));
       }
     });
+    void reload() => ref.invalidate(kantorMeetingsProvider(officeId));
+
+    // Layar lebar: daftar rapat di kiri, detail rapat di kanan. Layar sempit:
+    // daftar saja, detail halaman penuh, daftar dimuat ulang saat kembali.
+    return KantorMasterDetail<String>(
+      key: ValueKey('meetings-$officeId'),
+      keyOf: (id) => id,
+      onClosed: reload,
+      empty: const KantorPaneEmpty(
+        icon: Icons.groups_outlined,
+        text: 'Pilih rapat di kiri untuk membaca jalannya dan notulennya.',
+      ),
+      detail: (_, id) =>
+          KantorMeetingDetailScreen(officeId: officeId, meetingId: id),
+      master: (context, selected, open) => Consumer(
+        builder: (context, ref, _) => _master(context, ref, selected, open),
+      ),
+    );
+  }
+
+  Widget _master(
+    BuildContext context,
+    WidgetRef ref,
+    String? selected,
+    void Function(String) open,
+  ) {
     final meetings = ref.watch(kantorMeetingsProvider(officeId));
     final roles =
         ref.watch(kantorRolesProvider(officeId)).value ?? const <KantorRole>[];
@@ -61,14 +88,13 @@ class KantorMeetingsTab extends ConsumerWidget {
                 icon: Icons.add_rounded,
                 size: ChunkyButtonSize.small,
                 onPressed: () async {
-                  final id = await Navigator.of(context).push<String>(
-                    MaterialPageRoute<String>(
-                      builder: (_) =>
-                          KantorMeetingFormScreen(officeId: officeId),
-                    ),
+                  // Form rapat baru: panel samping di layar lebar.
+                  final id = await kantorPushAdaptive<String>(
+                    context,
+                    (_) => KantorMeetingFormScreen(officeId: officeId),
                   );
                   ref.invalidate(kantorMeetingsProvider(officeId));
-                  if (id != null && context.mounted) _open(context, ref, id);
+                  if (id != null && context.mounted) open(id);
                 },
               ),
             ),
@@ -83,7 +109,9 @@ class KantorMeetingsTab extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: GhinaSpace.md),
                 child: ChunkyCard(
-                  onTap: () => _open(context, ref, m.id),
+                  onTap: () => open(m.id),
+                  // rapat yang sedang terbuka di panel kanan disorot
+                  tinted: selected == m.id ? GhinaColors.blue : null,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -132,16 +160,5 @@ class KantorMeetingsTab extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  void _open(BuildContext context, WidgetRef ref, String id) {
-    Navigator.of(context)
-        .push<void>(
-          MaterialPageRoute(
-            builder: (_) =>
-                KantorMeetingDetailScreen(officeId: officeId, meetingId: id),
-          ),
-        )
-        .then((_) => ref.invalidate(kantorMeetingsProvider(officeId)));
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/diagnostics/error_log.dart';
 import '../data/widgets/kantor_widget_sync.dart';
@@ -11,11 +12,18 @@ import '../di/kantor_providers.dart';
 import '../presentation/design_system/design_system.dart';
 import '../presentation/features/kantor/kantor_data.dart';
 import '../presentation/features/kantor/session/kantor_snapshot_store.dart';
+import '../presentation/features/settings/pages/appearance_page.dart';
 import '../presentation/features/settings/pages/error_log_page.dart';
+import '../presentation/features/settings/pages/mascot_picker_page.dart';
 import '../presentation/features/settings/widgets/error_card.dart';
 import '../presentation/state/appearance_provider.dart';
+import '../presentation/state/mascot_kind_provider.dart';
 import 'kantor_routes.dart';
 import 'ravel_notifications.dart';
+
+/// Set once the first-run "Pilih maskotmu" sheet was answered (a pick or
+/// "Nanti saja"), so it shows only once, existing installs included.
+const ravelMascotChosenKey = 'ravel.mascot_chosen';
 
 final ravelRouterProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
@@ -23,6 +31,14 @@ final ravelRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       ...kantorRoutes,
       GoRoute(path: '/diagnostics', builder: (_, _) => const ErrorLogPage()),
+      GoRoute(
+        path: '/settings/mascot',
+        builder: (_, _) => const MascotPickerPage(),
+      ),
+      GoRoute(
+        path: '/settings/appearance',
+        builder: (_, _) => const AppearancePage(),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Ravel')),
@@ -58,10 +74,13 @@ class RavelApp extends ConsumerWidget {
       supportedLocales: const [Locale('id', 'ID'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: router,
+      // Like GhinaApp: the chosen mascot reaches every MascotView (sheets too).
       builder: (context, child) => AppearanceScope(
-        child: _RavelServices(
-          router: router,
-          child: child ?? const SizedBox.shrink(),
+        child: MascotKindScope(
+          child: _RavelServices(
+            router: router,
+            child: child ?? const SizedBox.shrink(),
+          ),
         ),
       ),
     );
@@ -80,6 +99,8 @@ class _RavelServices extends ConsumerStatefulWidget {
 class _RavelServicesState extends ConsumerState<_RavelServices> {
   StreamSubscription<String>? _taps;
   Set<String>? _seen;
+  bool _welcome = false;
+  ChildBackButtonDispatcher? _welcomeBack;
 
   void _open(String route) {
     if (!mounted || !(route == '/kantor' || route.startsWith('/kantor/'))) {
@@ -113,8 +134,48 @@ class _RavelServicesState extends ConsumerState<_RavelServices> {
     unawaited(RavelNotifications.requestPermission());
     // after the first frame: start reading the offline snapshot from disk
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(kantorSnapshotStoreProvider);
+      if (!mounted) return;
+      ref.read(kantorSnapshotStoreProvider);
+      unawaited(_welcomeMascot());
     });
+  }
+
+  /// Offers the mascot picker once, over whatever screen opened first.
+  Future<void> _welcomeMascot() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted || (prefs.getBool(ravelMascotChosenKey) ?? false)) return;
+      // Android back while the layer is up means "Nanti saja".
+      _welcomeBack =
+          ChildBackButtonDispatcher(widget.router.backButtonDispatcher)
+            ..addCallback(_welcomeBackPressed)
+            ..takePriority();
+      setState(() => _welcome = true);
+    } catch (_) {}
+  }
+
+  Future<bool> _welcomeBackPressed() async {
+    _finishWelcome();
+    return true;
+  }
+
+  void _finishWelcome() {
+    if (!_welcome) return;
+    _dropWelcomeBack();
+    setState(() => _welcome = false);
+    unawaited(
+      SharedPreferences.getInstance().then(
+        (p) => p.setBool(ravelMascotChosenKey, true),
+      ),
+    );
+  }
+
+  void _dropWelcomeBack() {
+    final back = _welcomeBack;
+    if (back == null) return;
+    _welcomeBack = null;
+    back.removeCallback(_welcomeBackPressed);
+    widget.router.backButtonDispatcher.forget(back);
   }
 
   @override
@@ -140,12 +201,20 @@ class _RavelServicesState extends ConsumerState<_RavelServices> {
       }
       _seen = current;
     });
-    return KantorWidgetSync(onOpen: _open, child: widget.child);
+    // Always a Stack, so showing the layer never rebuilds the navigator.
+    return Stack(
+      children: [
+        KantorWidgetSync(onOpen: _open, child: widget.child),
+        if (_welcome)
+          Positioned.fill(child: MascotWelcomeLayer(onDone: _finishWelcome)),
+      ],
+    );
   }
 
   @override
   void dispose() {
     _taps?.cancel();
+    _dropWelcomeBack();
     super.dispose();
   }
 }

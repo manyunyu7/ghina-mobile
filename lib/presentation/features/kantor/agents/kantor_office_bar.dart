@@ -7,7 +7,8 @@ import '../kantor_data.dart';
 import '../pages/kantor_office_switcher.dart';
 import '../session/kantor_feed.dart';
 
-/// Tinggi bilah ganti kantor (tanpa inset bawah). Chip di dalamnya 44dp.
+/// Tinggi bilah ganti kantor (tanpa inset bawah). Chip di dalamnya min 44dp,
+/// badge di chip min 20dp (sebaris dengan nama, tidak di sudut).
 const kKantorOfficeBarHeight = 56.0;
 
 /// Kantor untuk chip bilah bawah: favorit, lalu kantor lain yang sedang ada
@@ -101,12 +102,7 @@ class _KantorOfficeBarState extends ConsumerState<KantorOfficeBar> {
 
     Widget chip(Widget child) => Padding(
       padding: const EdgeInsets.only(right: GhinaSpace.sm),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: child,
-        ),
-      ),
+      child: Center(child: child),
     );
 
     return Material(
@@ -119,55 +115,252 @@ class _KantorOfficeBarState extends ConsumerState<KantorOfficeBar> {
         // inset bawah: gesture bar / tombol navigasi sistem
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: kKantorOfficeBarHeight,
-            child: Row(
-              children: [
-                Expanded(
-                  child: ListView(
-                    key: const ValueKey('kantor-office-bar-list'),
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.only(left: GhinaSpace.md),
+          // tinggi bilah tetap: skala teks sistem dibatasi supaya chip dan
+          // badge tidak meluap/terpotong
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.2,
+            child: SizedBox(
+              height: kKantorOfficeBarHeight,
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  // panel sempit (panel kiri dua-panel ±330dp): "Semua…"
+                  // cukup ikon supaya chip kantor dapat ruang lebih
+                  final narrow = box.maxWidth < 360;
+                  // lebar maksimum chip: nama dielipsis di dalamnya, badge
+                  // selalu utuh di kanan
+                  final maxChip = (box.maxWidth * 0.6).clamp(140.0, 240.0);
+                  return Row(
                     children: [
-                      for (final o in chips)
-                        chip(
-                          ChunkyChip(
-                            key: ValueKey('office-chip-${o['id']}'),
-                            label: '${o['name'] ?? o['id']}',
-                            icon: o['fav'] == true
-                                ? Icons.star_rounded
-                                : Icons.apartment_rounded,
-                            color: kantorOfficeSwatch('${o['name']}'),
-                            selected: '${o['id']}' == widget.currentId,
-                            onTap: () => _pick('${o['id']}'),
+                      Expanded(
+                        child: ListView(
+                          key: const ValueKey('kantor-office-bar-list'),
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.only(left: GhinaSpace.md),
+                          children: [
+                            for (final o in chips)
+                              chip(
+                                KantorOfficeChip(
+                                  key: ValueKey('office-chip-${o['id']}'),
+                                  label: '${o['name'] ?? o['id']}',
+                                  icon: o['fav'] == true
+                                      ? Icons.star_rounded
+                                      : Icons.apartment_rounded,
+                                  color: kantorOfficeSwatch('${o['name']}'),
+                                  selected: '${o['id']}' == widget.currentId,
+                                  badge: KantorOfficeBadgeData.of(o),
+                                  maxWidth: maxChip,
+                                  onTap: () => _pick('${o['id']}'),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // chip terakhir, selalu terlihat (tidak ikut tergeser)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: GhinaSpace.xs,
+                          right: GhinaSpace.md - GhinaSpace.sm,
+                        ),
+                        child: chip(
+                          KantorOfficeChip(
+                            key: const ValueKey('office-chip-all'),
+                            label: 'Semua…',
+                            icon: Icons.unfold_more_rounded,
+                            selected: false,
+                            iconOnly: narrow,
+                            onTap: () => showKantorOfficeSwitcher(
+                              context,
+                              currentId: widget.currentId,
+                              tab: widget.tab,
+                              onOffice: widget.onOffice,
+                            ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                // chip terakhir, selalu terlihat (tidak ikut tergeser)
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: GhinaSpace.xs,
-                    right: GhinaSpace.md - GhinaSpace.sm,
-                  ),
-                  child: chip(
-                    ChunkyChip(
-                      key: const ValueKey('office-chip-all'),
-                      label: 'Semua…',
-                      icon: Icons.unfold_more_rounded,
-                      selected: false,
-                      onTap: () => showKantorOfficeSwitcher(
-                        context,
-                        currentId: widget.currentId,
-                        tab: widget.tab,
-                        onOffice: widget.onOffice,
                       ),
-                    ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Isi badge chip kantor: jumlah dan nada warnanya.
+@immutable
+class KantorOfficeBadgeData {
+  const KantorOfficeBadgeData(this.count, this.tone);
+
+  final int count;
+  final KantorBadgeTone tone;
+
+  /// Badge untuk [office]: agen yang menunggu izin (perlu tindakan, merah)
+  /// didahulukan; selain itu jumlah agen hidup (biru/aksen bila ada yang
+  /// bekerja, netral bila semua idle). Null bila kantor sepi.
+  static KantorOfficeBadgeData? of(Map<String, dynamic> office) {
+    final live = [
+      for (final s in (office['sessions'] as List? ?? const []))
+        if (s is Map && s['status'] != 'ended') s,
+    ];
+    if (live.isEmpty) return null;
+    final waiting = live.where((s) => s['waiting'] != null).length;
+    if (waiting > 0) {
+      return KantorOfficeBadgeData(waiting, KantorBadgeTone.action);
+    }
+    final working = live.any((s) => s['status'] == 'working');
+    return KantorOfficeBadgeData(
+      live.length,
+      working ? KantorBadgeTone.active : KantorBadgeTone.quiet,
+    );
+  }
+
+  /// Teks badge: angka besar disingkat jadi "99+".
+  String get text => count > 99 ? '99+' : '$count';
+
+  /// Label pembaca layar.
+  String get semantic => switch (tone) {
+    KantorBadgeTone.action => '$count perlu tindakan',
+    KantorBadgeTone.active => '$count agen, ada yang bekerja',
+    KantorBadgeTone.quiet => '$count agen idle',
+  };
+}
+
+enum KantorBadgeTone { action, active, quiet }
+
+/// Chip kantor di bilah bawah: ikon, nama (elipsis bila panjang) dan badge
+/// sebaris di kanan. Badge bagian dari baris (bukan tumpukan di sudut), jadi
+/// tidak pernah terpotong tinggi bilah ataupun clip; yang mengalah hanya nama.
+class KantorOfficeChip extends StatelessWidget {
+  const KantorOfficeChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.color,
+    this.badge,
+    this.maxWidth = 240,
+    this.iconOnly = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final IconData? icon;
+
+  /// Null = `context.ghina.highlight`.
+  final ChunkySwatch? color;
+  final KantorOfficeBadgeData? badge;
+
+  /// Lebar maksimum chip; nama dielipsis supaya badge tetap utuh.
+  final double maxWidth;
+
+  /// Hanya ikon (label tetap jadi label semantik), untuk panel sempit.
+  final bool iconOnly;
+
+  /// Tinggi minimum chip (target sentuh).
+  static const minHeight = 44.0;
+
+  /// Tinggi minimum badge.
+  static const badgeMinSize = 20.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    final b = g.brightness;
+    final color = this.color ?? g.highlight;
+    final fg = selected ? color.base : g.textSecondary;
+    final badge = this.badge;
+    final semantic = [label, if (badge != null) badge.semantic].join(', ');
+    return AnimatedScale(
+      scale: selected ? 1.0 : 0.98,
+      duration: GhinaMotion.fast,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: minHeight,
+          minWidth: minHeight,
+          maxWidth: iconOnly ? double.infinity : maxWidth,
+        ),
+        child: ChunkySurface(
+          color: selected ? color.tint(b) : g.surface,
+          edgeColor: selected ? color.tintBorder(b) : g.borderEdge,
+          // kantor aktif: garis tepi warna penuh supaya jelas terlihat
+          borderColor: selected ? color.base : g.border,
+          depth: GhinaDepth.sm,
+          borderRadius: GhinaRadii.rMd,
+          padding: EdgeInsets.symmetric(
+            horizontal: iconOnly ? 10 : 12,
+            vertical: 8,
+          ),
+          onTap: onTap,
+          semanticLabel: semantic,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) Icon(icon, size: 18, color: fg),
+              if (!iconOnly) ...[
+                if (icon != null) const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: GhinaType.body.w(800).copyWith(color: fg),
                   ),
                 ),
               ],
-            ),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                KantorOfficeBadge(badge),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pil badge: min 20×20dp, angka 11sp tebal, warna dari colorScheme.
+class KantorOfficeBadge extends StatelessWidget {
+  const KantorOfficeBadge(this.data, {super.key});
+
+  final KantorOfficeBadgeData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (bg, fg) = switch (data.tone) {
+      KantorBadgeTone.action => (cs.error, cs.onError),
+      KantorBadgeTone.active => (cs.primary, cs.onPrimary),
+      KantorBadgeTone.quiet => (cs.surfaceContainerHighest, cs.onSurface),
+    };
+    return ExcludeSemantics(
+      child: Container(
+        key: const ValueKey('office-chip-badge'),
+        constraints: const BoxConstraints(
+          minWidth: KantorOfficeChip.badgeMinSize,
+          minHeight: KantorOfficeChip.badgeMinSize,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(KantorOfficeChip.badgeMinSize),
+        ),
+        child: Text(
+          data.text,
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+            color: fg,
           ),
         ),
       ),

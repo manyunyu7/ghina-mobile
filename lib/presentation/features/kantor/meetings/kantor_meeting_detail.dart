@@ -8,6 +8,7 @@ import '../roles/kantor_ui.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_meeting.dart';
 
 const _ownerLook = {
@@ -196,11 +197,14 @@ class _MeetingDetailState extends ConsumerState<KantorMeetingDetailScreen> {
           ? KantorErrorView(error: _error!, onRetry: () => _load(jump: true))
           : m == null
           ? const KantorLoading(count: 4)
-          : Column(
-              children: [
-                Expanded(child: _content(context, m, roles)),
-                if (m.running) _sayBar(context),
-              ],
+          // Transkrip dan kotak bicara dibatasi lebar baca di layar lebar.
+          : KantorReadable(
+              child: Column(
+                children: [
+                  Expanded(child: _content(context, m, roles)),
+                  if (m.running) _sayBar(context),
+                ],
+              ),
             ),
     );
   }

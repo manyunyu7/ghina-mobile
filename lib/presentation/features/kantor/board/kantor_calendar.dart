@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_board_data.dart';
 import 'kantor_board_lib.dart';
 import 'kantor_board_widgets.dart';
@@ -72,12 +73,15 @@ class _KantorCalendarScreenState extends ConsumerState<KantorCalendarScreen> {
           error: e,
           onRetry: () => ref.invalidate(kantorAllCardsProvider(id)),
         ),
-        data: _body,
+        // Layar lebar: grid bulan di kiri, daftar kartu di kanan.
+        data: (b) => LayoutBuilder(
+          builder: (context, box) => _body(b, box.maxWidth >= kKantorWideMin),
+        ),
       ),
     );
   }
 
-  Widget _body(KBoard b) {
+  Widget _body(KBoard b, bool wide) {
     final g = context.ghina;
     final cards = [
       for (final c in b.cards)
@@ -96,114 +100,153 @@ class _KantorCalendarScreenState extends ConsumerState<KantorCalendarScreen> {
       ..sort((a, x) => a.calDay.compareTo(x.calDay));
     final shown = _day == null ? monthCards : (byDay[_day] ?? const <KCard>[]);
     final today = kTodayStr();
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 32),
-      children: [
-        if (b.boards.isNotEmpty)
-          KChipStrip(
-            children: [
+    final chips = <Widget>[
+      if (b.boards.isNotEmpty)
+        KChipStrip(
+          children: [
+            ChunkyChip(
+              label: 'Semua papan',
+              selected: _board.isEmpty,
+              onTap: () => setState(() => _board = ''),
+            ),
+            for (final d in b.activeBoards)
               ChunkyChip(
-                label: 'Semua papan',
-                selected: _board.isEmpty,
-                onTap: () => setState(() => _board = ''),
+                label: d.icon.isEmpty ? d.name : '${d.icon} ${d.name}',
+                selected: _board == d.id,
+                onTap: () => setState(() => _board = d.id),
               ),
-              for (final d in b.activeBoards)
-                ChunkyChip(
-                  label: d.icon.isEmpty ? d.name : '${d.icon} ${d.name}',
-                  selected: _board == d.id,
-                  onTap: () => setState(() => _board = d.id),
-                ),
-            ],
-          ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left_rounded),
-                onPressed: () => _shift(-1),
-              ),
-              Expanded(
-                child: Text(
-                  '${_monthNames[_month.month - 1]} ${_month.year}',
-                  textAlign: TextAlign.center,
-                  style: GhinaType.h3.copyWith(color: g.textPrimary),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right_rounded),
-                onPressed: () => _shift(1),
-              ),
-            ],
-          ),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  for (final d in _dayNames)
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          d,
-                          style: GhinaType.caption.copyWith(color: g.textMuted),
-                        ),
+    ];
+    final month = <Widget>[
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chevron_left_rounded),
+              onPressed: () => _shift(-1),
+            ),
+            Expanded(
+              child: Text(
+                '${_monthNames[_month.month - 1]} ${_month.year}',
+                textAlign: TextAlign.center,
+                style: GhinaType.h3.copyWith(color: g.textPrimary),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.chevron_right_rounded),
+              onPressed: () => _shift(1),
+            ),
+          ],
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                for (final d in _dayNames)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        d,
+                        style: GhinaType.caption.copyWith(color: g.textMuted),
                       ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            for (var w = 0; w < cells ~/ 7; w++)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var k = 0; k < 7; k++)
+                    Expanded(
+                      child: _cell(w * 7 + k - lead + 1, days, byDay, b, today),
                     ),
                 ],
               ),
-              const SizedBox(height: 4),
-              for (var w = 0; w < cells ~/ 7; w++)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var k = 0; k < 7; k++)
-                      Expanded(
-                        child: _cell(
-                          w * 7 + k - lead + 1,
-                          days,
-                          byDay,
-                          b,
-                          today,
-                        ),
-                      ),
-                  ],
-                ),
-            ],
+          ],
+        ),
+      ),
+    ];
+    final list = <Widget>[
+      Padding(
+        padding: EdgeInsets.fromLTRB(16, wide ? 8 : 16, 16, 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                (_day == null
+                        ? 'Bulan ini (${shown.length})'
+                        : '${kFmtDay(_day)} (${shown.length})')
+                    .toUpperCase(),
+                style: GhinaType.overline.copyWith(color: g.textMuted),
+              ),
+            ),
+            if (_day != null)
+              TextButton(
+                onPressed: () => setState(() => _day = null),
+                child: const Text('Semua tanggal'),
+              ),
+          ],
+        ),
+      ),
+      if (shown.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Belum ada kartu dengan tanggal tayang.',
+            style: GhinaType.bodyS.copyWith(color: g.textMuted),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      for (final c in shown) _row(c, b),
+    ];
+    if (!wide) {
+      return ListView(
+        padding: const EdgeInsets.only(bottom: 32),
+        children: [...chips, ...month, ...list],
+      );
+    }
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ...chips,
+        Expanded(
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Text(
-                  (_day == null
-                          ? 'Bulan ini (${shown.length})'
-                          : '${kFmtDay(_day)} (${shown.length})')
-                      .toUpperCase(),
-                  style: GhinaType.overline.copyWith(color: g.textMuted),
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 32),
+                  children: [
+                    // Grid bulan dibatasi lebarnya supaya sel tidak melar.
+                    KantorReadable(
+                      maxWidth: 560,
+                      child: Column(children: month),
+                    ),
+                  ],
                 ),
               ),
-              if (_day != null)
-                TextButton(
-                  onPressed: () => setState(() => _day = null),
-                  child: const Text('Semua tanggal'),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: colors.outlineVariant,
+              ),
+              SizedBox(
+                width: kantorMasterWidth(MediaQuery.sizeOf(context).width),
+                child: ListView(
+                  padding: const EdgeInsets.only(bottom: 32),
+                  children: list,
                 ),
+              ),
             ],
           ),
         ),
-        if (shown.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Belum ada kartu dengan tanggal tayang.',
-              style: GhinaType.bodyS.copyWith(color: g.textMuted),
-            ),
-          ),
-        for (final c in shown) _row(c, b),
       ],
     );
   }

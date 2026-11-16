@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'wiki_format.dart';
 
 /// Revisions of one page, with a diff against the current text and restore.
@@ -109,41 +110,49 @@ class _WikiHistoryScreenState extends ConsumerState<WikiHistoryScreen> {
           : ListView(
               padding: const EdgeInsets.all(GhinaSpace.page),
               children: [
-                Text(
-                  'Pilih satu revisi untuk melihat perbedaannya dengan versi sekarang.',
-                  style: GhinaType.bodyS.copyWith(color: g.textMuted),
+                KantorReadable(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Pilih satu revisi untuk melihat perbedaannya dengan versi sekarang.',
+                        style: GhinaType.bodyS.copyWith(color: g.textMuted),
+                      ),
+                      const SizedBox(height: GhinaSpace.md),
+                      for (final r in _revs!.whereType<Map>())
+                        ChunkyTile(
+                          title: '#${r['id']} · ${r['author'] ?? ''}',
+                          subtitle: [
+                            agoId(r['at']),
+                            if ('${r['msg'] ?? ''}'.isNotEmpty) '${r['msg']}',
+                            if (r['size'] != null) '${r['size']} B',
+                          ].join(' · '),
+                          tinted: _sel?['id'].toString() == '${r['id']}'
+                              ? GhinaColors.blue
+                              : null,
+                          dense: true,
+                          onTap: () => _pick(r['id'] as Object),
+                        ),
+                      if (_sel != null) ...[
+                        const SizedBox(height: GhinaSpace.lg),
+                        SectionHeader(
+                          title:
+                              'Versi sekarang menjadi revisi #${_sel!['id']}',
+                        ),
+                        _Diff(
+                          a: '${widget.page['body'] ?? ''}',
+                          b: '${_sel!['body'] ?? ''}',
+                        ),
+                        const SizedBox(height: GhinaSpace.lg),
+                        ChunkyButton(
+                          label: 'Pulihkan versi ini',
+                          loading: _busy,
+                          onPressed: _busy ? null : _restore,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: GhinaSpace.md),
-                for (final r in _revs!.whereType<Map>())
-                  ChunkyTile(
-                    title: '#${r['id']} · ${r['author'] ?? ''}',
-                    subtitle: [
-                      agoId(r['at']),
-                      if ('${r['msg'] ?? ''}'.isNotEmpty) '${r['msg']}',
-                      if (r['size'] != null) '${r['size']} B',
-                    ].join(' · '),
-                    tinted: _sel?['id'].toString() == '${r['id']}'
-                        ? GhinaColors.blue
-                        : null,
-                    dense: true,
-                    onTap: () => _pick(r['id'] as Object),
-                  ),
-                if (_sel != null) ...[
-                  const SizedBox(height: GhinaSpace.lg),
-                  SectionHeader(
-                    title: 'Versi sekarang menjadi revisi #${_sel!['id']}',
-                  ),
-                  _Diff(
-                    a: '${widget.page['body'] ?? ''}',
-                    b: '${_sel!['body'] ?? ''}',
-                  ),
-                  const SizedBox(height: GhinaSpace.lg),
-                  ChunkyButton(
-                    label: 'Pulihkan versi ini',
-                    loading: _busy,
-                    onPressed: _busy ? null : _restore,
-                  ),
-                ],
               ],
             ),
     );
@@ -210,21 +219,26 @@ class _Diff extends StatelessWidget {
       );
     }
     flush();
-    return Container(
-      padding: const EdgeInsets.all(GhinaSpace.sm),
-      decoration: BoxDecoration(
-        color: g.surfaceAlt,
-        borderRadius: GhinaRadii.rMd,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: MediaQuery.sizeOf(context).width - 72,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: rows,
+    // lebar minimum mengikuti kolom tempat diff berada (bukan lebar layar),
+    // supaya di kolom baca / panel kanan tidak melebar keluar. Di layar sempit
+    // hasilnya sama dengan dulu: lebar layar - 72.
+    return LayoutBuilder(
+      builder: (context, c) => Container(
+        padding: const EdgeInsets.all(GhinaSpace.sm),
+        decoration: BoxDecoration(
+          color: g.surfaceAlt,
+          borderRadius: GhinaRadii.rMd,
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: c.maxWidth + 2 * GhinaSpace.page - 72,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rows,
+            ),
           ),
         ),
       ),

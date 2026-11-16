@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'wiki_editor_screen.dart';
 import 'wiki_format.dart';
 import 'wiki_page_screen.dart';
@@ -13,6 +14,10 @@ import 'wiki_tree.dart';
 
 /// Wiki of one office (or `_kompleks` for the shared one): page tree, search,
 /// and the entry to read / write pages.
+///
+/// Di layar lebar: pohon halaman + pencarian di kiri, halaman yang dibuka di
+/// panel kanan ([KantorMasterDetail]). Di layar sempit tetap satu daftar dan
+/// halaman dibuka penuh.
 class KantorWikiTab extends ConsumerStatefulWidget {
   const KantorWikiTab({super.key, required this.officeId});
 
@@ -115,25 +120,17 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
     });
   }
 
-  Future<void> _openPage(String ref_) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            WikiPageScreen(officeId: widget.officeId, pageRef: ref_),
-      ),
-    );
-    if (mounted) _load(quiet: true);
-  }
-
-  Future<void> _newPage({bool playbook = false}) async {
-    final slug = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => WikiEditorScreen(officeId: widget.officeId),
-      ),
+  // Membuka halaman lewat [KantorMasterDetail]: sempit = halaman penuh lalu
+  // daftar dimuat ulang diam-diam saat kembali (onClosed), lebar = panel kanan.
+  Future<void> _newPage(void Function(String) open) async {
+    // editor: sempit tetap halaman penuh, lebar jadi panel samping
+    final slug = await kantorPushAdaptive<String>(
+      context,
+      (_) => WikiEditorScreen(officeId: widget.officeId),
     );
     if (!mounted) return;
     await _load(quiet: true);
-    if (slug != null && mounted) _openPage(slug);
+    if (slug != null && mounted) open(slug);
   }
 
   @override
@@ -144,6 +141,33 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
       if (m['office'] != '*' && m['office'] != widget.officeId) return;
       _load(quiet: true);
     });
+    return KantorMasterDetail<String>(
+      // ganti kantor = pilihan halaman ikut kosong lagi
+      key: ValueKey('wiki-${widget.officeId}'),
+      keyOf: (slug) => slug,
+      master: _master,
+      detail: (c, slug) => WikiPageScreen(
+        officeId: widget.officeId,
+        pageRef: slug,
+        // panel kanan tidak pernah "kembali", jadi pohon disegarkan langsung
+        // setiap halaman diubah / dipindah / dihapus
+        onChanged: kantorIsWide(c) ? () => _load(quiet: true) : null,
+      ),
+      empty: const KantorPaneEmpty(
+        icon: Icons.menu_book_outlined,
+        text: 'Pilih halaman wiki di kiri untuk membacanya.',
+      ),
+      onClosed: () {
+        if (mounted) _load(quiet: true);
+      },
+    );
+  }
+
+  Widget _master(
+    BuildContext context,
+    String? sel,
+    void Function(String) open,
+  ) {
     if (_loading && _tree == null) return const KantorLoading();
     if (_error != null && _tree == null) {
       return KantorErrorView(error: _error!, onRetry: _load);
@@ -174,7 +198,7 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
                   label: 'Halaman baru',
                   icon: Icons.add,
                   size: ChunkyButtonSize.small,
-                  onPressed: _newPage,
+                  onPressed: () => _newPage(open),
                 ),
               ),
               const SizedBox(width: GhinaSpace.sm),
@@ -187,11 +211,11 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
           ),
           const SizedBox(height: GhinaSpace.lg),
           if (_results != null)
-            ..._searchResults(g)
+            ..._searchResults(g, sel, open)
           else if (_pbOnly)
-            ..._playbooks(tree, g)
+            ..._playbooks(tree, g, sel, open)
           else
-            ..._treeRows(tree, g),
+            ..._treeRows(tree, g, sel, open),
           if (_results == null && !_isKompleks && _sources.isNotEmpty) ...[
             const SizedBox(height: GhinaSpace.xl),
             const SectionHeader(title: 'Dari repo (hanya baca)'),
@@ -202,13 +226,12 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
                 leading: const Icon(Icons.description_outlined),
                 showChevron: true,
                 dense: true,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => WikiSourceScreen(
-                      officeId: widget.officeId,
-                      file: '${s['file']}',
-                      label: '${s['label']}',
-                    ),
+                onTap: () => kantorPushAdaptive<void>(
+                  context,
+                  (_) => WikiSourceScreen(
+                    officeId: widget.officeId,
+                    file: '${s['file']}',
+                    label: '${s['label']}',
                   ),
                 ),
               ),
@@ -218,7 +241,11 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
     );
   }
 
-  List<Widget> _searchResults(GhinaTokens g) {
+  List<Widget> _searchResults(
+    GhinaTokens g,
+    String? sel,
+    void Function(String) open,
+  ) {
     final r = _results!;
     if (r.isEmpty) {
       return [
@@ -235,12 +262,20 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
           title: '${x['title']}',
           subtitle: '${x['snippet'] ?? ''}'.replaceAll('\n', ' '),
           showChevron: true,
-          onTap: () => _openPage('${x['slug']}'),
+          tinted: sel != null && sel == '${x['slug']}'
+              ? GhinaColors.blue
+              : null,
+          onTap: () => open('${x['slug']}'),
         ),
     ];
   }
 
-  List<Widget> _playbooks(WikiTree tree, GhinaTokens g) {
+  List<Widget> _playbooks(
+    WikiTree tree,
+    GhinaTokens g,
+    String? sel,
+    void Function(String) open,
+  ) {
     final pbs = tree.pages.where((p) => p['playbook'] == true).toList()
       ..sort((a, b) => (a['title'] as String).compareTo(b['title'] as String));
     if (pbs.isEmpty) {
@@ -264,12 +299,18 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
             style: const TextStyle(fontSize: 20),
           ),
           showChevron: true,
-          onTap: () => _openPage('${p['slug']}'),
+          tinted: sel != null && sel == p['slug'] ? GhinaColors.blue : null,
+          onTap: () => open('${p['slug']}'),
         ),
     ];
   }
 
-  List<Widget> _treeRows(WikiTree tree, GhinaTokens g) {
+  List<Widget> _treeRows(
+    WikiTree tree,
+    GhinaTokens g,
+    String? sel,
+    void Function(String) open,
+  ) {
     if (tree.pages.isEmpty) {
       return [
         EmptyState(
@@ -277,7 +318,7 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
           message: 'Tulis halaman pertama wiki kantor ini, yuk.',
           mood: MascotMood.sleeping,
           actionLabel: 'Halaman baru',
-          onAction: _newPage,
+          onAction: () => _newPage(open),
         ),
       ];
     }
@@ -290,11 +331,12 @@ class _KantorWikiTabState extends ConsumerState<KantorWikiTab> {
           depth: depth,
           expandable: tree.hasKids(p['slug'] as String),
           open: _open.contains(p['slug']),
+          selected: sel != null && sel == p['slug'],
           onToggle: () => setState(() {
             final s = p['slug'] as String;
             _open.contains(s) ? _open.remove(s) : _open.add(s);
           }),
-          onTap: () => _openPage(p['slug'] as String),
+          onTap: () => open(p['slug'] as String),
         ),
     ];
   }
@@ -308,6 +350,7 @@ class _TreeRow extends StatelessWidget {
     required this.open,
     required this.onToggle,
     required this.onTap,
+    this.selected = false,
   });
 
   final Map<String, dynamic> page;
@@ -316,6 +359,9 @@ class _TreeRow extends StatelessWidget {
   final bool open;
   final VoidCallback onToggle;
   final VoidCallback onTap;
+
+  /// Halaman ini sedang terbuka di panel kanan (layar lebar).
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -326,48 +372,56 @@ class _TreeRow extends StatelessWidget {
       child: InkWell(
         borderRadius: GhinaRadii.rMd,
         onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 46),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 40,
-                child: expandable
-                    ? IconButton(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: open ? 'Ciutkan' : 'Buka',
-                        icon: Icon(
-                          open ? Icons.expand_more : Icons.chevron_right,
-                          color: g.textSecondary,
-                        ),
-                        onPressed: onToggle,
-                      )
-                    : null,
-              ),
-              Text(
-                icon != null && icon.isNotEmpty ? icon : '·',
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(width: GhinaSpace.sm),
-              Expanded(
-                child: Text(
-                  '${page['title']}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.body.w(700).copyWith(color: g.textPrimary),
+        child: Ink(
+          decoration: selected
+              ? BoxDecoration(
+                  color: GhinaColors.blue.tint(Theme.of(context).brightness),
+                  borderRadius: GhinaRadii.rMd,
+                )
+              : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 46),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 40,
+                  child: expandable
+                      ? IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: open ? 'Ciutkan' : 'Buka',
+                          icon: Icon(
+                            open ? Icons.expand_more : Icons.chevron_right,
+                            color: g.textSecondary,
+                          ),
+                          onPressed: onToggle,
+                        )
+                      : null,
                 ),
-              ),
-              if (page['playbook'] == true)
-                const Padding(
-                  padding: EdgeInsets.only(left: 6),
-                  child: Text('📘', style: TextStyle(fontSize: 14)),
+                Text(
+                  icon != null && icon.isNotEmpty ? icon : '·',
+                  style: const TextStyle(fontSize: 18),
                 ),
-              const SizedBox(width: GhinaSpace.sm),
-              Text(
-                agoId(page['updated_at']),
-                style: GhinaType.caption.copyWith(color: g.textMuted),
-              ),
-            ],
+                const SizedBox(width: GhinaSpace.sm),
+                Expanded(
+                  child: Text(
+                    '${page['title']}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GhinaType.body.w(700).copyWith(color: g.textPrimary),
+                  ),
+                ),
+                if (page['playbook'] == true)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: Text('📘', style: TextStyle(fontSize: 14)),
+                  ),
+                const SizedBox(width: GhinaSpace.sm),
+                Text(
+                  agoId(page['updated_at']),
+                  style: GhinaType.caption.copyWith(color: g.textMuted),
+                ),
+              ],
+            ),
           ),
         ),
       ),

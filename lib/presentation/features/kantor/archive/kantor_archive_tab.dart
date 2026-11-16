@@ -9,6 +9,7 @@ import '../roles/kantor_shift_sheet.dart' show kantorPermModes;
 import '../roles/kantor_ui.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_transcript_screen.dart';
 
 /// One archived (or running) session of the office.
@@ -164,6 +165,26 @@ class _KantorArchiveTabState extends ConsumerState<KantorArchiveTab> {
         ref.invalidate(kantorArchiveProvider(id));
       }
     });
+    // Layar lebar: daftar sesi di kiri, transkrip di kanan.
+    // Layar sempit: hanya daftar; transkrip dibuka halaman penuh seperti dulu.
+    return KantorMasterDetail<KantorArchiveRow>(
+      keyOf: (a) => a.sid,
+      empty: const KantorPaneEmpty(
+        icon: Icons.history_rounded,
+        text: 'Pilih sesi di kiri untuk membaca transkripnya.',
+      ),
+      master: _list,
+      detail: (_, a) => KantorTranscriptScreen(sid: a.sid, title: a.label),
+    );
+  }
+
+  /// Panel daftar sesi; [selected] adalah sesi yang transkripnya terbuka.
+  Widget _list(
+    BuildContext context,
+    KantorArchiveRow? selected,
+    void Function(KantorArchiveRow) open,
+  ) {
+    final id = widget.officeId;
     final g = context.ghina;
     final rows = ref.watch(kantorArchiveProvider(id));
     final roles =
@@ -233,7 +254,15 @@ class _KantorArchiveTabState extends ConsumerState<KantorArchiveTab> {
               for (final a in shown)
                 Padding(
                   padding: const EdgeInsets.only(bottom: GhinaSpace.md),
-                  child: _row(context, a, roles, office, g),
+                  child: _row(
+                    context,
+                    a,
+                    roles,
+                    office,
+                    g,
+                    selected: selected?.sid == a.sid,
+                    open: open,
+                  ),
                 ),
             ],
           ),
@@ -247,8 +276,10 @@ class _KantorArchiveTabState extends ConsumerState<KantorArchiveTab> {
     KantorArchiveRow a,
     List<KantorRole> roles,
     KantorOffice? office,
-    GhinaTokens g,
-  ) {
+    GhinaTokens g, {
+    required bool selected,
+    required void Function(KantorArchiveRow) open,
+  }) {
     final role = roles.where((r) => r.id == a.role).firstOrNull;
     final meta = [
       role?.name ?? 'Sesi manual',
@@ -259,11 +290,9 @@ class _KantorArchiveTabState extends ConsumerState<KantorArchiveTab> {
       if (a.cost > 0) kantorUsd(a.cost),
     ].where((s) => s.isNotEmpty).join(' · ');
     return ChunkyCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => KantorTranscriptScreen(sid: a.sid, title: a.label),
-        ),
-      ),
+      // Sorotan untuk sesi yang transkripnya terbuka di panel kanan.
+      tinted: selected ? GhinaColors.blue : null,
+      onTap: () => open(a),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -299,20 +328,18 @@ class _KantorArchiveTabState extends ConsumerState<KantorArchiveTab> {
             ],
           ),
           const SizedBox(height: GhinaSpace.sm),
-          Row(
+          // Wrap (bukan Row) supaya tombol turun baris di panel kiri yang
+          // sempit (320dp) alih-alih overflow.
+          Wrap(
+            spacing: GhinaSpace.sm,
+            runSpacing: GhinaSpace.sm,
             children: [
               ChunkyButton(
                 label: 'Transkrip',
                 size: ChunkyButtonSize.small,
                 variant: ChunkyButtonVariant.outline,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        KantorTranscriptScreen(sid: a.sid, title: a.label),
-                  ),
-                ),
+                onPressed: () => open(a),
               ),
-              const SizedBox(width: GhinaSpace.sm),
               if (a.active)
                 ChunkyButton(
                   label: 'Buka',

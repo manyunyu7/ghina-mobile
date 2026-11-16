@@ -10,6 +10,7 @@ import '../../../design_system/design_system.dart';
 import '../roles/kantor_role.dart';
 import '../roles/kantor_ui.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_file_viewer.dart';
 import 'kantor_files_model.dart';
 
@@ -181,21 +182,8 @@ class _KantorFilesTabState extends ConsumerState<KantorFilesTab> {
       kantorToast(context, done > 1 ? '$done file diupload' : 'File diupload');
   }
 
-  void _openFile(KantorFileEntry e, String root) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => KantorFileViewerScreen(
-          officeId: widget.officeId,
-          path: e.path,
-          root: root,
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final g = context.ghina;
     ref.listen(kantorEventsProvider, (_, next) {
       final m = next.value;
       if (m != null &&
@@ -205,6 +193,31 @@ class _KantorFilesTabState extends ConsumerState<KantorFilesTab> {
         ref.invalidate(kantorFolderProvider(_key));
       }
     });
+    // Layar lebar: daftar file/folder di kiri, file yang dibuka di kanan.
+    // Layar sempit: hanya daftar; membuka file = halaman penuh seperti dulu.
+    return KantorMasterDetail<_OpenFile>(
+      keyOf: (f) => f.path,
+      empty: const KantorPaneEmpty(
+        icon: Icons.description_outlined,
+        text: 'Pilih file di kiri untuk membukanya.',
+      ),
+      master: _browser,
+      detail: (_, f) => KantorFileViewerScreen(
+        officeId: widget.officeId,
+        path: f.path,
+        root: f.root,
+      ),
+    );
+  }
+
+  /// Panel daftar: cari, breadcrumb, tombol, dan isi folder. Navigasi folder
+  /// tetap di sini; [selected] adalah file yang sedang terbuka di kanan.
+  Widget _browser(
+    BuildContext context,
+    _OpenFile? selected,
+    void Function(_OpenFile) open,
+  ) {
+    final g = context.ghina;
     final folder = ref.watch(kantorFolderProvider(_key));
     final officeName =
         ref.watch(kantorOfficeProvider(widget.officeId)).value?.name ??
@@ -352,7 +365,10 @@ class _KantorFilesTabState extends ConsumerState<KantorFilesTab> {
                                 if (e.mtime != null)
                                   kantorAgo(e.mtime!.toUtc().toIso8601String()),
                               ].where((s) => s.isNotEmpty).join(' · '),
-                        onTap: () => e.dir ? _cd(e.path) : _openFile(e, f.root),
+                        selected: !e.dir && selected?.path == e.path,
+                        onTap: () => e.dir
+                            ? _cd(e.path)
+                            : open((path: e.path, root: f.root)),
                       ),
                     if (_results == null && f.hidden > 0)
                       Padding(
@@ -389,6 +405,7 @@ class _KantorFilesTabState extends ConsumerState<KantorFilesTab> {
     required String title,
     String? subtitle,
     Color? iconColor,
+    bool selected = false,
     required VoidCallback onTap,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
@@ -397,7 +414,12 @@ class _KantorFilesTabState extends ConsumerState<KantorFilesTab> {
       subtitle: subtitle == null || subtitle.isEmpty ? null : subtitle,
       leading: Icon(icon, color: iconColor ?? context.ghina.textSecondary),
       dense: true,
+      // Sorotan untuk file yang sedang terbuka di panel kanan.
+      tinted: selected ? GhinaColors.blue : null,
       onTap: onTap,
     ),
   );
 }
+
+/// File yang dibuka: path relatif + folder kantor absolut (untuk "Salin path").
+typedef _OpenFile = ({String path, String root});

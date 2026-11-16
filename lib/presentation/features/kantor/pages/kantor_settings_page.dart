@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
+import '../../../state/appearance_provider.dart';
+import '../../../state/mascot_kind_provider.dart';
+import '../../settings/pages/appearance_page.dart' show themeModeLabel;
 import '../kantor_data.dart';
 import '../session/chat_view_prefs.dart';
 import 'kantor_daemon_settings.dart';
@@ -214,6 +217,36 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
           ),
           const SizedBox(height: GhinaSpace.xl),
           const KantorDaemonSettings(),
+          // Ghina has its own entry under Pengaturan; Ravel only has this page.
+          if (ref.watch(kantorOnlyProvider)) ...[
+            ChunkyTile(
+              key: const ValueKey('kantor-settings-mascot'),
+              title: 'Maskot',
+              subtitle:
+                  '${ref.watch(mascotKindProvider).label} · ketuk buat ganti',
+              leading: const MascotView(
+                size: 40,
+                animate: false,
+                showShadow: false,
+              ),
+              showChevron: true,
+              onTap: () => context.push('/settings/mascot'),
+            ),
+            GhinaSpace.gapSm,
+            ChunkyTile(
+              key: const ValueKey('kantor-settings-appearance'),
+              title: 'Tampilan',
+              subtitle: _lookSummary(ref.watch(appearanceProvider)),
+              leading: Icon(switch (ref.watch(appearanceProvider).mode) {
+                ThemeMode.system => Icons.brightness_auto_rounded,
+                ThemeMode.light => Icons.light_mode_rounded,
+                ThemeMode.dark => Icons.dark_mode_rounded,
+              }),
+              showChevron: true,
+              onTap: () => context.push('/settings/appearance'),
+            ),
+            GhinaSpace.gapSm,
+          ],
           ChunkyTile(
             title: 'Tampilan chat',
             subtitle: 'Ukuran teks, wallpaper, gelembung, warna, maskot',
@@ -243,3 +276,7 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
     );
   }
 }
+
+/// "Mode: Gelap · Biru": what Ravel's "Tampilan" entry opens.
+String _lookSummary(GhinaAppearance a) =>
+    'Mode: ${themeModeLabel(a.mode)} · ${a.accent.label}';

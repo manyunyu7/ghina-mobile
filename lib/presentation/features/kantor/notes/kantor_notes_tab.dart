@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import '../wiki/wiki_format.dart';
 import 'note_colors.dart';
 import 'note_editor_screen.dart';
@@ -97,10 +99,11 @@ class _KantorNotesTabState extends ConsumerState<KantorNotesTab> {
   }
 
   Future<void> _open(Map<String, dynamic> n) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => NoteEditorScreen(officeId: widget.officeId, note: n),
-      ),
+    // Layar sempit: halaman penuh seperti dulu. Layar lebar: panel samping
+    // kanan, daftar catatan tetap terlihat di belakangnya.
+    await kantorPushAdaptive<void>(
+      context,
+      (_) => NoteEditorScreen(officeId: widget.officeId, note: n),
     );
     if (mounted) _load(quiet: true);
   }
@@ -150,84 +153,106 @@ class _KantorNotesTabState extends ConsumerState<KantorNotesTab> {
               96,
             ),
             children: [
-              ChunkyTextField(
-                controller: _search,
-                hint: 'Cari catatan',
-                prefixIcon: Icons.search,
-                onChanged: (v) {
-                  _debounce?.cancel();
-                  _debounce = Timer(const Duration(milliseconds: 300), () {
-                    _q = v.trim();
-                    _load(quiet: true);
-                  });
-                },
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              ChunkySegmented<String>(
-                segments: const [
-                  ChunkySegment(value: 'aktif', label: 'Aktif'),
-                  ChunkySegment(value: 'arsip', label: 'Arsip'),
-                  ChunkySegment(value: 'sampah', label: 'Sampah'),
-                ],
-                value: _view,
-                onChanged: (v) {
-                  setState(() => _view = v);
-                  _load();
-                },
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              Row(
-                children: [
-                  for (final c in noteColors)
-                    Padding(
-                      padding: const EdgeInsets.only(right: GhinaSpace.sm),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () =>
-                            setState(() => _color = _color == c ? '' : c),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: noteSwatch(c).base,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _color == c
-                                  ? g.textPrimary
-                                  : Colors.transparent,
-                              width: 3,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              if (_tags.isNotEmpty || _tag.isNotEmpty) ...[
-                const SizedBox(height: GhinaSpace.md),
-                Wrap(
-                  spacing: GhinaSpace.sm,
-                  runSpacing: GhinaSpace.sm,
-                  children: [
-                    for (final t
-                        in (_tags.isEmpty
-                            ? [
-                                {'tag': _tag, 'n': 0},
-                              ]
-                            : _tags))
-                      ChunkyChip(
-                        label: '${t['tag']}${t['n'] == 0 ? '' : ' ${t['n']}'}',
-                        selected: _tag == t['tag'],
-                        onTap: () {
-                          setState(
-                            () => _tag = _tag == t['tag'] ? '' : '${t['tag']}',
+              // Penyaring (cari, tampilan, warna, tag) dibatasi lebar supaya
+              // tidak melebar penuh di layar lebar; grid catatan tetap penuh.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: kKantorListMax),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ChunkyTextField(
+                        controller: _search,
+                        hint: 'Cari catatan',
+                        prefixIcon: Icons.search,
+                        onChanged: (v) {
+                          _debounce?.cancel();
+                          _debounce = Timer(
+                            const Duration(milliseconds: 300),
+                            () {
+                              _q = v.trim();
+                              _load(quiet: true);
+                            },
                           );
-                          _load(quiet: true);
                         },
                       ),
-                  ],
+                      const SizedBox(height: GhinaSpace.md),
+                      ChunkySegmented<String>(
+                        segments: const [
+                          ChunkySegment(value: 'aktif', label: 'Aktif'),
+                          ChunkySegment(value: 'arsip', label: 'Arsip'),
+                          ChunkySegment(value: 'sampah', label: 'Sampah'),
+                        ],
+                        value: _view,
+                        onChanged: (v) {
+                          setState(() => _view = v);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(height: GhinaSpace.md),
+                      Row(
+                        children: [
+                          for (final c in noteColors)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                right: GhinaSpace.sm,
+                              ),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => setState(
+                                  () => _color = _color == c ? '' : c,
+                                ),
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: noteSwatch(c).base,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _color == c
+                                          ? g.textPrimary
+                                          : Colors.transparent,
+                                      width: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (_tags.isNotEmpty || _tag.isNotEmpty) ...[
+                        const SizedBox(height: GhinaSpace.md),
+                        Wrap(
+                          spacing: GhinaSpace.sm,
+                          runSpacing: GhinaSpace.sm,
+                          children: [
+                            for (final t
+                                in (_tags.isEmpty
+                                    ? [
+                                        {'tag': _tag, 'n': 0},
+                                      ]
+                                    : _tags))
+                              ChunkyChip(
+                                label:
+                                    '${t['tag']}${t['n'] == 0 ? '' : ' ${t['n']}'}',
+                                selected: _tag == t['tag'],
+                                onTap: () {
+                                  setState(
+                                    () => _tag = _tag == t['tag']
+                                        ? ''
+                                        : '${t['tag']}',
+                                  );
+                                  _load(quiet: true);
+                                },
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ],
+              ),
               const SizedBox(height: GhinaSpace.lg),
               if (_loading && _notes.isEmpty)
                 const KantorLoading(count: 3)
@@ -296,7 +321,14 @@ class _KantorNotesTabState extends ConsumerState<KantorNotesTab> {
   }
 }
 
-/// Two columns, each note on the shorter one.
+/// Jumlah kolom grid catatan untuk lebar [width]: minimal 2 (tampilan HP
+/// seperti dulu), di layar lebar bertambah sampai 5 supaya kartu tidak
+/// melebar.
+int kantorNoteColumns(double width) =>
+    math.max(2, kantorGridColumns(width, minTile: 240, max: 5));
+
+/// Beberapa kolom (2 di HP, lebih banyak di layar lebar), tiap catatan
+/// masuk ke kolom yang paling pendek.
 class _Masonry extends StatelessWidget {
   const _Masonry({required this.notes, required this.onTap});
 
@@ -304,22 +336,30 @@ class _Masonry extends StatelessWidget {
   final void Function(Map<String, dynamic>) onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final cols = <List<Map<String, dynamic>>>[[], []];
-    final h = [0, 0];
-    for (final n in notes) {
-      final i = h[0] <= h[1] ? 0 : 1;
-      cols[i].add(n);
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) => _grid(kantorNoteColumns(c.maxWidth)),
+  );
+
+  Widget _grid(int n) {
+    final cols = [for (var i = 0; i < n; i++) <Map<String, dynamic>>[]];
+    final h = List.filled(n, 0);
+    for (final note in notes) {
+      // kolom terpendek; seri dimenangkan kolom paling kiri
+      var i = 0;
+      for (var k = 1; k < n; k++) {
+        if (h[k] < h[i]) i = k;
+      }
+      cols[i].add(note);
       h[i] +=
           60 +
-          ('${n['body'] ?? ''}'.length.clamp(0, 220)) +
-          ('${n['title'] ?? ''}'.length > 20 ? 20 : 0);
+          ('${note['body'] ?? ''}'.length.clamp(0, 220)) +
+          ('${note['title'] ?? ''}'.length > 20 ? 20 : 0);
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < 2; i++) ...[
-          if (i == 1) const SizedBox(width: GhinaSpace.md),
+        for (var i = 0; i < n; i++) ...[
+          if (i > 0) const SizedBox(width: GhinaSpace.md),
           Expanded(
             child: Column(
               children: [

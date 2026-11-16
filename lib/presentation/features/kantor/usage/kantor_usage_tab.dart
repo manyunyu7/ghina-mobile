@@ -8,6 +8,7 @@ import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/chart_empty.dart';
 import '../payroll/kantor_payroll_tab.dart' show tok, usd, num_;
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_limits_card.dart';
 import 'kantor_usage_data.dart';
 
@@ -74,11 +75,29 @@ class _KantorUsageTabState extends ConsumerState<KantorUsageTab> {
 
   @override
   Widget build(BuildContext context) {
-    final g = context.ghina;
     final async = ref.watch(
       kantorUsageSummaryProvider((widget.officeId, _range)),
     );
     final d = async.value;
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Layar lebar (lebar lokal): kartu ringkasan & daftar rincian dibuat
+        // berkolom. Layar sempit: [wide] = false, tampilan tetap seperti dulu.
+        final wide = box.maxWidth >= kKantorWideMin;
+        final inner = box.maxWidth - GhinaSpace.page * 2;
+        return _page(context, async, d, wide ? inner : null);
+      },
+    );
+  }
+
+  /// [inner] = lebar isi saat layar lebar, `null` di layar sempit.
+  Widget _page(
+    BuildContext context,
+    AsyncValue<Map<String, dynamic>> async,
+    Map<String, dynamic>? d,
+    double? inner,
+  ) {
+    final g = context.ghina;
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
@@ -120,13 +139,14 @@ class _KantorUsageTabState extends ConsumerState<KantorUsageTab> {
               onRetry: _refresh,
             )
           else
-            ..._body(d),
+            ..._body(d, inner),
         ],
       ),
     );
   }
 
-  List<Widget> _body(Map<String, dynamic> d) {
+  List<Widget> _body(Map<String, dynamic> d, double? inner) {
+    final wide = inner != null;
     final g = context.ghina;
     final t = (d['totals'] as Map?) ?? const {};
     final avg = (d['avgPerSession'] as Map?) ?? const {};
@@ -136,13 +156,20 @@ class _KantorUsageTabState extends ConsumerState<KantorUsageTab> {
     final tokens = _n(t['tokens']);
     final hasData = tokens > 0 || _n(t['sessions']) > 0;
     return [
-      GridView.count(
-        crossAxisCount: 2,
+      GridView(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: GhinaSpace.md,
-        crossAxisSpacing: GhinaSpace.md,
-        childAspectRatio: 1.9,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          // Lebar: kartu ringkasan berjajar (min ±200dp, maks 3) dengan
+          // tinggi tetap supaya tidak membesar ikut lebar. Sempit: seperti dulu.
+          crossAxisCount: wide
+              ? kantorGridColumns(inner, minTile: 200, max: 3)
+              : 2,
+          mainAxisSpacing: GhinaSpace.md,
+          crossAxisSpacing: GhinaSpace.md,
+          childAspectRatio: 1.9,
+          mainAxisExtent: wide ? 112 : null,
+        ),
         children: [
           _Kpi(tok(tokens), 'Total token'),
           _Kpi(usd(_n(t['cost'])), 'Biaya setara API (Claude)'),
@@ -195,28 +222,69 @@ class _KantorUsageTabState extends ConsumerState<KantorUsageTab> {
           child: ChartEmpty(label: 'Belum ada pemakaian di rentang ini.'),
         )
       else ...[
-        if (_global && _list(d['byOffice']).isNotEmpty) ...[
-          const SizedBox(height: GhinaSpace.xl),
-          const SectionHeader(title: 'Per kantor'),
-          ..._rows(_list(d['byOffice']), tokens),
-        ],
         const SizedBox(height: GhinaSpace.xl),
-        const SectionHeader(title: 'Per peran'),
-        ..._rows(_list(d['byRole']), tokens, withOffice: _global),
-        const SizedBox(height: GhinaSpace.xl),
-        const SectionHeader(title: 'Per model'),
-        ..._rows(_list(d['byModel']), tokens, nameKey: 'label'),
-        const SizedBox(height: GhinaSpace.xl),
-        const SectionHeader(title: 'Per mesin'),
-        ..._rows(_list(d['byMachine']), tokens),
-        const SizedBox(height: GhinaSpace.xl),
-        const SectionHeader(title: 'Sesi terboros'),
-        ..._sessions(_list(d['topSessions'])),
+        ..._sections([
+          if (_global && _list(d['byOffice']).isNotEmpty)
+            [
+              const SectionHeader(title: 'Per kantor'),
+              ..._rows(_list(d['byOffice']), tokens),
+            ],
+          [
+            const SectionHeader(title: 'Per peran'),
+            ..._rows(_list(d['byRole']), tokens, withOffice: _global),
+          ],
+          [
+            const SectionHeader(title: 'Per model'),
+            ..._rows(_list(d['byModel']), tokens, nameKey: 'label'),
+          ],
+          [
+            const SectionHeader(title: 'Per mesin'),
+            ..._rows(_list(d['byMachine']), tokens),
+          ],
+          [
+            const SectionHeader(title: 'Sesi terboros'),
+            ..._sessions(_list(d['topSessions'])),
+          ],
+        ], wide ? kantorGridColumns(inner, minTile: 340, max: 2) : 1),
       ],
       const SizedBox(height: GhinaSpace.xl),
       Text(
         '${d['costNote'] ?? ''} Jumlah tool call dan baris yang diedit belum dicatat.',
         style: GhinaType.caption.copyWith(color: g.textMuted),
+      ),
+    ];
+  }
+
+  /// Sempit ([cols] == 1): bagian ditumpuk berjarak xl seperti dulu.
+  /// Lebar: bagian dibagi bergiliran ke [cols] kolom berdampingan.
+  List<Widget> _sections(List<List<Widget>> sections, int cols) {
+    if (cols <= 1) {
+      return [
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i > 0) const SizedBox(height: GhinaSpace.xl),
+          ...sections[i],
+        ],
+      ];
+    }
+    return [
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var c = 0; c < cols; c++) ...[
+            if (c > 0) const SizedBox(width: GhinaSpace.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = c; i < sections.length; i += cols) ...[
+                    if (i >= cols) const SizedBox(height: GhinaSpace.xl),
+                    ...sections[i],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     ];
   }

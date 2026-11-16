@@ -7,23 +7,29 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_board_data.dart';
 import 'kantor_board_lib.dart';
 import 'kantor_board_widgets.dart';
 import 'kantor_label_manager.dart';
 
-/// Opens the full-screen detail of an existing card.
+/// Lebar panel samping detail kartu di layar lebar.
+const kKantorCardPanelWidth = 600.0;
+
+/// Membuka detail kartu: layar sempit halaman penuh, layar lebar panel
+/// samping kanan (board/kalender/timeline tetap terlihat di belakangnya).
 Future<void> openKantorCard(
   BuildContext context, {
   required String officeId,
   required String cardId,
-}) => Navigator.of(context).push<void>(
-  MaterialPageRoute(
-    builder: (_) => KantorCardScreen(officeId: officeId, cardId: cardId),
-  ),
+}) => kantorPushAdaptive<void>(
+  context,
+  (_) => KantorCardScreen(officeId: officeId, cardId: cardId),
+  panelWidth: kKantorCardPanelWidth,
 );
 
-/// Opens the detail in "new card" mode; nothing is saved until "Buat kartu".
+/// Membuka detail mode "kartu baru" (adaptif seperti [openKantorCard]);
+/// belum tersimpan sampai "Buat kartu".
 Future<void> openKantorNewCard(
   BuildContext context, {
   required String officeId,
@@ -32,17 +38,17 @@ Future<void> openKantorNewCard(
   String title = '',
   String who = '',
   String repo = '',
-}) => Navigator.of(context).push<void>(
-  MaterialPageRoute(
-    builder: (_) => KantorCardScreen(
-      officeId: officeId,
-      newCol: col,
-      newBoard: board,
-      newTitle: title,
-      newWho: who,
-      newRepo: repo,
-    ),
+}) => kantorPushAdaptive<void>(
+  context,
+  (_) => KantorCardScreen(
+    officeId: officeId,
+    newCol: col,
+    newBoard: board,
+    newTitle: title,
+    newWho: who,
+    newRepo: repo,
   ),
+  panelWidth: kKantorCardPanelWidth,
 );
 
 typedef _J = Map<String, dynamic>;
@@ -173,8 +179,9 @@ class _KantorCardScreenState extends ConsumerState<KantorCardScreen> {
         _card = m;
         _error = null;
         if (!_titleFocus.hasFocus) _title.text = '${m['title'] ?? ''}';
-        if (!_descFocus.hasFocus && !_descDirty)
+        if (!_descFocus.hasFocus && !_descDirty) {
           _desc.text = '${m['desc'] ?? ''}';
+        }
         if (!_whyFocus.hasFocus) _why.text = '${m['blocked'] ?? ''}';
       });
     } catch (e) {
@@ -295,9 +302,8 @@ class _KantorCardScreenState extends ConsumerState<KantorCardScreen> {
   ];
 
   int get _col => (c['col'] as num?)?.toInt() ?? 0;
-  String get _boardId => '${c['board'] ?? ''}'.isEmpty
-      ? 'utama'
-      : '${c['board']}';
+  String get _boardId =>
+      '${c['board'] ?? ''}'.isEmpty ? 'utama' : '${c['board']}';
 
   /// Columns of this card's board.
   List<KCol> _colsFor(KBoard? b) {
@@ -343,6 +349,7 @@ class _KantorCardScreenState extends ConsumerState<KantorCardScreen> {
     });
     await _set({'board': v, 'col': to});
   }
+
   String get _who => '${c['who'] ?? ''}';
 
   Future<void> _pickDate(String key) async {
@@ -427,7 +434,8 @@ class _KantorCardScreenState extends ConsumerState<KantorCardScreen> {
             ? (_error != null
                   ? KantorErrorView(error: _error!, onRetry: () => _load())
                   : const KantorLoading())
-            : _body(office, board),
+            // Isi tidak melebar berlebihan bila layar dibuka penuh & lebar.
+            : KantorReadable(child: _body(office, board)),
       ),
     );
   }

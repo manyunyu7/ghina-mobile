@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
+import '../widgets/kantor_wide.dart';
 import 'wiki_markdown.dart';
 
 const _templates = <(String, String)>[
@@ -350,117 +351,134 @@ class _WikiEditorScreenState extends ConsumerState<WikiEditorScreen> {
             ),
           ],
         ),
+        // isi dibatasi lebar baca di layar lebar, ListView tetap selebar
+        // layar supaya bisa digulir dari mana saja
         body: ListView(
           padding: const EdgeInsets.all(GhinaSpace.page),
           children: [
-            if (_isNew && widget.initialTitle == null) ...[
-              Text(
-                'Mulai dari',
-                style: GhinaType.overline.copyWith(color: g.textSecondary),
-              ),
-              const SizedBox(height: GhinaSpace.sm),
-              Wrap(
-                spacing: GhinaSpace.sm,
-                runSpacing: GhinaSpace.sm,
+            KantorReadable(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (var i = 0; i < _templates.length; i++)
-                    ChunkyChip(
-                      label: _templates[i].$1,
-                      selected: _tpl == i,
-                      onTap: () {
-                        if (_body.text.isNotEmpty &&
-                            _body.text != _templates[_tpl].$2) {
-                          _toast('Isi sudah ditulis, template tidak menimpa.');
-                          return;
-                        }
-                        setState(() => _tpl = i);
-                        _body.text = _templates[i].$2;
-                      },
+                  if (_isNew && widget.initialTitle == null) ...[
+                    Text(
+                      'Mulai dari',
+                      style: GhinaType.overline.copyWith(
+                        color: g.textSecondary,
+                      ),
                     ),
+                    const SizedBox(height: GhinaSpace.sm),
+                    Wrap(
+                      spacing: GhinaSpace.sm,
+                      runSpacing: GhinaSpace.sm,
+                      children: [
+                        for (var i = 0; i < _templates.length; i++)
+                          ChunkyChip(
+                            label: _templates[i].$1,
+                            selected: _tpl == i,
+                            onTap: () {
+                              if (_body.text.isNotEmpty &&
+                                  _body.text != _templates[_tpl].$2) {
+                                _toast(
+                                  'Isi sudah ditulis, template tidak menimpa.',
+                                );
+                                return;
+                              }
+                              setState(() => _tpl = i);
+                              _body.text = _templates[i].$2;
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: GhinaSpace.lg),
+                  ],
+                  if (_isNew && widget.parent != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+                      child: Text(
+                        'Sub-halaman dari ${widget.parent}',
+                        style: GhinaType.bodyS.copyWith(color: g.textMuted),
+                      ),
+                    ),
+                  ChunkyTextField(
+                    label: 'Judul',
+                    hint: 'Judul halaman',
+                    controller: _title,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: GhinaSpace.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChunkySegmented<bool>(
+                          segments: const [
+                            ChunkySegment(value: false, label: 'Tulis'),
+                            ChunkySegment(value: true, label: 'Pratinjau'),
+                          ],
+                          value: _preview,
+                          onChanged: (v) => setState(() => _preview = v),
+                        ),
+                      ),
+                      const SizedBox(width: GhinaSpace.sm),
+                      IconButton(
+                        tooltip: 'Lampirkan',
+                        onPressed: _attach,
+                        icon: _uploading > 0
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.attach_file),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: GhinaSpace.sm),
+                  if (!_preview) ...[
+                    _Toolbar(onInsert: _insert, controller: _body),
+                    ChunkyTextField(
+                      hint:
+                          'Tulis dengan markdown. Tautkan halaman lain dengan [[Judul]].',
+                      controller: _body,
+                      maxLines: null,
+                      minLines: 14,
+                      keyboardType: TextInputType.multiline,
+                      textCapitalization: TextCapitalization.sentences,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ] else
+                    Container(
+                      constraints: const BoxConstraints(minHeight: 240),
+                      padding: const EdgeInsets.all(GhinaSpace.md),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: g.border, width: 2),
+                        borderRadius: GhinaRadii.rMd,
+                      ),
+                      child: _body.text.trim().isEmpty
+                          ? Text(
+                              'Pratinjau muncul di sini.',
+                              style: GhinaType.body.copyWith(
+                                color: g.textMuted,
+                              ),
+                            )
+                          : WikiMarkdown(text: _body.text, api: api),
+                    ),
+                  const SizedBox(height: GhinaSpace.lg),
+                  ChunkyTextField(
+                    label: 'Ringkasan perubahan',
+                    hint: 'Opsional, mis. menambah langkah rollback',
+                    controller: _msg,
+                  ),
+                  const SizedBox(height: GhinaSpace.xl),
+                  ChunkyButton(
+                    label: 'Simpan',
+                    loading: _saving,
+                    onPressed: _saving ? null : _save,
+                  ),
                 ],
               ),
-              const SizedBox(height: GhinaSpace.lg),
-            ],
-            if (_isNew && widget.parent != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-                child: Text(
-                  'Sub-halaman dari ${widget.parent}',
-                  style: GhinaType.bodyS.copyWith(color: g.textMuted),
-                ),
-              ),
-            ChunkyTextField(
-              label: 'Judul',
-              hint: 'Judul halaman',
-              controller: _title,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: GhinaSpace.lg),
-            Row(
-              children: [
-                Expanded(
-                  child: ChunkySegmented<bool>(
-                    segments: const [
-                      ChunkySegment(value: false, label: 'Tulis'),
-                      ChunkySegment(value: true, label: 'Pratinjau'),
-                    ],
-                    value: _preview,
-                    onChanged: (v) => setState(() => _preview = v),
-                  ),
-                ),
-                const SizedBox(width: GhinaSpace.sm),
-                IconButton(
-                  tooltip: 'Lampirkan',
-                  onPressed: _attach,
-                  icon: _uploading > 0
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.attach_file),
-                ),
-              ],
-            ),
-            const SizedBox(height: GhinaSpace.sm),
-            if (!_preview) ...[
-              _Toolbar(onInsert: _insert, controller: _body),
-              ChunkyTextField(
-                hint:
-                    'Tulis dengan markdown. Tautkan halaman lain dengan [[Judul]].',
-                controller: _body,
-                maxLines: null,
-                minLines: 14,
-                keyboardType: TextInputType.multiline,
-                textCapitalization: TextCapitalization.sentences,
-                onChanged: (_) => setState(() {}),
-              ),
-            ] else
-              Container(
-                constraints: const BoxConstraints(minHeight: 240),
-                padding: const EdgeInsets.all(GhinaSpace.md),
-                decoration: BoxDecoration(
-                  border: Border.all(color: g.border, width: 2),
-                  borderRadius: GhinaRadii.rMd,
-                ),
-                child: _body.text.trim().isEmpty
-                    ? Text(
-                        'Pratinjau muncul di sini.',
-                        style: GhinaType.body.copyWith(color: g.textMuted),
-                      )
-                    : WikiMarkdown(text: _body.text, api: api),
-              ),
-            const SizedBox(height: GhinaSpace.lg),
-            ChunkyTextField(
-              label: 'Ringkasan perubahan',
-              hint: 'Opsional, mis. menambah langkah rollback',
-              controller: _msg,
-            ),
-            const SizedBox(height: GhinaSpace.xl),
-            ChunkyButton(
-              label: 'Simpan',
-              loading: _saving,
-              onPressed: _saving ? null : _save,
             ),
           ],
         ),

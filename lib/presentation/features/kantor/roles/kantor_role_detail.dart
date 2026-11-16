@@ -8,6 +8,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import '../codex/kantor_codex.dart';
 import '../dm/kantor_dm_screen.dart';
 import 'kantor_playbooks.dart';
@@ -174,158 +175,161 @@ class _RoleDetailState extends ConsumerState<KantorRoleDetailScreen> {
     final st = kantorRoleStatus(office, role);
     final sessions =
         office?.liveSessionsOf(role.id) ?? const <KantorSessionInfo>[];
-    return ListView(
-      padding: const EdgeInsets.all(GhinaSpace.page),
-      children: [
-        Row(
-          children: [
-            KantorSprite(look: role.look, size: 96),
-            const SizedBox(width: GhinaSpace.lg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    role.name,
-                    style: GhinaType.h2.copyWith(color: g.textPrimary),
-                  ),
-                  Text(
-                    role.title,
-                    style: GhinaType.body.copyWith(color: g.textSecondary),
-                  ),
-                  const SizedBox(height: GhinaSpace.sm),
-                  Wrap(
-                    spacing: 6,
-                    children: [
-                      if (role.isCodex) const KantorCodexBadge(),
-                      ChunkyPill(
-                        label: st.label,
-                        color: st.color,
-                        soft: true,
-                        uppercase: false,
-                      ),
-                      if (role.isManager)
-                        const ChunkyPill(
-                          label: 'Manager',
-                          color: GhinaColors.purple,
+    // Di layar lebar isi dibatasi lebar baca supaya tidak melebar penuh.
+    return KantorReadable(
+      child: ListView(
+        padding: const EdgeInsets.all(GhinaSpace.page),
+        children: [
+          Row(
+            children: [
+              KantorSprite(look: role.look, size: 96),
+              const SizedBox(width: GhinaSpace.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      role.name,
+                      style: GhinaType.h2.copyWith(color: g.textPrimary),
+                    ),
+                    Text(
+                      role.title,
+                      style: GhinaType.body.copyWith(color: g.textSecondary),
+                    ),
+                    const SizedBox(height: GhinaSpace.sm),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        if (role.isCodex) const KantorCodexBadge(),
+                        ChunkyPill(
+                          label: st.label,
+                          color: st.color,
                           soft: true,
                           uppercase: false,
                         ),
-                    ],
-                  ),
-                ],
+                        if (role.isManager)
+                          const ChunkyPill(
+                            label: 'Manager',
+                            color: GhinaColors.purple,
+                            soft: true,
+                            uppercase: false,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: GhinaSpace.lg),
+          if (!role.archived)
+            ChunkyButton(
+              label: 'Mulai shift',
+              icon: Icons.play_arrow_rounded,
+              onPressed: () => showKantorShiftSheet(
+                context,
+                officeId: id,
+                role: role,
+                liveSessions: sessions.length,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: GhinaSpace.lg),
-        if (!role.archived)
+          const SizedBox(height: GhinaSpace.sm),
           ChunkyButton(
-            label: 'Mulai shift',
-            icon: Icons.play_arrow_rounded,
-            onPressed: () => showKantorShiftSheet(
+            label: 'Pesan agen',
+            icon: Icons.forum_outlined,
+            variant: ChunkyButtonVariant.outline,
+            onPressed: () => openKantorDm(
               context,
               officeId: id,
-              role: role,
-              liveSessions: sessions.length,
+              role: role.id,
+              roleName: role.name,
             ),
           ),
-        const SizedBox(height: GhinaSpace.sm),
-        ChunkyButton(
-          label: 'Pesan agen',
-          icon: Icons.forum_outlined,
-          variant: ChunkyButtonVariant.outline,
-          onPressed: () => openKantorDm(
-            context,
-            officeId: id,
-            role: role.id,
-            roleName: role.name,
-          ),
-        ),
-        SectionHeader(title: 'Kepribadian'),
-        Text(
-          role.persona.isEmpty ? '-' : role.persona,
-          style: GhinaType.body.copyWith(color: g.textPrimary, height: 1.4),
-        ),
-        if (role.skills.isNotEmpty) ...[
-          const SectionHeader(title: 'Skills'),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final s in role.skills)
-                ChunkyPill(
-                  label: s,
-                  color: GhinaColors.gray,
-                  soft: true,
-                  uppercase: false,
-                ),
-            ],
-          ),
-        ],
-        const SectionHeader(title: 'Fakta'),
-        ChunkyCard(
-          child: Column(
-            children: [
-              _fact(context, 'Mesin', kantorEngineName(role.engine)),
-              _fact(context, 'Model', role.modelText),
-              _fact(
-                context,
-                'Ruangan',
-                office?.roomName(role.room) ?? role.room,
-              ),
-              _fact(
-                context,
-                'Budget bulanan',
-                role.budget != null && role.budget! > 0
-                    ? kantorUsd(role.budget, 0)
-                    : 'Tanpa batas',
-              ),
-              _fact(context, 'Peran', role.isManager ? 'Manager' : 'Anggota'),
-            ],
-          ),
-        ),
-        const SectionHeader(title: 'Sesi aktif'),
-        if (sessions.isEmpty)
+          SectionHeader(title: 'Kepribadian'),
           Text(
-            'Sedang libur. Belum ada sesi aktif.',
-            style: GhinaType.body.copyWith(color: g.textMuted),
-          )
-        else
-          for (final s in sessions)
-            Padding(
-              padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-              child: ChunkyTile(
-                title: s.title.isEmpty
-                    ? 'Sesi ${s.sid.substring(0, 6)}'
-                    : s.title,
-                trailing: KantorStatusPill(s.status),
-                showChevron: true,
-                onTap: () => context.push('/kantor/o/$id/s/${s.sid}'),
-              ),
+            role.persona.isEmpty ? '-' : role.persona,
+            style: GhinaType.body.copyWith(color: g.textPrimary, height: 1.4),
+          ),
+          if (role.skills.isNotEmpty) ...[
+            const SectionHeader(title: 'Skills'),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final s in role.skills)
+                  ChunkyPill(
+                    label: s,
+                    color: GhinaColors.gray,
+                    soft: true,
+                    uppercase: false,
+                  ),
+              ],
             ),
-        const SectionHeader(title: 'Playbook'),
-        KantorRolePlaybooks(officeId: id, role: role),
-        const SectionHeader(title: 'Buku catatan'),
-        ChunkyTextField(
-          controller: _notes,
-          hint:
-              'Catatan yang dibawa role ini dari shift ke shift. Role juga bisa menulisnya sendiri.',
-          helperText: _notesHint,
-          minLines: 5,
-          maxLines: 14,
-          onChanged: _notesChanged,
-        ),
-        const SizedBox(height: GhinaSpace.xl),
-        ChunkyButton(
-          label: role.archived ? 'Pulihkan role' : 'Arsipkan role',
-          variant: role.archived
-              ? ChunkyButtonVariant.secondary
-              : ChunkyButtonVariant.outline,
-          onPressed: () => _archive(role, office, !role.archived),
-        ),
-        const SizedBox(height: GhinaSpace.xxl),
-      ],
+          ],
+          const SectionHeader(title: 'Fakta'),
+          ChunkyCard(
+            child: Column(
+              children: [
+                _fact(context, 'Mesin', kantorEngineName(role.engine)),
+                _fact(context, 'Model', role.modelText),
+                _fact(
+                  context,
+                  'Ruangan',
+                  office?.roomName(role.room) ?? role.room,
+                ),
+                _fact(
+                  context,
+                  'Budget bulanan',
+                  role.budget != null && role.budget! > 0
+                      ? kantorUsd(role.budget, 0)
+                      : 'Tanpa batas',
+                ),
+                _fact(context, 'Peran', role.isManager ? 'Manager' : 'Anggota'),
+              ],
+            ),
+          ),
+          const SectionHeader(title: 'Sesi aktif'),
+          if (sessions.isEmpty)
+            Text(
+              'Sedang libur. Belum ada sesi aktif.',
+              style: GhinaType.body.copyWith(color: g.textMuted),
+            )
+          else
+            for (final s in sessions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+                child: ChunkyTile(
+                  title: s.title.isEmpty
+                      ? 'Sesi ${s.sid.substring(0, 6)}'
+                      : s.title,
+                  trailing: KantorStatusPill(s.status),
+                  showChevron: true,
+                  onTap: () => context.push('/kantor/o/$id/s/${s.sid}'),
+                ),
+              ),
+          const SectionHeader(title: 'Playbook'),
+          KantorRolePlaybooks(officeId: id, role: role),
+          const SectionHeader(title: 'Buku catatan'),
+          ChunkyTextField(
+            controller: _notes,
+            hint:
+                'Catatan yang dibawa role ini dari shift ke shift. Role juga bisa menulisnya sendiri.',
+            helperText: _notesHint,
+            minLines: 5,
+            maxLines: 14,
+            onChanged: _notesChanged,
+          ),
+          const SizedBox(height: GhinaSpace.xl),
+          ChunkyButton(
+            label: role.archived ? 'Pulihkan role' : 'Arsipkan role',
+            variant: role.archived
+                ? ChunkyButtonVariant.secondary
+                : ChunkyButtonVariant.outline,
+            onPressed: () => _archive(role, office, !role.archived),
+          ),
+          const SizedBox(height: GhinaSpace.xxl),
+        ],
+      ),
     );
   }
 

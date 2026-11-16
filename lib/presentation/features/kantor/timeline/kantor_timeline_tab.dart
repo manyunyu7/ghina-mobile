@@ -11,13 +11,17 @@ import '../board/kantor_board_lib.dart';
 import '../board/kantor_board_widgets.dart';
 import '../board/kantor_card_detail.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_timeline_lib.dart';
 
 const _rowH = 38.0;
 const _headH = 52.0;
 const _barT = 7.0;
 const _barH = 24.0;
-const _nameW = 128.0;
+const _nameWNarrow = 128.0;
+
+/// Kolom nama tugas di layar lebar: judul lebih terbaca, bar tetap luas.
+const _nameWWide = 200.0;
 
 const _groups = [
   ('epic', 'Epic'),
@@ -73,6 +77,9 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
 
   String get id => widget.officeId;
   double get _dw => kZooms[_zoom]!;
+
+  /// Lebar kolom "TUGAS": lebih lega di layar lebar, sama seperti dulu di HP.
+  double get _nameW => kantorIsWide(context) ? _nameWWide : _nameWNarrow;
   String get _prefKey => 'kantor.gantt.$id';
 
   @override
@@ -102,10 +109,12 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
       final j = jsonDecode(raw) as Map<String, dynamic>;
       setState(() {
         if (kZooms.containsKey(j['zoom'])) _zoom = j['zoom'] as String;
-        if (_groups.any((g) => g.$1 == j['group']))
+        if (_groups.any((g) => g.$1 == j['group'])) {
           _group = j['group'] as String;
-        if (j['color'] == 'col' || j['color'] == 'who')
+        }
+        if (j['color'] == 'col' || j['color'] == 'who') {
           _color = j['color'] as String;
+        }
         _hideDone = j['hideDone'] == true;
         _crit = j['crit'] == true;
         _collapsed.addAll([
@@ -296,8 +305,9 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
         end: t.add(const Duration(days: 2)),
       ),
     );
-    if (r != null)
+    if (r != null) {
       await _patch(c.id, {'start': kDayStr(r.start), 'due': kDayStr(r.end)});
+    }
   }
 
   void _setZoom(String z, int lo) {
@@ -426,9 +436,7 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _goToday(lo));
     }
 
-    final overdue = scheduled
-        .where((c) => !c.done && sp[c.id]!.e < t)
-        .length;
+    final overdue = scheduled.where((c) => !c.done && sp[c.id]!.e < t).length;
     final unsched = real.where((c) => sp[c.id] == null).length;
 
     return Column(
@@ -1047,12 +1055,23 @@ class _KantorTimelineTabState extends ConsumerState<KantorTimelineTab> {
     KBoard board,
     KOffice? office,
   ) {
-    final g = context.ghina;
     final un = [
       for (final c in real)
         if (sp[c.id] == null && _passes(c)) c,
     ];
     if (un.isEmpty) return const SizedBox.shrink();
+    // Daftar dibatasi lebarnya di layar lebar (rata kiri, sejajar gantt).
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: kKantorListMax),
+        child: _unscheduledList(un, board, office),
+      ),
+    );
+  }
+
+  Widget _unscheduledList(List<KCard> un, KBoard board, KOffice? office) {
+    final g = context.ghina;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       child: Column(
@@ -1257,8 +1276,9 @@ class _GridPainter extends CustomPainter {
     if (dw >= 4) {
       final p = Paint()..color = g.surfaceAlt.withValues(alpha: 0.7);
       for (var d = lo; d < lo + days; d++) {
-        if (ganttDow(d) == 6)
+        if (ganttDow(d) == 6) {
           canvas.drawRect(Rect.fromLTWH(_x(d), 0, 2 * dw, size.height), p);
+        }
       }
     }
     // vertical month/week lines
@@ -1272,8 +1292,9 @@ class _GridPainter extends CustomPainter {
         'month' => ganttYmd(d).$3 == 1,
         _ => ganttYmd(d).$3 == 1 && ganttYmd(d).$2 % 3 == 0,
       };
-      if (keyStart)
+      if (keyStart) {
         canvas.drawLine(Offset(_x(d), 0), Offset(_x(d), size.height), vl);
+      }
     }
     // today
     final t = ganttToday();

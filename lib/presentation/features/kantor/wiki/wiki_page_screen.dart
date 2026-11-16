@@ -5,6 +5,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'wiki_editor_screen.dart';
 import 'wiki_format.dart';
 import 'wiki_history_screen.dart';
@@ -32,10 +33,16 @@ class WikiPageScreen extends ConsumerStatefulWidget {
     super.key,
     required this.officeId,
     required this.pageRef,
+    this.onChanged,
   });
 
   final String officeId;
   final String pageRef;
+
+  /// Dipanggil setelah halaman ini diubah, dipindah, diberi ikon, dipulihkan,
+  /// atau dihapus. Dipakai panel kanan wiki di layar lebar untuk menyegarkan
+  /// pohon di kiri tanpa menunggu halaman ditutup.
+  final VoidCallback? onChanged;
 
   @override
   ConsumerState<WikiPageScreen> createState() => _WikiPageScreenState();
@@ -116,19 +123,26 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
     );
     if (!mounted) return;
     if (slug == null) return;
+    widget.onChanged?.call();
     if (page == null && parent == null && _page == null) {
       // created the page this screen was asking for
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              WikiPageScreen(officeId: widget.officeId, pageRef: slug),
+          builder: (_) => WikiPageScreen(
+            officeId: widget.officeId,
+            pageRef: slug,
+            onChanged: widget.onChanged,
+          ),
         ),
       );
     } else if (page == null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              WikiPageScreen(officeId: widget.officeId, pageRef: slug),
+          builder: (_) => WikiPageScreen(
+            officeId: widget.officeId,
+            pageRef: slug,
+            onChanged: widget.onChanged,
+          ),
         ),
       );
       if (mounted) _load(live: true);
@@ -163,6 +177,7 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
         'icon': icon,
         'msg': icon.isEmpty ? 'Ikon dihapus' : 'Ikon diubah',
       });
+      widget.onChanged?.call();
       await _load(live: true);
     } on KantorException catch (e) {
       _toast(e.message, bad: true);
@@ -281,6 +296,7 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
         'ord': last + 10,
       });
       _toast('Halaman dipindahkan.');
+      widget.onChanged?.call();
       await _load(live: true);
     } on KantorException catch (e) {
       _toast(e.message, bad: true);
@@ -305,7 +321,25 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
       );
       if (!mounted) return;
       _toast('Halaman dihapus.');
-      Navigator.of(context).pop();
+      widget.onChanged?.call();
+      final nav = Navigator.of(context);
+      if (nav.canPop()) {
+        nav.pop();
+      } else {
+        // halaman pertama di panel kanan (layar lebar): tidak ada yang bisa
+        // di-pop, jadi ganti dengan panel kosong
+        nav.pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (c) => Scaffold(
+              backgroundColor: c.ghina.background,
+              body: const KantorPaneEmpty(
+                icon: Icons.delete_outline,
+                text: 'Halaman dihapus. Pilih halaman lain di kiri.',
+              ),
+            ),
+          ),
+        );
+      }
     } on KantorException catch (e) {
       _toast(e.message, bad: true);
     }
@@ -319,7 +353,10 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
         builder: (_) => WikiHistoryScreen(officeId: widget.officeId, page: p),
       ),
     );
-    if (changed == true && mounted) _load(live: true);
+    if (changed == true && mounted) {
+      widget.onChanged?.call();
+      _load(live: true);
+    }
   }
 
   @override
@@ -428,6 +465,8 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
         (p['backlinks'] as List?)?.whereType<Map>().toList() ?? const [];
     final pb = p['playbook'];
     final hasH1 = RegExp(r'^\s*#\s').hasMatch(body);
+    // ListView tetap selebar layar (gulir & tarik-segarkan di mana saja),
+    // isinya dibatasi lebar baca supaya baris tidak melebar penuh
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         GhinaSpace.page,
@@ -436,115 +475,122 @@ class _WikiPageScreenState extends ConsumerState<WikiPageScreen> {
         48,
       ),
       children: [
-        if (crumbs.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 4,
-              children: [
-                _Crumb(
-                  'Wiki',
-                  () => openWikiPage(
-                    context,
-                    officeId: widget.officeId,
-                    ref: 'beranda',
+        KantorReadable(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (crumbs.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    children: [
+                      _Crumb(
+                        'Wiki',
+                        () => openWikiPage(
+                          context,
+                          officeId: widget.officeId,
+                          ref: 'beranda',
+                        ),
+                      ),
+                      for (final c in crumbs) ...[
+                        Text('›', style: TextStyle(color: g.textMuted)),
+                        _Crumb(
+                          '${c['icon'] ?? ''} ${c['title']}'.trim(),
+                          () => openWikiPage(
+                            context,
+                            officeId: widget.officeId,
+                            ref: '${c['slug']}',
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                for (final c in crumbs) ...[
-                  Text('›', style: TextStyle(color: g.textMuted)),
-                  _Crumb(
-                    '${c['icon'] ?? ''} ${c['title']}'.trim(),
-                    () => openWikiPage(
+              if (_hint != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: GhinaSpace.md),
+                  child: ChunkyCard(
+                    tinted: GhinaColors.blue,
+                    padding: const EdgeInsets.all(GhinaSpace.md),
+                    child: Text(
+                      _hint!,
+                      style: GhinaType.bodyS.copyWith(color: g.textPrimary),
+                    ),
+                  ),
+                ),
+              if (!hasH1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+                  child: Text(
+                    '${icon.isEmpty ? '' : '$icon '}${p['title']}',
+                    style: GhinaType.h1.copyWith(color: g.textPrimary),
+                  ),
+                ),
+              Text(
+                '${p['author'] ?? 'Tidak diketahui'} · ${agoId(p['updatedAt'])} · ${p['revs'] ?? 1} revisi',
+                style: GhinaType.caption.copyWith(color: g.textMuted),
+              ),
+              const SizedBox(height: GhinaSpace.md),
+              if (pb is Map) _PlaybookHead(pb: pb),
+              WikiMarkdown(
+                text: body,
+                api: api,
+                onWikiLink: _followLink,
+                onMedia: (_) =>
+                    _toast('Lampiran dibuka lewat web Kantor.', bad: true),
+              ),
+              const SizedBox(height: GhinaSpace.xl),
+              SectionHeader(
+                title: 'Sub-halaman',
+                actionLabel: '+ Sub-halaman',
+                onAction: () => _edit(parent: p['slug'] as String),
+              ),
+              if (children.isEmpty)
+                Text(
+                  'Belum ada sub-halaman.',
+                  style: GhinaType.bodyS.copyWith(color: g.textMuted),
+                )
+              else
+                for (final c in children)
+                  ChunkyTile(
+                    title: '${c['title']}',
+                    subtitle: agoId(c['updated_at']),
+                    leading: Text(
+                      '${c['icon'] ?? '📄'}',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    showChevron: true,
+                    dense: true,
+                    onTap: () => openWikiPage(
                       context,
                       officeId: widget.officeId,
                       ref: '${c['slug']}',
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
-        if (_hint != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: GhinaSpace.md),
-            child: ChunkyCard(
-              tinted: GhinaColors.blue,
-              padding: const EdgeInsets.all(GhinaSpace.md),
-              child: Text(
-                _hint!,
-                style: GhinaType.bodyS.copyWith(color: g.textPrimary),
-              ),
-            ),
-          ),
-        if (!hasH1)
-          Padding(
-            padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-            child: Text(
-              '${icon.isEmpty ? '' : '$icon '}${p['title']}',
-              style: GhinaType.h1.copyWith(color: g.textPrimary),
-            ),
-          ),
-        Text(
-          '${p['author'] ?? 'Tidak diketahui'} · ${agoId(p['updatedAt'])} · ${p['revs'] ?? 1} revisi',
-          style: GhinaType.caption.copyWith(color: g.textMuted),
-        ),
-        const SizedBox(height: GhinaSpace.md),
-        if (pb is Map) _PlaybookHead(pb: pb),
-        WikiMarkdown(
-          text: body,
-          api: api,
-          onWikiLink: _followLink,
-          onMedia: (_) =>
-              _toast('Lampiran dibuka lewat web Kantor.', bad: true),
-        ),
-        const SizedBox(height: GhinaSpace.xl),
-        SectionHeader(
-          title: 'Sub-halaman',
-          actionLabel: '+ Sub-halaman',
-          onAction: () => _edit(parent: p['slug'] as String),
-        ),
-        if (children.isEmpty)
-          Text(
-            'Belum ada sub-halaman.',
-            style: GhinaType.bodyS.copyWith(color: g.textMuted),
-          )
-        else
-          for (final c in children)
-            ChunkyTile(
-              title: '${c['title']}',
-              subtitle: agoId(c['updated_at']),
-              leading: Text(
-                '${c['icon'] ?? '📄'}',
-                style: const TextStyle(fontSize: 20),
-              ),
-              showChevron: true,
-              dense: true,
-              onTap: () => openWikiPage(
-                context,
-                officeId: widget.officeId,
-                ref: '${c['slug']}',
-              ),
-            ),
-        if (back.isNotEmpty) ...[
-          const SizedBox(height: GhinaSpace.lg),
-          const SectionHeader(title: 'Ditautkan dari'),
-          Wrap(
-            spacing: GhinaSpace.sm,
-            runSpacing: GhinaSpace.sm,
-            children: [
-              for (final b in back)
-                ActionChip(
-                  label: Text('${b['title']}'),
-                  onPressed: () => openWikiPage(
-                    context,
-                    officeId: widget.officeId,
-                    ref: '${b['slug']}',
-                  ),
+              if (back.isNotEmpty) ...[
+                const SizedBox(height: GhinaSpace.lg),
+                const SectionHeader(title: 'Ditautkan dari'),
+                Wrap(
+                  spacing: GhinaSpace.sm,
+                  runSpacing: GhinaSpace.sm,
+                  children: [
+                    for (final b in back)
+                      ActionChip(
+                        label: Text('${b['title']}'),
+                        onPressed: () => openWikiPage(
+                          context,
+                          officeId: widget.officeId,
+                          ref: '${b['slug']}',
+                        ),
+                      ),
+                  ],
                 ),
+              ],
             ],
           ),
-        ],
+        ),
       ],
     );
   }
@@ -700,15 +746,24 @@ class _WikiSourceScreenState extends ConsumerState<WikiSourceScreen> {
         : ListView(
             padding: const EdgeInsets.all(GhinaSpace.page),
             children: [
-              Text(
-                'Sumber dari disk, ubah lewat repo.',
-                style: GhinaType.bodyS.copyWith(color: context.ghina.textMuted),
+              KantorReadable(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Sumber dari disk, ubah lewat repo.',
+                      style: GhinaType.bodyS.copyWith(
+                        color: context.ghina.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: GhinaSpace.md),
+                    if (_text!.trim().isEmpty)
+                      const Text('File kosong.')
+                    else
+                      KantorMarkdown(_text!, selectable: true),
+                  ],
+                ),
               ),
-              const SizedBox(height: GhinaSpace.md),
-              if (_text!.trim().isEmpty)
-                const Text('File kosong.')
-              else
-                KantorMarkdown(_text!, selectable: true),
             ],
           ),
   );

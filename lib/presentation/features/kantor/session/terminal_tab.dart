@@ -9,6 +9,7 @@ import 'package:xterm/xterm.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
+import 'terminal_clipboard.dart';
 import 'terminal_prefs.dart';
 import 'terminal_scroll.dart';
 import 'terminal_themes.dart';
@@ -69,6 +70,8 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   int _cols = 80;
   int _rows = 24;
   bool _sized = false;
+  // ada seleksi di layar: bar terminal menampilkan tombol "Salin"
+  bool _selecting = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -78,6 +81,7 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     super.initState();
     _terminal.onOutput = _onOutput;
     _terminal.onResize = _onResize;
+    _controller.addListener(_onSelection);
     // normally the first layout reports the real size; if it never does
     // (hidden tab), connect with the default size after a moment
     _fallback = Timer(const Duration(milliseconds: 1500), () {
@@ -98,7 +102,9 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     _sub?.cancel();
     _ws?.close();
     _focus.dispose();
-    _controller.dispose();
+    _controller
+      ..removeListener(_onSelection)
+      ..dispose();
     super.dispose();
   }
 
@@ -107,7 +113,9 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     _rows = h;
     if (!_sized) {
       _sized = true;
-      _connect();
+      // dipanggil dari layout xterm: setState di _connect harus menunggu
+      // frame ini selesai
+      scheduleMicrotask(_connect);
       return;
     }
     _resizeTimer?.cancel();
@@ -197,9 +205,100 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   void _arrow(String letter) =>
       _send('${_terminal.cursorKeysMode ? '\x1bO' : '\x1b['}$letter');
 
+  void _onSelection() {
+    final on = _controller.selection != null;
+    if (on != _selecting && mounted) setState(() => _selecting = on);
+  }
+
+  void _toast(String message, {bool ok = true}) => showToastBadge(
+    context,
+    message: message,
+    icon: ok ? Icons.check_rounded : Icons.info_outline_rounded,
+    color: ok ? GhinaColors.green : GhinaColors.orange,
+    tag: 'kantor-term-clip',
+    haptics: false,
+  );
+
+  /// Salin teks yang dipilih (tekan lama / seret mouse), lalu lepas seleksi.
+  Future<void> _copySelection() async {
+    final text = termSelectionText(_terminal, _controller);
+    if (text == null) {
+      _toast('Belum ada teks yang dipilih', ok: false);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+    _controller.clearSelection();
+    if (mounted) _toast('Disalin');
+  }
+
+  /// Salin seluruh layar yang terlihat: jalan pintas yang selalu berhasil.
+  Future<void> _copyScreen() async {
+    final text = termScreenText(_terminal);
+    if (text.isEmpty) {
+      _toast('Layar masih kosong', ok: false);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) _toast('Layar disalin');
+  }
+
+  /// Tempel isi clipboard ke sesi lewat jalur input websocket yang sama
+  /// dengan ketikan ([Terminal.paste] -> [_onOutput]). Kalau program memakai
+  /// bracketed paste (Claude Code, shell modern), teks multi-baris masuk
+  /// sebagai satu tempelan; kalau tidak, minta konfirmasi dulu karena tiap
+  /// baris baru akan terkirim sebagai Enter.
   Future<void> _paste() async {
-    final d = await Clipboard.getData('text/plain');
-    if (d?.text != null) _terminal.paste(d!.text!);
+    final d = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = d?.text;
+    if (!mounted) return;
+    if (text == null || text.isEmpty) {
+      _toast('Clipboard kosong', ok: false);
+      return;
+    }
+    final ready = pasteReady(text);
+    final enters = pasteEnters(_terminal, ready);
+    if (enters > 0) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Tempel teks multi-baris?'),
+          content: Text(
+            'Program di terminal tidak memakai tempel aman, jadi $enters '
+            'baris baru akan terkirim sebagai Enter (perintah bisa langsung '
+            'jalan).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Tempel'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    _controller.clearSelection();
+    _terminal.paste(ready);
+  }
+
+  /// Salin-tempel dari keyboard fisik; tombol lain diteruskan ke xterm.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    switch (termClipKey(event, hasSelection: _controller.selection != null)) {
+      case TermClipKey.copy:
+        _copySelection();
+        return KeyEventResult.handled;
+      case TermClipKey.paste:
+        _paste();
+        return KeyEventResult.handled;
+      case TermClipKey.swallow:
+        return KeyEventResult.handled;
+      case null:
+        return KeyEventResult.ignored;
+    }
   }
 
   void _zoom(double d) => ref
@@ -258,7 +357,23 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
                 icon: const Icon(Icons.add_rounded, size: 18),
                 onPressed: font < termFontMax ? () => _zoom(1) : null,
               ),
+              if (_selecting)
+                TextButton.icon(
+                  key: const ValueKey('term-copy'),
+                  onPressed: _copySelection,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Salin'),
+                )
+              else
+                IconButton(
+                  key: const ValueKey('term-copy-screen'),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Salin layar',
+                  icon: const Icon(Icons.copy_all_rounded, size: 18),
+                  onPressed: _copyScreen,
+                ),
               IconButton(
+                key: const ValueKey('term-paste'),
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Tempel',
                 icon: const Icon(Icons.content_paste_rounded, size: 18),
@@ -285,6 +400,10 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
               padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
               keyboardType: TextInputType.visiblePassword,
               deleteDetection: true,
+              // salin-tempel ditangani _onKey; tanpa shortcut bawaan xterm,
+              // Ctrl+A kembali ke shell (bukan "pilih semua")
+              shortcuts: const {},
+              onKeyEvent: _onKey,
             ),
           ),
         ),

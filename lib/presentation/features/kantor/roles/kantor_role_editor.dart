@@ -5,6 +5,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../engines/kantor_engines.dart';
 import '../widgets/kantor_sprite.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_look.dart';
 import 'kantor_role.dart';
 import 'kantor_shift_sheet.dart';
@@ -185,249 +186,254 @@ class _RoleEditorState extends ConsumerState<KantorRoleEditorScreen> {
             for (final r in roles)
               if (!r.archived && !r.isManager && r.id != editing?.id) r,
           ];
-          return ListView(
-            padding: const EdgeInsets.all(GhinaSpace.page),
-            children: [
-              Center(
-                child: Column(
-                  children: [
-                    KantorSprite(look: _look.toJson(), size: 120),
-                    const SizedBox(height: GhinaSpace.sm),
-                    Text(
-                      _name.text.trim().isEmpty
-                          ? 'Role baru'
-                          : _name.text.trim(),
-                      style: GhinaType.h3.copyWith(color: g.textPrimary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: GhinaSpace.lg),
-              ChunkyTextField(
-                controller: _name,
-                label: 'Nama',
-                hint: 'mis. Gilang',
-                textCapitalization: TextCapitalization.words,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              ChunkyTextField(
-                controller: _title,
-                label: 'Jabatan',
-                hint: 'mis. Desainer UI',
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              ChunkyTextField(
-                controller: _persona,
-                label: 'Kepribadian',
-                hint:
-                    'Cara dia bicara, apa yang dia pedulikan, apa yang tidak pernah dia lakukan',
-                helperText:
-                    'Menjadi system prompt role: dibaca Claude setiap shift dimulai.',
-                minLines: 3,
-                maxLines: 8,
-              ),
-              const SizedBox(height: GhinaSpace.lg),
-              const KantorFieldLabel('Skills'),
-              Wrap(
-                spacing: GhinaSpace.sm,
-                runSpacing: GhinaSpace.sm,
-                children: [
-                  for (final s in _skills)
-                    InputChip(
-                      label: Text(s),
-                      onDeleted: () => setState(() => _skills.remove(s)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: GhinaSpace.sm),
-              ChunkyTextField(
-                controller: _skillInput,
-                hint: 'Ketik lalu enter',
-                textCapitalization: TextCapitalization.none,
-                onSubmitted: (v) {
-                  _addSkill(v);
-                  _skillInput.clear();
-                },
-              ),
-              const SizedBox(height: GhinaSpace.sm),
-              Wrap(
-                spacing: GhinaSpace.sm,
-                children: [
-                  for (final s in _skillSuggestions)
-                    if (!_skills.contains(s))
-                      ActionChip(
-                        label: Text('+ $s'),
-                        onPressed: () => _addSkill(s),
+          // Form dibatasi lebar di layar lebar (tablet / Fold terbuka).
+          return KantorReadable(
+            maxWidth: kKantorListMax,
+            child: ListView(
+              padding: const EdgeInsets.all(GhinaSpace.page),
+              children: [
+                Center(
+                  child: Column(
+                    children: [
+                      KantorSprite(look: _look.toJson(), size: 120),
+                      const SizedBox(height: GhinaSpace.sm),
+                      Text(
+                        _name.text.trim().isEmpty
+                            ? 'Role baru'
+                            : _name.text.trim(),
+                        style: GhinaType.h3.copyWith(color: g.textPrimary),
                       ),
-                ],
-              ),
-              const SizedBox(height: GhinaSpace.lg),
-              KantorCatalogFields(
-                engine: _engine,
-                model: _model,
-                effort: _effort,
-                onChanged: (engine, model, effort, permission, spec) =>
-                    setState(() {
-                      _engine = engine;
-                      _model = model;
-                      _effort = effort;
-                    }),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              KantorPickField<String>(
-                label: 'Ruangan',
-                value: _room,
-                options: [
-                  for (final r in rooms) KantorChoice(r.id, r.name, r.path),
-                ],
-                onChanged: (v) => setState(() => _room = v),
-              ),
-              if (editing?.isManager != true) ...[
+                    ],
+                  ),
+                ),
+                const SizedBox(height: GhinaSpace.lg),
+                ChunkyTextField(
+                  controller: _name,
+                  label: 'Nama',
+                  hint: 'mis. Gilang',
+                  textCapitalization: TextCapitalization.words,
+                  onChanged: (_) => setState(() {}),
+                ),
                 const SizedBox(height: GhinaSpace.md),
-                KantorPickField<String>(
-                  label: 'Atasan',
-                  value: _boss,
-                  options: [
-                    const KantorChoice('', 'Langsung di bawah manager'),
-                    for (final r in bosses) KantorChoice(r.id, r.name, r.title),
-                  ],
-                  onChanged: (v) => setState(() => _boss = v),
+                ChunkyTextField(
+                  controller: _title,
+                  label: 'Jabatan',
+                  hint: 'mis. Desainer UI',
+                  textCapitalization: TextCapitalization.words,
                 ),
-              ],
-              const SizedBox(height: GhinaSpace.xl),
-              Text(
-                'Tampilan karakter',
-                style: GhinaType.h3.copyWith(color: g.textPrimary),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Template'),
-              SizedBox(
-                height: 100,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: kantorLookTemplates.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: GhinaSpace.sm),
-                  itemBuilder: (_, i) {
-                    final t = kantorLookTemplates[i];
-                    return GestureDetector(
-                      onTap: () => setState(() => _look.apply(t.look())),
-                      child: SizedBox(
-                        width: 72,
-                        child: Column(
-                          children: [
-                            KantorSprite(look: t.look().toJson(), size: 64),
-                            const SizedBox(height: 4),
-                            Text(
-                              t.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GhinaType.caption.copyWith(
-                                color: g.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
+                const SizedBox(height: GhinaSpace.md),
+                ChunkyTextField(
+                  controller: _persona,
+                  label: 'Kepribadian',
+                  hint:
+                      'Cara dia bicara, apa yang dia pedulikan, apa yang tidak pernah dia lakukan',
+                  helperText:
+                      'Menjadi system prompt role: dibaca Claude setiap shift dimulai.',
+                  minLines: 3,
+                  maxLines: 8,
+                ),
+                const SizedBox(height: GhinaSpace.lg),
+                const KantorFieldLabel('Skills'),
+                Wrap(
+                  spacing: GhinaSpace.sm,
+                  runSpacing: GhinaSpace.sm,
+                  children: [
+                    for (final s in _skills)
+                      InputChip(
+                        label: Text(s),
+                        onDeleted: () => setState(() => _skills.remove(s)),
                       ),
-                    );
+                  ],
+                ),
+                const SizedBox(height: GhinaSpace.sm),
+                ChunkyTextField(
+                  controller: _skillInput,
+                  hint: 'Ketik lalu enter',
+                  textCapitalization: TextCapitalization.none,
+                  onSubmitted: (v) {
+                    _addSkill(v);
+                    _skillInput.clear();
                   },
                 ),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ChunkyButton(
-                  label: 'Acak',
-                  icon: Icons.casino_rounded,
-                  variant: ChunkyButtonVariant.outline,
-                  size: ChunkyButtonSize.small,
-                  onPressed: () =>
-                      setState(() => _look.apply(kantorRandomLook())),
+                const SizedBox(height: GhinaSpace.sm),
+                Wrap(
+                  spacing: GhinaSpace.sm,
+                  children: [
+                    for (final s in _skillSuggestions)
+                      if (!_skills.contains(s))
+                        ActionChip(
+                          label: Text('+ $s'),
+                          onPressed: () => _addSkill(s),
+                        ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: GhinaSpace.lg),
-              const KantorFieldLabel('Warna seragam'),
-              KantorSwatchRow(
-                colors: kantorSwatches,
-                selected: _look.color,
-                onChanged: (c) => setState(() => _look.color = c),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Warna kulit'),
-              KantorSwatchRow(
-                colors: kantorSkins,
-                selected: _look.skin,
-                onChanged: (c) => setState(() => _look.skin = c),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Warna rambut'),
-              KantorSwatchRow(
-                colors: kantorHairColors,
-                selected: _look.hair,
-                onChanged: (c) => setState(() => _look.hair = c),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Gaya rambut'),
-              KantorChips(
-                options: kantorHairStyles,
-                value: _look.hairStyle,
-                onChanged: (v) => setState(() {
-                  _look.hairStyle = v;
-                  _look.normalize();
-                }),
-              ),
-              if (_look.hairStyle == 'hijab') ...[
+                const SizedBox(height: GhinaSpace.lg),
+                KantorCatalogFields(
+                  engine: _engine,
+                  model: _model,
+                  effort: _effort,
+                  onChanged: (engine, model, effort, permission, spec) =>
+                      setState(() {
+                        _engine = engine;
+                        _model = model;
+                        _effort = effort;
+                      }),
+                ),
                 const SizedBox(height: GhinaSpace.md),
-                const KantorFieldLabel('Warna hijab'),
-                KantorSwatchRow(
-                  colors: kantorHijabs,
-                  selected: _look.hijab,
-                  onChanged: (c) => setState(() => _look.hijab = c),
+                KantorPickField<String>(
+                  label: 'Ruangan',
+                  value: _room,
+                  options: [
+                    for (final r in rooms) KantorChoice(r.id, r.name, r.path),
+                  ],
+                  onChanged: (v) => setState(() => _room = v),
                 ),
-              ],
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Pakaian'),
-              KantorChips(
-                options: kantorOutfits,
-                value: _look.outfit,
-                onChanged: (v) => setState(() => _look.outfit = v),
-              ),
-              const SizedBox(height: GhinaSpace.md),
-              const KantorFieldLabel('Aksesori'),
-              KantorChips(
-                options: {
-                  for (final e in kantorAccessories.entries)
-                    if (!(e.key == 'topi' && _look.hairStyle == 'hijab'))
-                      e.key: e.value,
-                },
-                value: _look.acc,
-                onChanged: (v) => setState(() => _look.acc = v),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Berdasi'),
-                value: _look.tie,
-                onChanged: (v) => setState(() => _look.tie = v),
-              ),
-              if (editing == null)
+                if (editing?.isManager != true) ...[
+                  const SizedBox(height: GhinaSpace.md),
+                  KantorPickField<String>(
+                    label: 'Atasan',
+                    value: _boss,
+                    options: [
+                      const KantorChoice('', 'Langsung di bawah manager'),
+                      for (final r in bosses)
+                        KantorChoice(r.id, r.name, r.title),
+                    ],
+                    onChanged: (v) => setState(() => _boss = v),
+                  ),
+                ],
+                const SizedBox(height: GhinaSpace.xl),
+                Text(
+                  'Tampilan karakter',
+                  style: GhinaType.h3.copyWith(color: g.textPrimary),
+                ),
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Template'),
+                SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: kantorLookTemplates.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: GhinaSpace.sm),
+                    itemBuilder: (_, i) {
+                      final t = kantorLookTemplates[i];
+                      return GestureDetector(
+                        onTap: () => setState(() => _look.apply(t.look())),
+                        child: SizedBox(
+                          width: 72,
+                          child: Column(
+                            children: [
+                              KantorSprite(look: t.look().toJson(), size: 64),
+                              const SizedBox(height: 4),
+                              Text(
+                                t.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GhinaType.caption.copyWith(
+                                  color: g.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ChunkyButton(
+                    label: 'Acak',
+                    icon: Icons.casino_rounded,
+                    variant: ChunkyButtonVariant.outline,
+                    size: ChunkyButtonSize.small,
+                    onPressed: () =>
+                        setState(() => _look.apply(kantorRandomLook())),
+                  ),
+                ),
+                const SizedBox(height: GhinaSpace.lg),
+                const KantorFieldLabel('Warna seragam'),
+                KantorSwatchRow(
+                  colors: kantorSwatches,
+                  selected: _look.color,
+                  onChanged: (c) => setState(() => _look.color = c),
+                ),
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Warna kulit'),
+                KantorSwatchRow(
+                  colors: kantorSkins,
+                  selected: _look.skin,
+                  onChanged: (c) => setState(() => _look.skin = c),
+                ),
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Warna rambut'),
+                KantorSwatchRow(
+                  colors: kantorHairColors,
+                  selected: _look.hair,
+                  onChanged: (c) => setState(() => _look.hair = c),
+                ),
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Gaya rambut'),
+                KantorChips(
+                  options: kantorHairStyles,
+                  value: _look.hairStyle,
+                  onChanged: (v) => setState(() {
+                    _look.hairStyle = v;
+                    _look.normalize();
+                  }),
+                ),
+                if (_look.hairStyle == 'hijab') ...[
+                  const SizedBox(height: GhinaSpace.md),
+                  const KantorFieldLabel('Warna hijab'),
+                  KantorSwatchRow(
+                    colors: kantorHijabs,
+                    selected: _look.hijab,
+                    onChanged: (c) => setState(() => _look.hijab = c),
+                  ),
+                ],
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Pakaian'),
+                KantorChips(
+                  options: kantorOutfits,
+                  value: _look.outfit,
+                  onChanged: (v) => setState(() => _look.outfit = v),
+                ),
+                const SizedBox(height: GhinaSpace.md),
+                const KantorFieldLabel('Aksesori'),
+                KantorChips(
+                  options: {
+                    for (final e in kantorAccessories.entries)
+                      if (!(e.key == 'topi' && _look.hairStyle == 'hijab'))
+                        e.key: e.value,
+                  },
+                  value: _look.acc,
+                  onChanged: (v) => setState(() => _look.acc = v),
+                ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Manager'),
-                  subtitle: const Text(
-                    'Memecah permintaan jadi kartu dan boleh memulai shift role lain. Ditetapkan saat dibuat.',
-                  ),
-                  value: _manager,
-                  onChanged: (v) => setState(() => _manager = v),
+                  title: const Text('Berdasi'),
+                  value: _look.tie,
+                  onChanged: (v) => setState(() => _look.tie = v),
                 ),
-              const SizedBox(height: GhinaSpace.xl),
-              ChunkyButton(
-                label: editing != null ? 'Simpan' : 'Buat role',
-                loading: _busy,
-                onPressed: _busy ? null : () => _save(office),
-              ),
-              const SizedBox(height: GhinaSpace.xxl),
-            ],
+                if (editing == null)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Manager'),
+                    subtitle: const Text(
+                      'Memecah permintaan jadi kartu dan boleh memulai shift role lain. Ditetapkan saat dibuat.',
+                    ),
+                    value: _manager,
+                    onChanged: (v) => setState(() => _manager = v),
+                  ),
+                const SizedBox(height: GhinaSpace.xl),
+                ChunkyButton(
+                  label: editing != null ? 'Simpan' : 'Buat role',
+                  loading: _busy,
+                  onPressed: _busy ? null : () => _save(office),
+                ),
+                const SizedBox(height: GhinaSpace.xxl),
+              ],
+            ),
           );
         },
       ),

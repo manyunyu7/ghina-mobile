@@ -160,12 +160,14 @@ void main() {
       expect(find.text('office B'), findsOneWidget);
     });
 
-    testWidgets('very wide screens center the content at 1100dp', (t) async {
+    testWidgets('very wide screens center the content at 1280dp', (t) async {
       await pumpAt(t, 1400);
-      final search = t.getRect(find.byKey(const ValueKey('kantor-search-bar')));
-      expect(search.width, kantorComplexMaxContentWidth);
-      expect(search.center.dx, 700);
-      // Three columns: A, B, C on one row.
+      final split = t.getRect(
+        find.byKey(const ValueKey('kantor-complex-split')),
+      );
+      expect(split.width, kantorComplexMaxContentWidth);
+      expect(split.center.dx, 700);
+      // Kartu ringkas berjajar: A, B, C dalam satu baris.
       final a = t.getTopLeft(find.text('Kantor A'));
       final c = t.getTopLeft(find.text('Kantor C'));
       expect(c.dy, a.dy);
@@ -173,10 +175,17 @@ void main() {
     });
 
     test('column count follows the Fold postures', () {
-      expect(kantorComplexColumns(690 - 2 * GhinaSpace.page), 2);
-      expect(kantorComplexColumns(830 - 2 * GhinaSpace.page), 3);
+      // Fold tegak (±690dp, satu kolom di tengah).
+      expect(kantorComplexColumns(690 - 2 * GhinaSpace.page), 3);
       expect(kantorComplexColumns(560), 2);
-      expect(kantorComplexColumns(1100), 3);
+      // Layar dalam Fold (±830dp): kolom kiri di samping panel kanan.
+      expect(kantorComplexColumns(474), 2);
+      // Tablet 1200dp dan layar sangat lebar.
+      expect(kantorComplexColumns(784), 3);
+      expect(kantorComplexColumns(904), 4);
+      expect(kantorComplexColumns(300), 2);
+      expect(kantorComplexAsideWidth(790), 300);
+      expect(kantorComplexAsideWidth(1160), 360);
     });
   });
 }

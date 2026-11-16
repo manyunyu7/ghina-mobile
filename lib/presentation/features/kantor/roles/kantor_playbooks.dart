@@ -5,6 +5,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_markdown.dart';
 import '../widgets/kantor_states.dart';
+import '../widgets/kantor_wide.dart';
 import 'kantor_role.dart';
 import 'kantor_ui.dart';
 
@@ -366,35 +367,43 @@ class _PlaybookScreenState extends ConsumerState<KantorPlaybookScreen> {
           ? KantorErrorView(error: _error!, onRetry: _load)
           : page == null
           ? const KantorLoading(count: 4)
+          // Isi playbook dibatasi lebar baca di layar lebar.
           : _editing
-          ? ListView(
-              padding: const EdgeInsets.all(GhinaSpace.page),
-              children: [
-                ChunkyTextField(
-                  controller: _body,
-                  minLines: 12,
-                  maxLines: 30,
-                  label: 'Isi (markdown)',
-                ),
-                const SizedBox(height: GhinaSpace.lg),
-                ChunkyButton(
-                  label: 'Simpan',
-                  loading: _saving,
-                  onPressed: _saving ? null : _save,
-                ),
-                const SizedBox(height: GhinaSpace.sm),
-                ChunkyButton(
-                  label: 'Batal',
-                  variant: ChunkyButtonVariant.ghost,
-                  onPressed: () => setState(() => _editing = false),
-                ),
-              ],
+          ? KantorReadable(
+              child: ListView(
+                padding: const EdgeInsets.all(GhinaSpace.page),
+                children: [
+                  ChunkyTextField(
+                    controller: _body,
+                    minLines: 12,
+                    maxLines: 30,
+                    label: 'Isi (markdown)',
+                  ),
+                  const SizedBox(height: GhinaSpace.lg),
+                  ChunkyButton(
+                    label: 'Simpan',
+                    loading: _saving,
+                    onPressed: _saving ? null : _save,
+                  ),
+                  const SizedBox(height: GhinaSpace.sm),
+                  ChunkyButton(
+                    label: 'Batal',
+                    variant: ChunkyButtonVariant.ghost,
+                    onPressed: () => setState(() => _editing = false),
+                  ),
+                ],
+              ),
             )
-          : ListView(
-              padding: const EdgeInsets.all(GhinaSpace.page),
-              children: [
-                KantorMarkdown(page['body'] as String? ?? '', selectable: true),
-              ],
+          : KantorReadable(
+              child: ListView(
+                padding: const EdgeInsets.all(GhinaSpace.page),
+                children: [
+                  KantorMarkdown(
+                    page['body'] as String? ?? '',
+                    selectable: true,
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -425,11 +434,10 @@ class KantorProposalsSection extends ConsumerWidget {
               subtitle: '${p.by}${p.reason.isEmpty ? '' : ': ${p.reason}'}',
               showChevron: true,
               tinted: GhinaColors.orange,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      KantorProposalScreen(officeId: officeId, proposal: p),
-                ),
+              // Layar lebar: panel samping; layar sempit: halaman penuh.
+              onTap: () => kantorPushAdaptive<void>(
+                context,
+                (_) => KantorProposalScreen(officeId: officeId, proposal: p),
               ),
             ),
           ),
@@ -508,35 +516,37 @@ class _ProposalScreenState extends ConsumerState<KantorProposalScreen> {
           ? KantorErrorView(error: _error!, onRetry: _load)
           : _body == null
           ? const KantorLoading(count: 4)
-          : ListView(
-              padding: const EdgeInsets.all(GhinaSpace.page),
-              children: [
-                Text(
-                  'Usulan dari ${p.by} · ${kantorWhen(p.at)}',
-                  style: GhinaType.bodyS.copyWith(color: g.textSecondary),
-                ),
-                if (p.reason.isNotEmpty) ...[
-                  const SizedBox(height: GhinaSpace.sm),
+          : KantorReadable(
+              child: ListView(
+                padding: const EdgeInsets.all(GhinaSpace.page),
+                children: [
                   Text(
-                    p.reason,
-                    style: GhinaType.body.copyWith(color: g.textPrimary),
+                    'Usulan dari ${p.by} · ${kantorWhen(p.at)}',
+                    style: GhinaType.bodyS.copyWith(color: g.textSecondary),
+                  ),
+                  if (p.reason.isNotEmpty) ...[
+                    const SizedBox(height: GhinaSpace.sm),
+                    Text(
+                      p.reason,
+                      style: GhinaType.body.copyWith(color: g.textPrimary),
+                    ),
+                  ],
+                  const SizedBox(height: GhinaSpace.lg),
+                  ChunkyCard(child: KantorMarkdown(_body!, selectable: true)),
+                  const SizedBox(height: GhinaSpace.lg),
+                  ChunkyButton(
+                    label: 'Terima usulan',
+                    loading: _busy,
+                    onPressed: _busy ? null : () => _decide(true),
+                  ),
+                  const SizedBox(height: GhinaSpace.sm),
+                  ChunkyButton(
+                    label: 'Tolak',
+                    variant: ChunkyButtonVariant.danger,
+                    onPressed: _busy ? null : () => _decide(false),
                   ),
                 ],
-                const SizedBox(height: GhinaSpace.lg),
-                ChunkyCard(child: KantorMarkdown(_body!, selectable: true)),
-                const SizedBox(height: GhinaSpace.lg),
-                ChunkyButton(
-                  label: 'Terima usulan',
-                  loading: _busy,
-                  onPressed: _busy ? null : () => _decide(true),
-                ),
-                const SizedBox(height: GhinaSpace.sm),
-                ChunkyButton(
-                  label: 'Tolak',
-                  variant: ChunkyButtonVariant.danger,
-                  onPressed: _busy ? null : () => _decide(false),
-                ),
-              ],
+              ),
             ),
     );
   }
