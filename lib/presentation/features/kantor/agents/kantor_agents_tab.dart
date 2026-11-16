@@ -20,6 +20,7 @@ import '../session/chat_style.dart';
 import 'kantor_room_marks.dart';
 import '../meetings/kantor_meeting.dart';
 import '../meetings/kantor_meeting_detail.dart';
+import 'kantor_office_bar.dart';
 import 'kantor_two_pane.dart';
 
 /// Agents of one office, grouped by what needs the user: waiting (permission
@@ -77,7 +78,15 @@ class _KantorAgentsTabState extends ConsumerState<KantorAgentsTab> {
           builder: (context, box) {
             final wide = box.maxWidth >= kKantorTwoPaneMin;
             _onLayout(wide);
-            if (!wide) return list;
+            if (!wide) {
+              // ganti kantor di bawah (jempol); "Agen baru" tetap di atasnya
+              return Column(
+                children: [
+                  Expanded(child: list),
+                  KantorOfficeBar(currentId: officeId),
+                ],
+              );
+            }
             return KantorTwoPane(
               officeId: officeId,
               officeName: '${feed.office?['name'] ?? officeId}',

@@ -11,6 +11,7 @@ import '../session/kantor_feed.dart';
 import '../session/kantor_session_page.dart';
 import '../widgets/kantor_states.dart';
 import 'kantor_agents_tab.dart';
+import 'kantor_office_bar.dart';
 
 /// Layar selebar ini (dp) atau lebih memakai dua panel: daftar agen di kiri,
 /// chat sesi di kanan. Di bawahnya (layar luar, Fold tertutup) tampilan tetap
@@ -161,6 +162,7 @@ class KantorTwoPane extends ConsumerWidget {
     return _PaneRow(
       width: width,
       header: _OfficeHeader(officeId: officeId, name: officeName),
+      bar: KantorOfficeBar(currentId: officeId),
       selectedSid: chat?.office == officeId ? chat?.sid : null,
       onSelect: (sid) => ref.read(kantorPaneProvider.notifier).select((
         connection: connection,
@@ -189,12 +191,14 @@ class KantorTwoPane extends ConsumerWidget {
   }
 }
 
-/// Tata letak dua panel bersama: header kantor + daftar agen di kiri, [right]
-/// di kanan. [safe] untuk halaman tanpa AppBar (padding status bar di kiri).
+/// Tata letak dua panel bersama: header kantor + daftar agen + [bar] (ganti
+/// kantor, di jangkauan jempol) di kiri, [right] di kanan. [safe] untuk
+/// halaman tanpa AppBar (padding status bar di kiri).
 class _PaneRow extends StatelessWidget {
   const _PaneRow({
     required this.width,
     required this.header,
+    required this.bar,
     required this.selectedSid,
     required this.onSelect,
     required this.list,
@@ -204,6 +208,7 @@ class _PaneRow extends StatelessWidget {
 
   final double width;
   final Widget header;
+  final Widget bar;
   final String? selectedSid;
   final void Function(String sid) onSelect;
   final Widget list;
@@ -224,6 +229,7 @@ class _PaneRow extends StatelessWidget {
             child: list,
           ),
         ),
+        bar,
       ],
     );
     return Row(
@@ -476,6 +482,10 @@ class _KantorSessionHostState extends ConsumerState<KantorSessionHost> {
             name: '${feed.office?['name'] ?? _listOffice}',
             onOffice: (id) => setState(() => _listOffice = id),
             onBack: () => Navigator.of(context).maybePop(),
+          ),
+          bar: KantorOfficeBar(
+            currentId: _listOffice,
+            onOffice: (id) => setState(() => _listOffice = id),
           ),
           selectedSid: _office == _listOffice ? _sid : null,
           onSelect: (sid) => setState(() => _show(_listOffice, sid)),
