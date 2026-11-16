@@ -40,6 +40,10 @@ Future<void> showKantorOfficeSwitcher(
   );
 }
 
+/// Warna tetap per kantor (dari namanya), sama di sheet dan bilah bawah.
+ChunkySwatch kantorOfficeSwatch(String name) =>
+    _palette[name.codeUnits.fold<int>(0, (a, c) => a + c) % _palette.length];
+
 const _palette = [
   GhinaColors.blue,
   GhinaColors.green,
@@ -109,7 +113,8 @@ class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
 
     // The sheet itself scrolls (ChunkyBottomSheet) and would give this list
     // unbounded height: then the list takes the drags but never moves. Bound
-    // it so the search stays on top and the list scrolls to its last office.
+    // it so the list scrolls to its last office. The search sits below the
+    // list, near the thumb (the sheet lifts it above the keyboard).
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.72,
@@ -118,14 +123,9 @@ class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ChunkyTextField(
-            hint: 'Cari kantor…',
-            prefixIcon: Icons.search_rounded,
-            onChanged: (v) => setState(() => _query = v),
-          ),
-          const SizedBox(height: GhinaSpace.sm),
           Flexible(
             child: ListView(
+              key: const ValueKey('office-switcher-list'),
               shrinkWrap: true,
               children: [
                 if (q.isEmpty)
@@ -164,6 +164,12 @@ class _SwitcherBodyState extends ConsumerState<_SwitcherBody> {
               ],
             ),
           ),
+          const SizedBox(height: GhinaSpace.sm),
+          ChunkyTextField(
+            hint: 'Cari kantor…',
+            prefixIcon: Icons.search_rounded,
+            onChanged: (v) => setState(() => _query = v),
+          ),
         ],
       ),
     );
@@ -193,9 +199,7 @@ class _OfficeRow extends StatelessWidget {
     final sessions = _live(office);
     final working = sessions.where((s) => s['status'] == 'working').length;
     final waiting = sessions.where((s) => s['waiting'] != null).length;
-    final color =
-        _palette[name.codeUnits.fold<int>(0, (a, c) => a + c) %
-            _palette.length];
+    final color = kantorOfficeSwatch(name);
     final style = '${office['style'] ?? ''}';
     final status = sessions.isEmpty
         ? 'sepi'
