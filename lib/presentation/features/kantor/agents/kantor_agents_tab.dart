@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
@@ -23,13 +22,41 @@ import 'kantor_two_pane.dart';
 
 /// Agents of one office, grouped by what needs the user: waiting (permission
 /// or question), working, idle, and roles off shift.
-class KantorAgentsTab extends ConsumerWidget {
+///
+/// Lebar >= [kKantorTwoPaneMin] (Fold terbuka): daftar di kiri, chat di kanan
+/// ([KantorTwoPane]). Di bawahnya tetap satu panel, ketuk agen membuka halaman
+/// sesi seperti biasa.
+class KantorAgentsTab extends ConsumerStatefulWidget {
   const KantorAgentsTab({super.key, required this.officeId});
 
   final String officeId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KantorAgentsTab> createState() => _KantorAgentsTabState();
+}
+
+class _KantorAgentsTabState extends ConsumerState<KantorAgentsTab> {
+  /// Daftar dipindah (bukan dibuat ulang) antara satu dan dua panel, jadi
+  /// filter, pencarian, dan posisi scroll daftar tetap saat Fold dilipat/dibuka.
+  final _listKey = GlobalKey(debugLabel: 'kantor-agent-list');
+
+  /// Tata letak pada build sebelumnya; null sebelum layout pertama.
+  bool? _wasWide;
+
+  void _onLayout(bool wide) {
+    final was = _wasWide;
+    _wasWide = wide;
+    if (was == true && !wide) {
+      // dua panel -> satu panel: chat di panel kanan jadi halaman penuh
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _wasWide == false) kantorUndockToRoute(context, ref);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final officeId = widget.officeId;
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
     final style = ref.watch(chatViewPrefsProvider.select((p) => p.style));
@@ -40,24 +67,30 @@ class KantorAgentsTab extends ConsumerWidget {
         if (feed.error != null && feed.office == null) {
           return KantorErrorView(error: feed.error!, onRetry: feed.load);
         }
-        final list = RefreshIndicator(
-          onRefresh: feed.load,
-          child: style != ChatStyle.bawaan
-              ? _MessengerAgentList(feed: feed, style: style)
-              : _AgentList(
-                  feed: feed,
-                  actions: api == null ? null : KantorActions(api),
-                ),
+        final list = KeyedSubtree(
+          key: _listKey,
+          child: RefreshIndicator(
+            onRefresh: feed.load,
+            child: style != ChatStyle.bawaan
+                ? _MessengerAgentList(feed: feed, style: style)
+                : _AgentList(
+                    feed: feed,
+                    actions: api == null ? null : KantorActions(api),
+                  ),
+          ),
         );
-        // lebar >= 600dp (Fold terbuka): daftar di kiri, chat di kanan
         return LayoutBuilder(
-          builder: (context, box) => box.maxWidth >= kKantorTwoPaneMin
-              ? KantorTwoPane(
-                  officeId: officeId,
-                  list: list,
-                  width: box.maxWidth,
-                )
-              : list,
+          builder: (context, box) {
+            final wide = box.maxWidth >= kKantorTwoPaneMin;
+            _onLayout(wide);
+            if (!wide) return list;
+            return KantorTwoPane(
+              officeId: officeId,
+              officeName: '${feed.office?['name'] ?? officeId}',
+              list: list,
+              width: box.maxWidth,
+            );
+          },
         );
       },
     );
@@ -128,12 +161,8 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
   Future<void> _open(BuildContext context, String sid) async {
     final marks = ref.read(kantorRoomMarksProvider.notifier);
     marks.markRead(sid);
-    final pane = KantorPaneScope.maybeOf(context);
-    if (pane != null) {
-      pane.onSelect(sid);
-      return;
-    }
-    await context.push('/kantor/o/${widget.feed.officeId}/s/$sid');
+    // dua panel: ganti panel kanan; layar sempit: push halaman sesi
+    await kantorOpenFromList(context, widget.feed.officeId, sid);
     marks.markRead(sid);
   }
 
@@ -707,14 +736,8 @@ class _AgentList extends StatelessWidget {
     tag: 'kantor-agents',
   );
 
-  void _open(BuildContext context, String sid) {
-    final pane = KantorPaneScope.maybeOf(context);
-    if (pane != null) {
-      pane.onSelect(sid);
-      return;
-    }
-    context.push('/kantor/o/${feed.officeId}/s/$sid');
-  }
+  void _open(BuildContext context, String sid) =>
+      kantorOpenFromList(context, feed.officeId, sid);
 
   Future<void> _decide(BuildContext context, Json item, String behavior) async {
     try {

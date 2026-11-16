@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_active_agents.dart';
+import '../agents/kantor_two_pane.dart';
 import '../codex/kantor_codex.dart';
 import '../pages/kantor_agent_switcher.dart';
 import '../kantor_place.dart';
@@ -57,6 +58,9 @@ class KantorSessionPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // dibuka dari daftar agen di layar sempit, lalu Fold dibuka: pindah ke
+    // panel kanan daftar agen
+    if (!embedded) kantorDockIfWide(context, ref, officeId: officeId, sid: sid);
     final feed = ref.watch(kantorOfficeFeedProvider(officeId));
     final api = ref.watch(kantorApiProvider);
     final complex = ref.watch(kantorActiveComplexProvider);
@@ -285,7 +289,8 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                   Flexible(
                     child: _Header(feed: widget.feed, sess: s),
                   ),
-                  const Icon(Icons.expand_more_rounded, size: 20),
+                  if (!widget.embedded)
+                    const Icon(Icons.expand_more_rounded, size: 20),
                 ],
               ),
             ),
@@ -421,6 +426,13 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             onTap: _profile,
           ),
           actions: [
+            // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
+            // Telegram tidak punya pemilih agen di judul seperti gaya bawaan)
+            KantorComplexSwitcherButton(
+              officeId: widget.officeId,
+              currentSid: widget.sid,
+              tab: _tabNames[_shown],
+            ),
             if (s['tmux'] != null && s['status'] != 'ended')
               IconButton(
                 tooltip: _shown == 1 ? 'Chat' : 'Terminal',

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import 'chat_model.dart';
+import 'chat_view_prefs.dart';
 
 Uri chatImageUrl(
   KantorApi api,
@@ -146,7 +147,8 @@ class ChatImageBubble extends StatelessWidget {
     if (a == null) return const SizedBox.shrink();
     final g = context.ghina;
     final w = MediaQuery.sizeOf(context).width;
-    final size = big ? w * 0.7 : 120.0;
+    // gambar besar ikut batas lebar bubble (maks 560dp di layar lebar)
+    final size = big ? kantorBubbleMaxWidth(w, 0.7) : 120.0;
     final mine = image.mine;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
