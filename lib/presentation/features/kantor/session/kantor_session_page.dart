@@ -26,8 +26,10 @@ import 'attachment_files.dart';
 import 'attachment_model.dart';
 import 'attachment_views.dart';
 import 'kantor_actions.dart';
+import 'kantor_agent_rank.dart';
 import 'kantor_feed.dart';
 import 'kantor_konteks.dart';
+import 'kantor_tabletop.dart';
 import 'profile_tab.dart';
 import 'session_pratinjau_tab.dart';
 import 'stop_choice.dart';
@@ -205,6 +207,9 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
 
   late int _shown = widget.initialTab;
 
+  /// Strip agen tampil (sembunyi saat chat/terminal digulir ke riwayat).
+  bool _stripShown = true;
+
   @override
   void initState() {
     super.initState();
@@ -234,6 +239,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     setState(() {
       _shown = i;
       _built.add(i);
+      _stripShown = true;
     });
   }
 
@@ -278,7 +284,45 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
   Widget build(BuildContext context) {
     final s = widget.feed.session(widget.sid)!;
     final view = ref.watch(chatViewPrefsProvider);
-    if (view.messenger) return _messengerScaffold(s, view);
+    // mode meja (Fold setengah terbuka, engsel mendatar): layar tetap menyala
+    // selama posisi ini; di tab Chat/Terminal AppBar dan bar konteks diganti
+    // header mini dan chip agen di layar meja (lihat kantor_tabletop.dart)
+    final table = _table;
+    return KantorKeepAwake(
+      on: kantorTabletopHinge(context) != null,
+      child: KantorTabletopScope(
+        enabled: table,
+        header: table
+            ? KantorTabletopHeader(
+                feed: widget.feed,
+                sess: s,
+                onTerminal: _shown == _terminalTab,
+                onBack: widget.embedded
+                    ? null
+                    : () => Navigator.of(context).maybePop(),
+                onSwap: s['tmux'] != null && s['status'] != 'ended'
+                    ? () => _tabs.animateTo(_shown == _terminalTab ? 0 : 1)
+                    : null,
+              )
+            : null,
+        agents: table
+            ? KantorAgentStrip(
+                currentSid: widget.sid,
+                onOpen: _openAgent,
+                chips: true,
+              )
+            : null,
+        child: view.messenger ? _messengerScaffold(s, view) : _plainScaffold(s),
+      ),
+    );
+  }
+
+  /// Tata letak mode meja berlaku: posisi meja dan tab Chat/Terminal tampil.
+  bool get _table =>
+      (_shown == 0 || _shown == _terminalTab) &&
+      kantorTabletopHinge(context) != null;
+
+  Widget _plainScaffold(Json s) {
     // Only the selected tab is visible and focusable: the others stay mounted
     // (state kept) but are offstage and out of the focus tree, so the terminal
     // can never steal the keyboard from the chat field.
@@ -288,86 +332,89 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
       },
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          automaticallyImplyLeading: !widget.embedded,
-          titleSpacing: 0,
-          // tap the agent to switch (this office or all); swipe the header to
-          // step to the previous/next active agent, staying on the same tab
-          title: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragEnd: (d) {
-              if (widget.embedded) return;
-              final v = d.primaryVelocity ?? 0;
-              if (v.abs() < 400) return;
-              kantorStepAgent(
-                context,
-                currentSid: widget.sid,
-                dir: v < 0 ? 1 : -1,
-                tab: _tabNames[_shown],
-              );
-            },
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              // hidden: how long the last load of this chat took
-              onLongPress: _timings,
-              onTap: widget.embedded
-                  ? null
-                  : () => showKantorAgentSwitcher(
+        appBar: _table
+            ? null
+            : AppBar(
+                automaticallyImplyLeading: !widget.embedded,
+                titleSpacing: 0,
+                // tap the agent to switch (this office or all); swipe the header to
+                // step to the previous/next active agent, staying on the same tab
+                title: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragEnd: (d) {
+                    if (widget.embedded) return;
+                    final v = d.primaryVelocity ?? 0;
+                    if (v.abs() < 400) return;
+                    kantorStepAgent(
                       context,
-                      officeId: widget.officeId,
                       currentSid: widget.sid,
+                      dir: v < 0 ? 1 : -1,
                       tab: _tabNames[_shown],
+                    );
+                  },
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    // hidden: how long the last load of this chat took
+                    onLongPress: _timings,
+                    onTap: widget.embedded
+                        ? null
+                        : () => showKantorAgentSwitcher(
+                            context,
+                            officeId: widget.officeId,
+                            currentSid: widget.sid,
+                            tab: _tabNames[_shown],
+                          ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: _Header(feed: widget.feed, sess: s),
+                        ),
+                        if (!widget.embedded)
+                          const Icon(Icons.expand_more_rounded, size: 20),
+                      ],
                     ),
-              child: Row(
-                children: [
-                  Flexible(
-                    child: _Header(feed: widget.feed, sess: s),
                   ),
-                  if (!widget.embedded)
-                    const Icon(Icons.expand_more_rounded, size: 20),
+                ),
+                actions: [
+                  KantorComplexSwitcherButton(
+                    officeId: widget.officeId,
+                    currentSid: widget.sid,
+                    tab: _tabNames[_shown],
+                  ),
+                  _Menu(
+                    feed: widget.feed,
+                    sess: s,
+                    actions: widget.actions,
+                    // the open tab decides which look settings the menu offers
+                    scope: _shown == _terminalTab
+                        ? ViewSheetScope.terminal
+                        : ViewSheetScope.chat,
+                  ),
                 ],
+                bottom: TabBar(
+                  controller: _tabs,
+                  // five tabs don't fit 360dp: scroll horizontally, compact labels
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  labelStyle: GhinaType.bodyS.w(800),
+                  unselectedLabelStyle: GhinaType.bodyS.w(700),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  tabs: const [
+                    Tab(text: 'Chat'),
+                    Tab(text: 'Terminal'),
+                    Tab(text: 'Profil'),
+                    Tab(text: 'Subagent'),
+                    Tab(text: 'Pratinjau'),
+                  ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            KantorComplexSwitcherButton(
-              officeId: widget.officeId,
-              currentSid: widget.sid,
-              tab: _tabNames[_shown],
-            ),
-            _Menu(
-              feed: widget.feed,
-              sess: s,
-              actions: widget.actions,
-              // the open tab decides which look settings the menu offers
-              scope: _shown == _terminalTab
-                  ? ViewSheetScope.terminal
-                  : ViewSheetScope.chat,
-            ),
-          ],
-          bottom: TabBar(
-            controller: _tabs,
-            // five tabs don't fit 360dp: scroll horizontally, compact labels
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            labelStyle: GhinaType.bodyS.w(800),
-            unselectedLabelStyle: GhinaType.bodyS.w(700),
-            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-            tabs: const [
-              Tab(text: 'Chat'),
-              Tab(text: 'Terminal'),
-              Tab(text: 'Profil'),
-              Tab(text: 'Subagent'),
-              Tab(text: 'Pratinjau'),
-            ],
-          ),
-        ),
         body: SafeArea(
           top: false,
           child: Column(
             children: [
+              _strip(),
               // konteks hanya di Chat dan Terminal; hilang saat keyboard terbuka
-              if (_shown == 0 || _shown == 1)
+              if (!_table && (_shown == 0 || _shown == 1))
                 KantorKonteksBar(
                   session: s,
                   onDraft: widget.actions == null
@@ -395,21 +442,83 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
   }
 
   Widget _tabStack(Json s) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        for (var i = 0; i < _tabNames.length; i++)
-          if (_built.contains(i))
-            Offstage(
-              key: ValueKey('tab$i'),
-              offstage: _shown != i,
-              child: TickerMode(
-                enabled: _shown == i,
-                child: ExcludeFocus(excluding: _shown != i, child: _page(i, s)),
+    // gulir chat/terminal menyembunyikan/menampilkan strip agen
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        final v = kantorStripVisibility(n);
+        if (v != null && v != _stripShown) setState(() => _stripShown = v);
+        return false;
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          for (var i = 0; i < _tabNames.length; i++)
+            if (_built.contains(i))
+              Offstage(
+                key: ValueKey('tab$i'),
+                offstage: _shown != i,
+                child: TickerMode(
+                  enabled: _shown == i,
+                  child: ExcludeFocus(
+                    excluding: _shown != i,
+                    child: _page(i, s),
+                  ),
+                ),
               ),
-            ),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// Strip avatar agen di bawah header: hanya layar sempit (di layar lebar
+  /// daftar agen ada di panel kiri), di tab Chat dan Terminal, dan tidak saat
+  /// keyboard terbuka. Slotnya selalu ada (tinggi 0 saat sembunyi) supaya isi
+  /// tab di bawahnya tidak dibuat ulang.
+  Widget _strip() {
+    final narrow =
+        !widget.embedded &&
+        MediaQuery.sizeOf(context).width < kKantorTwoPaneMin;
+    final on = narrow && (_shown == 0 || _shown == 1);
+    final show =
+        on && _stripShown && MediaQuery.viewInsetsOf(context).bottom == 0;
+    return ClipRect(
+      key: const ValueKey('agent-strip-slot'),
+      child: AnimatedAlign(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: Alignment.bottomCenter,
+        heightFactor: show ? 1 : 0,
+        child: on
+            ? IgnorePointer(
+                ignoring: !show,
+                child: ExcludeSemantics(
+                  excluding: !show,
+                  child: KantorAgentStrip(
+                    currentSid: widget.sid,
+                    onOpen: _openAgent,
+                  ),
+                ),
+              )
+            : const SizedBox(width: double.infinity),
+      ),
+    );
+  }
+
+  /// Ketuk avatar di strip: pindah ke chat agen itu di tab yang sama.
+  Future<void> _openAgent(KantorRankedAgent a) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      await kantorOpenRankedAgent(context, a, tab: _tabNames[_shown]);
+    } catch (_) {
+      final where = a.connectionName.isEmpty ? a.officeName : a.connectionName;
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tidak bisa membuka $where. Periksa koneksi lalu coba lagi.',
+          ),
+        ),
+      );
+    }
   }
 
   /// Hidden load meter of this chat (long-press on the header).
@@ -450,57 +559,62 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
       },
       child: Scaffold(
         backgroundColor: colors.wall,
-        appBar: AppBar(
-          backgroundColor: colors.header,
-          foregroundColor: colors.headerInk,
-          surfaceTintColor: Colors.transparent,
-          automaticallyImplyLeading: !widget.embedded,
-          titleSpacing: 0,
-          leading: _shown == 0
-              ? null
-              : IconButton(
-                  tooltip: 'Kembali ke chat',
-                  onPressed: () => _tabs.animateTo(0),
-                  icon: const Icon(Icons.arrow_back),
+        appBar: _table
+            ? null
+            : AppBar(
+                backgroundColor: colors.header,
+                foregroundColor: colors.headerInk,
+                surfaceTintColor: Colors.transparent,
+                automaticallyImplyLeading: !widget.embedded,
+                titleSpacing: 0,
+                leading: _shown == 0
+                    ? null
+                    : IconButton(
+                        tooltip: 'Kembali ke chat',
+                        onPressed: () => _tabs.animateTo(0),
+                        icon: const Icon(Icons.arrow_back),
+                      ),
+                title: KantorMessengerHeader(
+                  feed: widget.feed,
+                  sess: s,
+                  style: view.style,
+                  onTap: _profile,
+                  onLongPress: _timings,
                 ),
-          title: KantorMessengerHeader(
-            feed: widget.feed,
-            sess: s,
-            style: view.style,
-            onTap: _profile,
-            onLongPress: _timings,
-          ),
-          actions: [
-            // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
-            // Telegram tidak punya pemilih agen di judul seperti gaya bawaan)
-            KantorComplexSwitcherButton(
-              officeId: widget.officeId,
-              currentSid: widget.sid,
-              tab: _tabNames[_shown],
-            ),
-            if (s['tmux'] != null && s['status'] != 'ended')
-              IconButton(
-                tooltip: _shown == 1 ? 'Chat' : 'Terminal',
-                onPressed: () => _tabs.animateTo(_shown == 1 ? 0 : 1),
-                icon: Icon(
-                  _shown == 1 ? Icons.chat_bubble_outline : Icons.terminal,
-                ),
+                actions: [
+                  // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
+                  // Telegram tidak punya pemilih agen di judul seperti gaya bawaan)
+                  KantorComplexSwitcherButton(
+                    officeId: widget.officeId,
+                    currentSid: widget.sid,
+                    tab: _tabNames[_shown],
+                  ),
+                  if (s['tmux'] != null && s['status'] != 'ended')
+                    IconButton(
+                      tooltip: _shown == 1 ? 'Chat' : 'Terminal',
+                      onPressed: () => _tabs.animateTo(_shown == 1 ? 0 : 1),
+                      icon: Icon(
+                        _shown == 1
+                            ? Icons.chat_bubble_outline
+                            : Icons.terminal,
+                      ),
+                    ),
+                  _Menu(
+                    feed: widget.feed,
+                    sess: s,
+                    actions: widget.actions,
+                    scope: _shown == 1
+                        ? ViewSheetScope.terminal
+                        : ViewSheetScope.chat,
+                  ),
+                ],
               ),
-            _Menu(
-              feed: widget.feed,
-              sess: s,
-              actions: widget.actions,
-              scope: _shown == 1
-                  ? ViewSheetScope.terminal
-                  : ViewSheetScope.chat,
-            ),
-          ],
-        ),
         body: SafeArea(
           top: false,
           child: Column(
             children: [
-              if (_shown == 0 || _shown == 1)
+              _strip(),
+              if (!_table && (_shown == 0 || _shown == 1))
                 KantorKonteksBar(
                   session: s,
                   onDraft: widget.actions == null

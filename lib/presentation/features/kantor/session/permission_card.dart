@@ -83,6 +83,13 @@ AskParse parseAsk(String summary) {
   }
 }
 
+/// Izin yang bisa dijawab Izinkan / Tolak dari Kantor: bukan pertanyaan
+/// (AskUserQuestion) dan masih ditahan hook (belum pindah ke terminal). Sama
+/// dengan syarat tombol Izinkan/Tolak di [KantorPermissionCard]; dipakai juga
+/// tombol besar mode meja.
+bool kantorPermissionCanDecide(Json item) =>
+    item['tool'] != 'AskUserQuestion' && item['held'] == true;
+
 /// A pending permission of a session: Izinkan / Tolak, or the question
 /// Claude asked with its options as buttons.
 class KantorPermissionCard extends StatelessWidget {

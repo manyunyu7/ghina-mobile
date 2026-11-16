@@ -11,6 +11,7 @@ import '../../../state/platform/platform_state.dart';
 import '../../notes/widgets/dictation_bar.dart';
 import '../widgets/kantor_markdown.dart';
 import 'attach_picker.dart';
+import 'blocker_card.dart';
 import 'attachment_tray.dart';
 import 'chat_look.dart';
 import 'chat_look_paint.dart';
@@ -34,6 +35,7 @@ import 'chat_style.dart';
 import '../board/kantor_card_detail.dart';
 import 'kantor_actions.dart';
 import 'kantor_feed.dart';
+import 'kantor_tabletop.dart';
 import 'stop_choice.dart';
 import 'permission_card.dart';
 
@@ -63,6 +65,10 @@ class KantorChatTab extends ConsumerStatefulWidget {
 class _KantorChatTabState extends ConsumerState<KantorChatTab>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
+
+  /// Isi chat dan composer: dipindah utuh saat masuk/keluar mode meja.
+  final _listKey = GlobalKey(debugLabel: 'kantor-chat-list');
+  final _composerKey = GlobalKey(debugLabel: 'kantor-chat-composer');
   late final KantorApi? _api;
   late final String _connection;
   late final KantorChatMemory _memory;
@@ -189,6 +195,21 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
 
   Json get _sess => widget.feed.session(widget.sid) ?? const {};
 
+  /// Blocker dari jawaban `GET /open`: lebih baru dari feed saat itu, jadi
+  /// dipakai sampai feed dimuat ulang atau event `session` sesi ini datang.
+  /// Hanya data segar: snapshot disk tidak membawa blocker (lihat
+  /// [kantorNeutralOffice]).
+  bool _hasOpenBlocker = false;
+  Json? _openBlocker;
+  DateTime? _openFeedAt;
+
+  Json? get _blocker {
+    if (_hasOpenBlocker && widget.feed.loadedAt == _openFeedAt) {
+      return _openBlocker;
+    }
+    return kantorBlockerOf(_sess['blocker']);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -299,6 +320,12 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
             query: {'n': _firstPage, 'after': ?_cursor},
           );
           final t = o is Map ? o['transcript'] : null;
+          final os = o is Map ? o['session'] : null;
+          if (os is Map && os.containsKey('blocker') && _active) {
+            _hasOpenBlocker = true;
+            _openBlocker = kantorBlockerOf(os['blocker']);
+            _openFeedAt = widget.feed.loadedAt;
+          }
           if (t is Map) {
             data = Map<String, dynamic>.from(t);
             source = 'open';
@@ -528,6 +555,12 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   }
 
   void _onEvent(Json? msg) {
+    if (_hasOpenBlocker &&
+        msg != null &&
+        (msg['t'] == 'session' || msg['t'] == 'session-gone') &&
+        (msg['sid'] ?? asJson(msg['session'])['sid']) == widget.sid) {
+      _hasOpenBlocker = false; // kabar langsung dari daemon: feed lebih baru
+    }
     if (_active &&
         msg != null &&
         msg['t'] == 'transcript' &&
@@ -756,204 +789,311 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
               for (final i in widget.feed.inbox)
                 if (i['sid'] == widget.sid) i,
             ];
-            return Column(
-              children: [
-                Expanded(
-                  child: Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: _pinchDown,
-                    onPointerMove: _pinchMove,
-                    onPointerUp: _pinchEnd,
-                    onPointerCancel: _pinchEnd,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: _list(context, api, outbox, view),
-                        ),
-                        if (_entries != null && (!_synced || _syncFailed))
-                          Positioned(
-                            top: GhinaSpace.sm,
-                            left: GhinaSpace.md,
-                            right: GhinaSpace.md,
-                            child: Center(child: _syncBadge(context)),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (perms.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      GhinaSpace.md,
-                      GhinaSpace.sm,
-                      GhinaSpace.md,
-                      0,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+            // mode meja: isi chat di atas engsel, izin + chip agen + composer
+            // di bawah. Isi chat dan composer memakai GlobalKey, jadi masuk /
+            // keluar mode meja memindahkan widget yang sama (scroll, draf, dan
+            // fokus tetap; chat tidak dimuat ulang).
+            final table = kantorTabletopActive(context) != null;
+            final list = KeyedSubtree(
+              key: _listKey,
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _pinchDown,
+                onPointerMove: _pinchMove,
+                onPointerUp: _pinchEnd,
+                onPointerCancel: _pinchEnd,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: _list(context, api, outbox, view)),
+                    if (_entries != null && (!_synced || _syncFailed))
+                      Positioned(
+                        top: GhinaSpace.sm,
+                        left: GhinaSpace.md,
+                        right: GhinaSpace.md,
+                        child: Center(child: _syncBadge(context)),
                       ),
-                      child: SingleChildScrollView(
-                        child: Column(
+                  ],
+                ),
+              ),
+            );
+            final blocker = ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+              ),
+              child: SingleChildScrollView(
+                child: KantorBlockerCard(
+                  key: ValueKey('blocker-${widget.sid}'),
+                  blocker: _blocker,
+                  sid: widget.sid,
+                  api: _active ? _api : null,
+                  who: sessionName(widget.feed, _sess),
+                  padding: const EdgeInsets.fromLTRB(
+                    GhinaSpace.md,
+                    GhinaSpace.sm,
+                    GhinaSpace.md,
+                    0,
+                  ),
+                  onActed: _bumpLoad,
+                ),
+              ),
+            );
+            final composer = KeyedSubtree(
+              key: _composerKey,
+              child: _Glass(
+                on: view.hasWall,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
+                    if (!view.messenger)
+                      _StatusLine(feed: widget.feed, sess: _sess),
+                    _Quick(
+                      scale: view.scale,
+                      shape: view.bubble,
+                      enabled: can,
+                      onSay: _say,
+                      onEsc: () => _act('esc'),
+                      onCompact: () => _act('compact'),
+                    ),
+                    if (dictating)
+                      DictationBar(
+                        onStop: _dictation.stop,
+                        onCancel: _dictation.cancel,
+                      ),
+                    AttachmentTray(items: _staged, onRemove: _unstage),
+                    if (view.messenger)
+                      _messengerComposer(view, can, dictating)
+                    else
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          GhinaSpace.md,
+                          GhinaSpace.xs,
+                          GhinaSpace.md,
+                          GhinaSpace.sm,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            for (final p in perms)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  bottom: GhinaSpace.sm,
-                                ),
-                                child: KantorPermissionCard(
-                                  style: view.style,
-                                  item: p,
-                                  who: sessionName(widget.feed, _sess),
-                                  onDismiss: () async {
-                                    try {
-                                      await _actions?.dismiss('${p['id']}');
-                                    } catch (e) {
-                                      if (_active) _err(e);
+                            IconButton(
+                              key: const ValueKey('kantor-attach'),
+                              tooltip: 'Kirim foto, video, atau file',
+                              onPressed: _canAttach ? _attach : null,
+                              icon: const Icon(Icons.attach_file_rounded),
+                            ),
+                            GestureDetector(
+                              onLongPressStart: can
+                                  ? (_) {
+                                      if (_dictation.active) return;
+                                      _holdMic = true;
+                                      HapticFeedback.lightImpact();
+                                      _dictation.start();
                                     }
-                                  },
-                                  onDecide: (b) async {
-                                    try {
-                                      await _actions?.decide('${p['id']}', b);
-                                    } catch (e) {
-                                      if (_active) _err(e);
+                                  : null,
+                              onLongPressEnd: can
+                                  ? (_) {
+                                      if (_holdMic) _dictation.stop();
+                                      _holdMic = false;
                                     }
-                                  },
-                                  onSubmit: (answers) async {
-                                    try {
-                                      await _actions?.submitAsk(
-                                        '${p['id']}',
-                                        answers,
-                                      );
-                                      _bumpLoad();
-                                    } catch (e) {
-                                      if (_active) _err(e);
-                                    }
-                                  },
-                                  onAnswer: (n) async {
-                                    try {
-                                      await _actions?.answerAsk(p, n);
-                                      _bumpLoad();
-                                    } catch (e) {
-                                      if (_active) _err(e);
-                                    }
-                                  },
+                                  : null,
+                              child: IconButton(
+                                key: const ValueKey('kantor-mic'),
+                                tooltip: dictating
+                                    ? 'Selesai dikte'
+                                    : 'Dikte (ketuk atau tahan)',
+                                onPressed: can ? _dictation.toggle : null,
+                                icon: Icon(
+                                  dictating
+                                      ? Icons.stop_circle_rounded
+                                      : Icons.mic_rounded,
+                                  color: dictating
+                                      ? GhinaColors.blue.base
+                                      : null,
                                 ),
                               ),
+                            ),
+                            Expanded(
+                              child: _ThemedField(
+                                shape: view.bubble,
+                                me: view.me,
+                                child: ChunkyTextField(
+                                  controller: _input,
+                                  enabled: can,
+                                  hint: can
+                                      ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
+                                      : _sess['status'] == 'ended'
+                                      ? 'Sesi sudah selesai'
+                                      : 'Tidak bisa mengetik ke sesi ini dari sini',
+                                  minLines: 1,
+                                  maxLines: 5,
+                                  textInputAction: TextInputAction.newline,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: GhinaSpace.sm),
+                            ChunkyIconButton(
+                              icon: Icons.send_rounded,
+                              tooltip: 'Kirim',
+                              color: can
+                                  ? _meSwatch(view.me)
+                                  : GhinaColors.gray,
+                              onPressed: can && !_sending ? _send : null,
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                _Glass(
-                  on: view.hasWall,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
-                      if (!view.messenger)
-                        _StatusLine(feed: widget.feed, sess: _sess),
-                      _Quick(
-                        scale: view.scale,
-                        shape: view.bubble,
-                        enabled: can,
-                        onSay: _say,
-                        onEsc: () => _act('esc'),
-                        onCompact: () => _act('compact'),
-                      ),
-                      if (dictating)
-                        DictationBar(
-                          onStop: _dictation.stop,
-                          onCancel: _dictation.cancel,
-                        ),
-                      AttachmentTray(items: _staged, onRemove: _unstage),
-                      if (view.messenger)
-                        _messengerComposer(view, can, dictating)
-                      else
-                        Container(
-                          padding: EdgeInsets.fromLTRB(
-                            GhinaSpace.md,
-                            GhinaSpace.xs,
-                            GhinaSpace.md,
-                            GhinaSpace.sm,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              IconButton(
-                                key: const ValueKey('kantor-attach'),
-                                tooltip: 'Kirim foto, video, atau file',
-                                onPressed: _canAttach ? _attach : null,
-                                icon: const Icon(Icons.attach_file_rounded),
-                              ),
-                              GestureDetector(
-                                onLongPressStart: can
-                                    ? (_) {
-                                        if (_dictation.active) return;
-                                        _holdMic = true;
-                                        HapticFeedback.lightImpact();
-                                        _dictation.start();
-                                      }
-                                    : null,
-                                onLongPressEnd: can
-                                    ? (_) {
-                                        if (_holdMic) _dictation.stop();
-                                        _holdMic = false;
-                                      }
-                                    : null,
-                                child: IconButton(
-                                  key: const ValueKey('kantor-mic'),
-                                  tooltip: dictating
-                                      ? 'Selesai dikte'
-                                      : 'Dikte (ketuk atau tahan)',
-                                  onPressed: can ? _dictation.toggle : null,
-                                  icon: Icon(
-                                    dictating
-                                        ? Icons.stop_circle_rounded
-                                        : Icons.mic_rounded,
-                                    color: dictating
-                                        ? GhinaColors.blue.base
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: _ThemedField(
-                                  shape: view.bubble,
-                                  me: view.me,
-                                  child: ChunkyTextField(
-                                    controller: _input,
-                                    enabled: can,
-                                    hint: can
-                                        ? 'Pesan untuk ${sessionName(widget.feed, _sess)}'
-                                        : _sess['status'] == 'ended'
-                                        ? 'Sesi sudah selesai'
-                                        : 'Tidak bisa mengetik ke sesi ini dari sini',
-                                    minLines: 1,
-                                    maxLines: 5,
-                                    textInputAction: TextInputAction.newline,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: GhinaSpace.sm),
-                              ChunkyIconButton(
-                                icon: Icons.send_rounded,
-                                tooltip: 'Kirim',
-                                color: can
-                                    ? _meSwatch(view.me)
-                                    : GhinaColors.gray,
-                                onPressed: can && !_sending ? _send : null,
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
+              ),
+            );
+            if (table) {
+              return _tabletop(list, blocker, perms, view, composer);
+            }
+            return Column(
+              children: [
+                Expanded(child: list),
+                blocker,
+                if (perms.isNotEmpty) _permsBox(perms, view),
+                composer,
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  /// Kartu izin/pertanyaan sesi ini (aksi lewat [KantorActions]).
+  Widget _permCard(Json p, ChatViewPrefs view) => KantorPermissionCard(
+    style: view.style,
+    item: p,
+    who: sessionName(widget.feed, _sess),
+    onDismiss: () async {
+      try {
+        await _actions?.dismiss('${p['id']}');
+      } catch (e) {
+        if (_active) _err(e);
+      }
+    },
+    onDecide: (b) => _decide(p, b),
+    onSubmit: (answers) async {
+      try {
+        await _actions?.submitAsk('${p['id']}', answers);
+        _bumpLoad();
+      } catch (e) {
+        if (_active) _err(e);
+      }
+    },
+    onAnswer: (n) async {
+      try {
+        await _actions?.answerAsk(p, n);
+        _bumpLoad();
+      } catch (e) {
+        if (_active) _err(e);
+      }
+    },
+  );
+
+  Widget _permsBox(List<Json> perms, ChatViewPrefs view) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      GhinaSpace.md,
+      GhinaSpace.sm,
+      GhinaSpace.md,
+      0,
+    ),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            for (final p in perms)
+              Padding(
+                padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
+                child: _permCard(p, view),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  /// Izinkan / Tolak, dipakai kartu izin dan tombol besar mode meja.
+  Future<void> _decide(Json p, String behavior) async {
+    try {
+      await _actions?.decide('${p['id']}', behavior);
+    } catch (e) {
+      if (_active) _err(e);
+    }
+  }
+
+  /// "Izinkan selalu" (mode meja, hanya alat edit): izinkan sekarang lalu
+  /// mode izin sesi jadi Edit otomatis. Lihat [kantorAllowAlwaysTools].
+  Future<void> _allowAlways(Json p) async {
+    try {
+      await _actions?.decide('${p['id']}', 'allow');
+      await _actions?.setMode(widget.sid, 'acceptEdits');
+    } catch (e) {
+      if (_active) _err(e);
+    }
+  }
+
+  /// Tata letak mode meja. Atas: header mini (dari halaman sesi) + isi chat.
+  /// Bawah: tombol izin besar, kartu login/pertanyaan, chip agen, composer.
+  Widget _tabletop(
+    Widget list,
+    Widget blocker,
+    List<Json> perms,
+    ChatViewPrefs view,
+    Widget composer,
+  ) {
+    final scope = KantorTabletopScope.maybeOf(context);
+    final who = sessionName(widget.feed, _sess);
+    return KantorTabletopLayout(
+      key: const ValueKey('chat-tabletop'),
+      top: Column(
+        children: [
+          ?scope?.header,
+          Expanded(child: list),
+        ],
+      ),
+      bottom: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                GhinaSpace.md,
+                GhinaSpace.sm,
+                GhinaSpace.md,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  blocker,
+                  for (final p in perms)
+                    kantorPermissionCanDecide(p)
+                        ? KantorTabletopPermissionBar(
+                            item: p,
+                            who: who,
+                            onDecide: (b) => _decide(p, b),
+                            onAlways: kantorAllowAlwaysFits(p)
+                                ? () => _allowAlways(p)
+                                : null,
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: GhinaSpace.sm,
+                            ),
+                            child: _permCard(p, view),
+                          ),
+                ],
+              ),
+            ),
+          ),
+          ?scope?.agents,
+          composer,
+        ],
       ),
     );
   }
@@ -1174,9 +1314,16 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
           ),
         );
       }
-      return const Padding(
-        padding: EdgeInsets.all(GhinaSpace.page),
-        child: SkeletonList(count: 4),
+      // agen tertahan: kartunya sudah di bawah, ruang sempit tidak diisi kerangka
+      if (_blocker != null) return const SizedBox.shrink();
+      // tidak bisa digulir, hanya supaya kerangka tidak meluap di ruang
+      // pendek (mis. bagian atas mode meja)
+      return const SingleChildScrollView(
+        physics: NeverScrollableScrollPhysics(),
+        child: Padding(
+          padding: EdgeInsets.all(GhinaSpace.page),
+          child: SkeletonList(count: 4),
+        ),
       );
     }
     final entries = [
@@ -1197,6 +1344,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       for (final j in outbox) UploadEntry(j.id, ''),
     ];
     if (entries.isEmpty) {
+      // agen tertahan (mis. belum login): kartunya di atas composer yang bicara
+      if (_blocker != null) return const SizedBox.shrink();
       return Center(
         child: _Backed(
           on: view.hasWall,

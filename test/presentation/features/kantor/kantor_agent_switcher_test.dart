@@ -66,7 +66,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 600));
     expect(find.text('Pindah agen'), findsOneWidget);
-    expect(find.text('MENUNGGU KAMU  1'), findsOneWidget);
+    expect(find.text('PERLU TINDAKAN  1'), findsOneWidget);
     expect(find.text('LIBUR  1'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsOneWidget);
     await t.tap(find.textContaining('Tono'));

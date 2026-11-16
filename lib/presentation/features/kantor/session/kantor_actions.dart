@@ -106,6 +106,21 @@ class KantorActions {
     'mode': ?mode,
   });
 
+  /// Jawab layar yang menahan agen (login / "tekan Enter"): tombol [action]
+  /// dari `blocker.actions`, atau `input.id` dengan [value]. Mengembalikan
+  /// jawaban daemon `{ok, blocker}` apa adanya (null bila bukan objek).
+  Future<Map<dynamic, dynamic>?> blocker(
+    String sid,
+    String action, {
+    String? value,
+  }) async {
+    final r = await api.post(
+      '/api/sessions/${Uri.encodeComponent(sid)}/blocker',
+      {'action': action, 'value': ?value},
+    );
+    return r is Map ? r : null;
+  }
+
   /// Starts a shift for a role without a session; returns the new sid.
   Future<String?> startShift(
     String officeId,

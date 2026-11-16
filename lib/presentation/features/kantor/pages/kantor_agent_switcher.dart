@@ -1,29 +1,32 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
-import '../agents/kantor_active_agents.dart';
 import 'kantor_complex_agent_switcher.dart';
 import '../codex/kantor_codex.dart';
 import '../session/kantor_actions.dart';
+import '../session/kantor_agent_rank.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_konteks.dart';
 import '../session/start_shift_sheet.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';
 
-/// Agent picker for one office: jump to another agent's session (replacing the
-/// current page), or start a shift for a role that is off duty. A second tab
-/// "Semua kompleks" lists the active agents across saved server connections.
+/// Pencari cepat agen (tahan/ketuk judul chat, atau tombol "Pindah agen" di
+/// kantor). Satu daftar gabungan semua agen dari semua kantor dan koneksi
+/// server tersimpan, dibagi: "Perlu tindakan", "Terakhir dibuka", "Bekerja",
+/// "Semua agen · N", lalu "Libur" (role kantor ini yang belum shift; ketuk
+/// untuk mulai shift). Kolom cari ada di bawah (zona jempol); ketik untuk
+/// menyaring nama agen / kantor / mesin, Enter membuka hasil teratas.
 Future<void> showKantorAgentSwitcher(
   BuildContext context, {
   required String officeId,
   String? currentSid,
   String? tab,
 }) {
-  final router = GoRouter.of(context);
   return showChunkyBottomSheet<void>(
     context,
     title: 'Pindah agen',
@@ -31,46 +34,26 @@ Future<void> showKantorAgentSwitcher(
       officeId: officeId,
       currentSid: currentSid,
       tab: tab,
-      onOpen: (sid) {
-        Navigator.pop(sheet);
-        router.go(
-          kantorAgentPath(officeId, sid, tab: kantorSwitchSessionTab(tab)),
-        );
-      },
+      onClose: () => Navigator.pop(sheet),
     ),
   );
 }
 
-class _Entry {
-  const _Entry({
-    required this.look,
-    required this.name,
-    required this.job,
-    required this.sub,
-    this.session,
-    this.role,
-  });
-  final Json look;
-  final String name;
-  final String job;
-  final String sub;
-  final Json? session;
-  final Json? role;
-  String? get sid => session == null ? null : '${session!['sid']}';
-}
+/// Satu baris daftar: agen hidup, atau role libur (belum shift).
+typedef _Item = ({KantorRankedAgent? agent, Json? role});
 
 class _AgentSwitcher extends ConsumerStatefulWidget {
   const _AgentSwitcher({
     required this.officeId,
     required this.currentSid,
-    required this.onOpen,
+    required this.onClose,
     this.tab,
   });
 
   final String officeId;
   final String? currentSid;
   final String? tab;
-  final void Function(String sid) onOpen;
+  final VoidCallback onClose;
 
   @override
   ConsumerState<_AgentSwitcher> createState() => _AgentSwitcherState();
@@ -78,7 +61,41 @@ class _AgentSwitcher extends ConsumerStatefulWidget {
 
 class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
   String _query = '';
-  bool _all = false;
+  String? _opening;
+  String? _error;
+
+  /// Hasil teratas saat ini, untuk Enter.
+  _Item? _top;
+
+  bool _isCurrent(KantorRankedAgent a) =>
+      a.active && a.officeId == widget.officeId && a.sid == widget.currentSid;
+
+  Future<void> _open(KantorRankedAgent a) async {
+    if (_opening != null) return;
+    if (_isCurrent(a)) return widget.onClose();
+    setState(() {
+      _opening = a.identity;
+      _error = null;
+    });
+    try {
+      await kantorOpenRankedAgent(
+        context,
+        a,
+        tab: widget.tab,
+        beforeGo: widget.onClose,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      final where = a.connectionName.isEmpty ? a.officeName : a.connectionName;
+      setState(
+        () => _error =
+            'Tidak bisa membuka $where. Periksa koneksi lalu coba lagi.',
+      );
+      if (!a.active) ref.invalidate(kantorComplexStateProvider(a.connection));
+    } finally {
+      if (mounted) setState(() => _opening = null);
+    }
+  }
 
   Future<void> _startShift(KantorOfficeFeed feed, Json role) async {
     final api = ref.read(kantorApiProvider);
@@ -88,197 +105,265 @@ class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
       actions: api == null ? null : KantorActions(api),
       role: role,
     );
-    if (sid != null && mounted) widget.onOpen(sid);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: GhinaSpace.sm),
-          child: SegmentedButton<bool>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: false, label: Text('Kantor ini')),
-              ButtonSegment(value: true, label: Text('Semua kompleks')),
-            ],
-            selected: {_all},
-            onSelectionChanged: (v) => setState(() {
-              _all = v.first;
-              _query = '';
-            }),
-          ),
-        ),
-        Flexible(child: _all ? _everyOffice() : _thisOffice()),
-      ],
-    );
-  }
-
-  Widget _everyOffice() {
-    final router = GoRouter.of(context);
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * .6,
-      child: KantorComplexAgentPicker(
-        officeId: widget.officeId,
-        currentSid: widget.currentSid,
-        tab: widget.tab,
-        onNavigate: (path) {
-          Navigator.of(context).pop();
-          router.go(path);
-        },
+    if (sid == null || !mounted) return;
+    final active = ref.read(kantorActiveComplexProvider);
+    await _open(
+      KantorRankedAgent(
+        connection: active?.id ?? '',
+        connectionName: active?.name ?? '',
+        active: true,
+        office: {'id': widget.officeId, 'name': feed.office?['name']},
+        session: {'sid': sid, 'status': 'starting'},
       ),
     );
   }
 
-  Widget _thisOffice() {
+  void _tap(KantorOfficeFeed feed, _Item item) {
+    if (item.agent != null) {
+      _open(item.agent!);
+    } else if (item.role != null) {
+      _startShift(feed, item.role!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final feed = ref.watch(kantorOfficeFeedProvider(widget.officeId));
-    return ListenableBuilder(
-      listenable: feed,
-      builder: (context, _) {
-        if (feed.loading) {
-          return const SizedBox(height: 160, child: KantorLoading());
-        }
-        if (feed.error != null && feed.office == null) {
-          return KantorErrorView(error: feed.error!, onRetry: feed.load);
-        }
-        return _list(context, feed);
-      },
+    final mq = MediaQuery.of(context);
+    // tinggi tetap: daftar bisa digulir sampai bawah dan kolom cari tetap di
+    // bawah, juga saat keyboard terbuka
+    final height = math.max(
+      220.0,
+      (mq.size.height - mq.viewInsets.bottom - mq.padding.top) * .78 - 72,
+    );
+    return SizedBox(
+      height: height,
+      child: ListenableBuilder(
+        listenable: feed,
+        builder: (context, _) => _body(context, feed),
+      ),
     );
   }
 
-  Widget _list(BuildContext context, KantorOfficeFeed feed) {
+  /// Agen: peringkat semua koneksi, ditambah sesi kantor ini dari feed bila
+  /// state koneksi aktif belum ada (mis. baru dibuka atau gagal dimuat).
+  List<KantorRankedAgent> _agents(KantorOfficeFeed feed) {
+    final ranking = ref.watch(kantorAgentRankProvider);
+    final recent = ref.watch(kantorRecentComplexChatsProvider);
+    final active = ref.watch(kantorActiveComplexProvider);
+    final hasOffice = ranking.sources.any(
+      (s) =>
+          s.active &&
+          asJsonList(
+            s.state['offices'],
+          ).any((o) => '${o['id']}' == widget.officeId),
+    );
+    if (hasOffice || feed.office == null) return ranking.agents;
+    final sessions = [
+      for (final s in feed.sessions)
+        if (s['status'] != 'ended')
+          {
+            ...s,
+            if (s['look'] is! Map && feed.role(s['role'] as String?) != null)
+              'look': {
+                ...feed.role(s['role'] as String?)!,
+                'name': sessionName(feed, s),
+              },
+          },
+    ];
+    final extra = (
+      connection: active?.id ?? '',
+      connectionName: active?.name ?? '',
+      active: true,
+      state: <String, dynamic>{
+        'offices': [
+          {
+            'id': widget.officeId,
+            'name': feed.office?['name'] ?? widget.officeId,
+            'sessions': sessions,
+          },
+        ],
+      },
+    );
+    return kantorRankAgents([...ranking.sources, extra], recent);
+  }
+
+  Widget _body(BuildContext context, KantorOfficeFeed feed) {
     final g = context.ghina;
-    final live = feed.sessions.where((s) => s['status'] != 'ended').toList();
-    final waiting = <_Entry>[], working = <_Entry>[], idle = <_Entry>[];
-    final off = <_Entry>[];
+    final ranking = ref.watch(kantorAgentRankProvider);
+    final agents = _agents(feed);
+    final live = feed.sessions.where((s) => s['status'] != 'ended');
+    final off = [
+      for (final r in feed.roles)
+        if (r['archived'] != true && !live.any((s) => s['role'] == r['id'])) r,
+    ];
 
-    void put(Json s, Json look, String name, String job, Json? role) {
-      _Entry e(String sub) => _Entry(
-        look: look,
-        name: name,
-        job: job,
-        sub: sub,
-        session: s,
-        role: role,
-      );
-      final w = s['waiting'] is Map ? asJson(s['waiting']) : null;
-      final status = s['status'];
-      if (w != null || status == 'waiting') {
-        final what = w?['tool'] == 'AskUserQuestion'
-            ? 'bertanya'
-            : 'minta izin';
-        waiting.add(
-          e('$what: ${clip('${w?['summary'] ?? w?['tool'] ?? ''}', 40)}'),
-        );
-      } else if (status == 'working' || status == 'starting') {
-        final t = toolFull(s['tool']);
-        working.add(e(t.isNotEmpty ? t : 'sedang bekerja'));
-      } else {
-        final since = agoText(s['lastSeen']);
-        idle.add(e('diam ${since.isEmpty ? 'baru saja' : since}'));
+    if (agents.isEmpty && off.isEmpty) {
+      if (feed.loading || ranking.loading) return const KantorLoading();
+      if (feed.error != null && feed.office == null) {
+        return KantorErrorView(error: feed.error!, onRetry: feed.load);
       }
     }
 
-    for (final r in feed.roles.where((r) => r['archived'] != true)) {
-      final ss = live.where((s) => s['role'] == r['id']).toList();
-      if (ss.isEmpty) {
-        off.add(
-          _Entry(
-            look: r,
-            name: '${r['name']}',
-            job: '${r['title'] ?? ''}',
-            sub: 'libur · ketuk untuk mulai shift',
-            role: r,
-          ),
-        );
-        continue;
-      }
-      for (final s in ss) {
-        final slot = (s['slot'] as num?)?.toInt() ?? 0;
-        put(
-          s,
-          r,
-          '${r['name']}${slot > 0 ? ' #${slot + 1}' : ''}',
-          '${r['title'] ?? ''}',
-          r,
-        );
-      }
-    }
-    for (final s in live.where((s) => s['role'] == null)) {
-      put(
-        s,
-        KantorSprite.guestLook('${s['sid']}'),
-        sessionName(feed, s),
-        '',
-        null,
-      );
-    }
-
-    final total = waiting.length + working.length + idle.length + off.length;
     final q = _query.trim().toLowerCase();
-    List<_Entry> f(List<_Entry> l) => q.isEmpty
-        ? l
-        : l
-              .where((e) => '${e.name} ${e.job}'.toLowerCase().contains(q))
-              .toList();
+    final sections = <(String, List<_Item>, Color?)>[];
+    if (q.isEmpty) {
+      final action = agents.where((a) => a.needsAction).toList();
+      final recent =
+          agents.where((a) => !a.needsAction && a.recent >= 0).toList()
+            ..sort((a, b) => a.recent - b.recent);
+      final recentTop = recent.take(5).toList();
+      final working = agents
+          .where((a) => a.working && !recentTop.contains(a))
+          .toList();
+      final shown = {...action, ...recentTop, ...working};
+      final rest = agents.where((a) => !shown.contains(a)).toList();
+      _Item it(KantorRankedAgent a) => (agent: a, role: null);
+      sections.addAll([
+        (
+          'PERLU TINDAKAN  ${action.length}',
+          action.map(it).toList(),
+          Theme.of(context).colorScheme.error,
+        ),
+        (
+          'TERAKHIR DIBUKA  ${recentTop.length}',
+          recentTop.map(it).toList(),
+          null,
+        ),
+        ('BEKERJA  ${working.length}', working.map(it).toList(), null),
+        ('SEMUA AGEN · ${agents.length}', rest.map(it).toList(), null),
+        (
+          'LIBUR  ${off.length}',
+          [for (final r in off) (agent: null, role: r)],
+          null,
+        ),
+      ]);
+    } else {
+      // pencarian: satu daftar, nama yang cocok di depan, lalu urutan peringkat
+      int score(KantorRankedAgent a) {
+        final n = a.name.toLowerCase();
+        return n.startsWith(q) ? 0 : (n.contains(q) ? 1 : 2);
+      }
 
-    Widget group(String title, List<_Entry> l, {Color? color}) => l.isEmpty
-        ? const SizedBox.shrink()
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: GhinaSpace.md,
-                  bottom: GhinaSpace.xs,
+      final hits =
+          [
+            for (final (i, a) in agents.indexed)
+              if (a.haystack.contains(q) ||
+                  a.officeName.toLowerCase().contains(q))
+                (i, a),
+          ]..sort((x, y) {
+            final s = score(x.$2) - score(y.$2);
+            return s != 0 ? s : x.$1 - y.$1;
+          });
+      final offHits = off.where(
+        (r) => '${r['name']} ${r['title'] ?? ''}'.toLowerCase().contains(q),
+      );
+      final items = <_Item>[
+        for (final (_, a) in hits) (agent: a, role: null),
+        for (final r in offHits) (agent: null, role: r),
+      ];
+      sections.add(('HASIL  ${items.length}', items, null));
+    }
+    _top = sections.expand((s) => s.$2).firstOrNull;
+
+    final rows = <Widget>[];
+    for (final (title, items, color) in sections) {
+      if (items.isEmpty) continue;
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(
+            top: GhinaSpace.md,
+            bottom: GhinaSpace.xs,
+          ),
+          child: Text(
+            title,
+            style: GhinaType.overline.copyWith(color: color ?? g.textSecondary),
+          ),
+        ),
+      );
+      for (final item in items) {
+        rows.add(
+          item.agent != null
+              ? _AgentRow(
+                  agent: item.agent!,
+                  current: _isCurrent(item.agent!),
+                  opening: _opening == item.agent!.identity,
+                  onTap: _opening != null ? null : () => _tap(feed, item),
+                )
+              : _OffRow(
+                  role: item.role!,
+                  onTap: _opening != null ? null : () => _tap(feed, item),
                 ),
-                child: Text(
-                  '${title.toUpperCase()}  ${l.length}',
-                  style: GhinaType.overline.copyWith(
-                    color: color ?? g.textSecondary,
-                  ),
-                ),
-              ),
-              for (final e in l)
-                _AgentRow(
-                  entry: e,
-                  current: e.sid != null && e.sid == widget.currentSid,
-                  onTap: () => e.sid != null
-                      ? widget.onOpen(e.sid!)
-                      : _startShift(feed, e.role!),
-                ),
-            ],
-          );
+        );
+      }
+    }
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (total > 8)
-          ChunkyTextField(
-            hint: 'Cari agen…',
-            prefixIcon: Icons.search_rounded,
-            onChanged: (v) => setState(() => _query = v),
-          ),
-        Flexible(
+        Expanded(
           child: ListView(
-            shrinkWrap: true,
+            key: const ValueKey('agent-switcher-list'),
             children: [
-              if (total == 0)
-                const EmptyState(title: 'Belum ada agen', compact: true),
-              group(
-                'Menunggu kamu',
-                f(waiting),
-                color: GhinaColors.orange.edge,
-              ),
-              group('Bekerja', f(working)),
-              group('Idle', f(idle)),
-              group('Libur', f(off)),
+              if (rows.isEmpty)
+                EmptyState(
+                  title: q.isEmpty ? 'Belum ada agen' : 'Tidak ada yang cocok',
+                  compact: true,
+                ),
+              ...rows,
+              for (final p in ranking.offline)
+                Padding(
+                  padding: const EdgeInsets.only(top: GhinaSpace.sm),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.cloud_off_outlined,
+                        size: 18,
+                        color: g.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${p.name} tidak terhubung',
+                          style: GhinaType.caption.copyWith(
+                            color: g.textSecondary,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            ref.invalidate(kantorComplexStateProvider(p.id)),
+                        child: const Text('Coba lagi'),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: GhinaSpace.sm),
             ],
           ),
+        ),
+        if (_opening != null) const LinearProgressIndicator(),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text(
+              _error!,
+              style: GhinaType.caption.copyWith(color: GhinaColors.red.base),
+            ),
+          ),
+        const SizedBox(height: GhinaSpace.sm),
+        // kolom cari di bawah: dekat jempol; Enter = buka hasil teratas
+        ChunkyTextField(
+          key: const ValueKey('agent-switcher-search'),
+          hint: 'Ketik nama agen / kantor…',
+          prefixIcon: Icons.search_rounded,
+          textInputAction: TextInputAction.go,
+          textCapitalization: TextCapitalization.none,
+          onChanged: (v) => setState(() => _query = v),
+          onSubmitted: (_) {
+            final top = _top;
+            if (top != null) _tap(feed, top);
+          },
         ),
       ],
     );
@@ -287,46 +372,99 @@ class _AgentSwitcherState extends ConsumerState<_AgentSwitcher> {
 
 class _AgentRow extends StatelessWidget {
   const _AgentRow({
-    required this.entry,
+    required this.agent,
     required this.current,
+    required this.opening,
     required this.onTap,
   });
 
-  final _Entry entry;
+  final KantorRankedAgent agent;
   final bool current;
-  final VoidCallback onTap;
+  final bool opening;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final s = entry.session;
-    final waiting =
-        s != null && (s['waiting'] != null || s['status'] == 'waiting');
+    final a = agent;
+    final job = '${a.look['title'] ?? ''}';
+    final ago = agoText(a.lastSeen);
+    final what = a.needsAction && !a.waiting
+        ? (a.actionLabel == 'login' ? 'perlu login' : 'perlu tindakan')
+        : a.doing == 'diam' && ago.isNotEmpty
+        ? 'diam $ago'
+        : a.doing;
     return Padding(
       padding: const EdgeInsets.only(bottom: GhinaSpace.xs),
       child: ChunkyTile(
-        leading: Opacity(
-          opacity: s == null ? 0.55 : 1,
-          child: KantorSprite(look: entry.look, size: 36),
-        ),
-        title: entry.job.isEmpty ? entry.name : '${entry.name} · ${entry.job}',
-        subtitle: kantorKonteksSubtitle(entry.session, entry.sub),
+        key: ValueKey('switch-${a.identity}'),
+        leading: KantorSprite(look: a.look, size: 36),
+        title: job.isEmpty ? a.name : '${a.name} · $job',
+        subtitle: [
+          a.officeName,
+          if (!a.active && a.connectionName.isNotEmpty) a.connectionName,
+          kantorKonteksSubtitle(a.session, what),
+        ].join(' · '),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (kantorEngineIsCodex(s, entry.role)) ...[
+            if (a.codex) ...[
               const KantorCodexBadge(),
               const SizedBox(width: 4),
             ],
-            if (current)
+            if (opening)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (current)
               const Icon(Icons.check_rounded)
-            else if (waiting)
-              const ChunkyPill(
-                label: 'izin',
-                color: GhinaColors.orange,
+            else if (a.needsAction)
+              ChunkyPill(
+                label: a.actionLabel,
+                color: a.actionLabel == 'login'
+                    ? GhinaColors.yellow
+                    : GhinaColors.red,
                 soft: true,
+              )
+            else if (a.working)
+              Icon(
+                Icons.circle,
+                size: 10,
+                color: GhinaColors.blue.base,
+                semanticLabel: 'bekerja',
               ),
           ],
         ),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Role kantor ini yang belum shift: ketuk untuk mulai shift.
+class _OffRow extends StatelessWidget {
+  const _OffRow({required this.role, required this.onTap});
+
+  final Json role;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final job = '${role['title'] ?? ''}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: GhinaSpace.xs),
+      child: ChunkyTile(
+        key: ValueKey('switch-off-${role['id']}'),
+        leading: Opacity(
+          opacity: 0.55,
+          child: KantorSprite(look: role, size: 36),
+        ),
+        title: job.isEmpty ? '${role['name']}' : '${role['name']} · $job',
+        subtitle: 'libur · ketuk untuk mulai shift',
+        trailing: kantorEngineIsCodex(null, role)
+            ? const KantorCodexBadge()
+            : null,
         onTap: onTap,
       ),
     );

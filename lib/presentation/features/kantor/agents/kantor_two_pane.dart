@@ -10,6 +10,7 @@ import '../session/chat_view_prefs.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_session_page.dart';
 import '../session/kantor_snapshot_store.dart';
+import '../session/kantor_tabletop.dart';
 import '../widgets/kantor_states.dart';
 import 'kantor_agents_tab.dart';
 import 'kantor_office_bar.dart';
@@ -454,7 +455,10 @@ class _KantorSessionHostState extends ConsumerState<KantorSessionHost> {
   Widget build(BuildContext context) {
     final pane = ref.watch(kantorPaneProvider);
     final size = MediaQuery.sizeOf(context);
-    final wide = size.width >= kKantorTwoPaneMin;
+    // mode meja (Fold setengah terbuka, engsel mendatar): chat satu panel
+    // selebar layar, dibagi atas/bawah engsel (lihat kantor_tabletop.dart)
+    final wide =
+        size.width >= kKantorTwoPaneMin && kantorTabletopHinge(context) == null;
     _dockIfWide(pane, wide);
     if (_docked) {
       return ColoredBox(color: Theme.of(context).scaffoldBackgroundColor);

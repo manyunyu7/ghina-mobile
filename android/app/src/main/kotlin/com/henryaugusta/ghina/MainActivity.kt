@@ -14,6 +14,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.WindowManager
 import android.webkit.MimeTypeMap
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -143,6 +144,24 @@ class MainActivity : FlutterFragmentActivity() {
                     result.notImplemented()
                 }
             }
+        }
+
+        // Ravel mode meja (Fold setengah terbuka di meja): layar tetap menyala
+        // selama Dart memintanya (lib/.../session/kantor_tabletop.dart,
+        // KantorScreenAwake). Di Ghina channel ini no-op.
+        MethodChannel(messenger, SCREEN).setMethodCallHandler { call, result ->
+            if (call.method != "keepOn") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            if (BuildConfig.FLAVOR == "ravel") {
+                if (call.arguments == true) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+            result.success(null)
         }
 
         MethodChannel(messenger, METHODS).setMethodCallHandler { call, result ->
@@ -507,6 +526,7 @@ class MainActivity : FlutterFragmentActivity() {
         private const val METHODS = "com.henryaugusta.ghina/platform"
         private const val SHARE_EVENTS = "com.henryaugusta.ghina/share"
         private const val KANTOR_WIDGET = "com.henryaugusta.ghina/kantor_widget"
+        private const val SCREEN = "ravel/screen"
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
         private const val MAX_PDF_BYTES = 11L * 1024 * 1024

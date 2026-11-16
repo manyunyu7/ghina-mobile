@@ -9,6 +9,9 @@ import 'package:xterm/xterm.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
+import '../../../state/platform/platform_state.dart';
+import 'chat_dictation.dart';
+import 'kantor_tabletop.dart';
 import 'terminal_clipboard.dart';
 import 'terminal_prefs.dart';
 import 'terminal_scroll.dart';
@@ -73,6 +76,17 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   // ada seleksi di layar: bar terminal menampilkan tombol "Salin"
   bool _selecting = false;
 
+  /// Layar terminal: dipindah utuh (GlobalKey) saat masuk/keluar mode meja.
+  final _viewKey = GlobalKey(debugLabel: 'kantor-term-view');
+
+  /// Kolom ketik mode meja (dikte masuk ke sini juga).
+  final _line = TextEditingController();
+  late final ChatDictation _dictation = ChatDictation(
+    ref: ref,
+    context: () => context,
+    text: _line,
+  );
+
   @override
   bool get wantKeepAlive => true;
 
@@ -102,6 +116,8 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     _sub?.cancel();
     _ws?.close();
     _focus.dispose();
+    _dictation.dispose();
+    _line.dispose();
     _controller
       ..removeListener(_onSelection)
       ..dispose();
@@ -301,6 +317,20 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     }
   }
 
+  /// Kirim isi kolom ketik mode meja lalu Enter. Kosong = Enter saja. Teks
+  /// multi-baris masuk sebagai tempelan (aman bila program memakai bracketed
+  /// paste), satu baris dikirim seperti diketik.
+  void _sendLine() {
+    final text = _line.text;
+    if (text.contains('\n')) {
+      _terminal.paste(pasteReady(text));
+    } else if (text.isNotEmpty) {
+      _send(text);
+    }
+    _send('\r');
+    _line.clear();
+  }
+
   void _zoom(double d) => ref
       .read(terminalPrefsProvider.notifier)
       .update((p) => p.copyWith(fontSize: p.fontSize + d));
@@ -311,6 +341,79 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     final g = context.ghina;
     final look = ref.watch(terminalPrefsProvider);
     final font = look.fontSize;
+    ref.listen(dictationControllerProvider, _dictation.onChange);
+    final dictating = ref.watch(dictationControllerProvider).isActive;
+    final view = KeyedSubtree(
+      key: _viewKey,
+      child: GestureDetector(
+        onTap: _focus.requestFocus,
+        child: TerminalView(
+          _terminal,
+          controller: _controller,
+          focusNode: _focus,
+          autofocus: false,
+          hardwareKeyboardOnly: false,
+          theme: look.themeDef.toTerminalTheme(),
+          textStyle: TerminalStyle(
+            fontSize: font,
+            fontFamily: look.face.family,
+            fontFamilyFallback: TermFace.fallback,
+          ),
+          padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+          keyboardType: TextInputType.visiblePassword,
+          deleteDetection: true,
+          // salin-tempel ditangani _onKey; tanpa shortcut bawaan xterm,
+          // Ctrl+A kembali ke shell (bukan "pilih semua")
+          shortcuts: const {},
+          onKeyEvent: _onKey,
+        ),
+      ),
+    );
+    // mode meja: layar terminal di atas engsel, tombol besar + kolom ketik di
+    // bawah (lewat jalur input websocket yang sama)
+    if (kantorTabletopActive(context) != null) {
+      final header = KantorTabletopScope.maybeOf(context)?.header;
+      return KantorTabletopLayout(
+        key: const ValueKey('term-tabletop'),
+        top: Column(
+          children: [
+            ?header,
+            if (_closed)
+              Material(
+                color: g.surface,
+                child: Row(
+                  children: [
+                    const SizedBox(width: GhinaSpace.md),
+                    Expanded(
+                      child: Text(
+                        'terputus',
+                        style: GhinaType.caption.copyWith(
+                          color: g.textSecondary,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _connect,
+                      child: const Text('Sambung ulang'),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(child: view),
+          ],
+        ),
+        bottom: KantorTabletopTermKeys(
+          onSeq: _send,
+          onArrow: _arrow,
+          onPaste: _paste,
+          onCopyScreen: _copyScreen,
+          line: _line,
+          onSend: _sendLine,
+          onMic: _dictation.toggle,
+          dictating: dictating,
+        ),
+      );
+    }
     return Column(
       children: [
         Container(
@@ -382,31 +485,7 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
             ],
           ),
         ),
-        Expanded(
-          child: GestureDetector(
-            onTap: _focus.requestFocus,
-            child: TerminalView(
-              _terminal,
-              controller: _controller,
-              focusNode: _focus,
-              autofocus: false,
-              hardwareKeyboardOnly: false,
-              theme: look.themeDef.toTerminalTheme(),
-              textStyle: TerminalStyle(
-                fontSize: font,
-                fontFamily: look.face.family,
-                fontFamilyFallback: TermFace.fallback,
-              ),
-              padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-              keyboardType: TextInputType.visiblePassword,
-              deleteDetection: true,
-              // salin-tempel ditangani _onKey; tanpa shortcut bawaan xterm,
-              // Ctrl+A kembali ke shell (bukan "pilih semua")
-              shortcuts: const {},
-              onKeyEvent: _onKey,
-            ),
-          ),
-        ),
+        Expanded(child: view),
         _KeyBar(
           ctrl: _ctrl,
           onCtrl: () => setState(() => _ctrl = !_ctrl),

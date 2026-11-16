@@ -713,11 +713,13 @@ class _Meta {
 
 /// [office] as it may be shown before the daemon answered: live sessions get
 /// an unknown status (`''`, shown as "Menyinkronkan…"), and no permission
-/// wait, tool, subagents, work step, error or draft. Ended sessions stay ended.
+/// wait, tool, subagents, work step, error, draft or blocker (layar login /
+/// "tekan Enter"). Ended sessions stay ended.
 Json kantorNeutralOffice(Json office) {
   Json neutral(Json s) {
     final out = Map<String, dynamic>.from(s)
       ..remove('waiting')
+      ..remove('blocker')
       ..remove('tool')
       ..remove('subs')
       ..remove('compacting');
