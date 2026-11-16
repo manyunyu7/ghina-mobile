@@ -422,11 +422,13 @@ class KantorMessengerHeader extends StatelessWidget {
     required this.sess,
     required this.style,
     required this.onTap,
+    this.onLongPress,
   });
   final KantorOfficeFeed feed;
   final Json sess;
   final ChatStyle style;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -435,6 +437,7 @@ class KantorMessengerHeader extends StatelessWidget {
     return InkWell(
       key: const ValueKey('messenger-profile-header'),
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),

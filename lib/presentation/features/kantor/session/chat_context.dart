@@ -171,14 +171,17 @@ Future<void> kantorPrefetchChats(
       );
       if (raw is! Map || cache.peek(key) != null || !cache.hasRoom) continue;
       final data = Map<String, dynamic>.from(raw);
-      final merged = mergeTranscript(null, data, keep: cache.maxItems);
+      final w = applyTranscriptDelta(null, data, keep: cache.maxItems).window;
       cache.put(
         key,
         KantorTranscriptSnap(
-          items: merged.items,
-          cursor: merged.cursor,
+          items: w.items,
+          cursor: w.cursor,
           size: data['size'],
           at: DateTime.now(),
+          first: w.first,
+          gen: w.gen,
+          older: w.older,
         ),
       );
     } catch (_) {
@@ -242,4 +245,226 @@ mergeTranscript(
   }
   if (items.isEmpty) return (items: held, cursor: cursor, changed: false);
   return (items: tail([...held, ...items]), cursor: cursor, changed: true);
+}
+
+/// What the chat holds of one transcript: the items plus where they sit in
+/// the daemon's transcript ([first] = sequence number of `items.first`,
+/// [gen] = transcript generation, [older] = the daemon has lines before
+/// [first]). Same meaning as the fields of [KantorTranscriptSnap].
+typedef KantorTranscriptWindow = ({
+  List<Map<String, dynamic>> items,
+  String? cursor,
+  int? first,
+  String? gen,
+  bool older,
+});
+
+/// Result of [applyTranscriptDelta] / [prependTranscript]: the new window and
+/// whether its items changed.
+typedef KantorTranscriptMerge = ({KantorTranscriptWindow window, bool changed});
+
+List<Map<String, dynamic>> _itemsOf(Object? raw) => [
+  if (raw is List)
+    for (final e in raw)
+      if (e is Map) Map<String, dynamic>.from(e),
+];
+
+/// Applies one `GET /transcript?delta=1` (or the `transcript` part of
+/// `GET /open`) answer to [held], keeping `first`/`gen`/`older` in step.
+///
+/// The same rules as [mergeTranscript] decide between "append the delta" and
+/// "replace with the whole tail"; at most [keep] items are kept and dropping
+/// older ones moves `first` forward and sets `older`.
+KantorTranscriptMerge applyTranscriptDelta(
+  KantorTranscriptWindow? held,
+  Map<String, dynamic> data, {
+  int keep = 200,
+}) {
+  final items = _itemsOf(data['items']);
+  final cursor = data['cursor'] is String ? data['cursor'] as String : null;
+  final first = data['first'] is int ? data['first'] as int : null;
+  final gen = data['gen'] is String ? data['gen'] as String : null;
+  KantorTranscriptWindow trimmed(
+    List<Map<String, dynamic>> l,
+    int? first,
+    String? gen,
+    bool older,
+  ) {
+    if (l.length <= keep) {
+      return (items: l, cursor: cursor, first: first, gen: gen, older: older);
+    }
+    final drop = l.length - keep;
+    return (
+      items: l.sublist(drop),
+      cursor: cursor,
+      first: first == null ? null : first + drop,
+      gen: gen,
+      older: true,
+    );
+  }
+
+  if (cursor == null || held == null || data['reset'] != false) {
+    return (
+      window: trimmed(items, first, gen, data['older'] == true),
+      changed: true,
+    );
+  }
+  // a delta continues the held window: its start stays where it was
+  var start = held.first;
+  var older = held.older;
+  if (start == null && first != null && items.isNotEmpty) {
+    // window from a daemon (or cache) without paging info: the delta's own
+    // sequence number places it, since the delta follows on directly
+    final s = first - held.items.length;
+    if (s >= 0) {
+      start = s;
+      older = s > 0;
+    }
+  }
+  if (items.isEmpty) {
+    return (
+      window: (
+        items: held.items,
+        cursor: cursor,
+        first: start,
+        gen: gen ?? held.gen,
+        older: older,
+      ),
+      changed: false,
+    );
+  }
+  return (
+    window: trimmed([...held.items, ...items], start, gen ?? held.gen, older),
+    changed: true,
+  );
+}
+
+/// Applies one `GET /transcript?before=<first>&gen=<gen>` answer: the older
+/// items go in front of [held]. A `reset` answer (the transcript was
+/// rewritten) or an answer that does not line up with [held] leaves the items
+/// alone and only stops further paging.
+KantorTranscriptMerge prependTranscript(
+  KantorTranscriptWindow held,
+  Map<String, dynamic> data,
+) {
+  KantorTranscriptMerge stop() => (
+    window: (
+      items: held.items,
+      cursor: held.cursor,
+      first: held.first,
+      gen: held.gen,
+      older: false,
+    ),
+    changed: false,
+  );
+  final at = held.first;
+  if (data['reset'] == true || at == null) return stop();
+  final gen = data['gen'] is String ? data['gen'] as String : held.gen;
+  if (held.gen != null && gen != held.gen) return stop();
+  var items = _itemsOf(data['items']);
+  var first = data['first'] is int ? data['first'] as int : at - items.length;
+  // the page must end right where the held window starts
+  if (first + items.length > at) {
+    final n = at - first;
+    if (n < 0) return stop();
+    items = items.sublist(0, n); // overlap: drop what is already held
+  } else if (first + items.length < at) {
+    return stop(); // gap: never show a hole in the history
+  }
+  final older = data['older'] == true && first > 0;
+  if (items.isEmpty) {
+    return (
+      window: (
+        items: held.items,
+        cursor: held.cursor,
+        first: held.first,
+        gen: gen,
+        older: older,
+      ),
+      changed: false,
+    );
+  }
+  return (
+    window: (
+      items: [...items, ...held.items],
+      cursor: held.cursor,
+      first: first,
+      gen: gen,
+      older: older,
+    ),
+    changed: true,
+  );
+}
+
+/// Timings of one chat load, for the hidden meter on the chat header.
+class KantorLoadTiming {
+  KantorLoadTiming({
+    required this.source,
+    required this.items,
+    this.network,
+    this.build,
+    this.shown,
+  });
+
+  /// cache, open, delta or before.
+  final String source;
+
+  /// Items held after this load.
+  final int items;
+
+  /// Request until the JSON was in hand.
+  Duration? network;
+
+  /// buildChat + merge.
+  Duration? build;
+
+  /// setState until the first frame after it.
+  Duration? shown;
+  final DateTime at = DateTime.now();
+
+  String get label {
+    String ms(Duration? d) => d == null ? '–' : '${d.inMilliseconds} ms';
+    return '$source · $items item · jaringan ${ms(network)} · '
+        'susun ${ms(build)} · tampil ${ms(shown)}';
+  }
+}
+
+/// Last few loads per chat, in memory only.
+final kantorChatTimings = <KantorChatKey, List<KantorLoadTiming>>{};
+
+void kantorRecordTiming(KantorChatKey key, KantorLoadTiming t) {
+  final list = kantorChatTimings.remove(key) ?? <KantorLoadTiming>[];
+  list.insert(0, t);
+  if (list.length > 5) list.removeRange(5, list.length);
+  kantorChatTimings[key] = list; // most recently used last
+  while (kantorChatTimings.length > 16) {
+    kantorChatTimings.remove(kantorChatTimings.keys.first);
+  }
+}
+
+/// Connections whose daemon has no `GET /open` (answered 404): they use the
+/// separate transcript + attachments requests.
+final kantorNoOpenRoute = <String>{};
+
+/// The hidden load meter: long-press on the chat header.
+void showKantorChatTimings(BuildContext context, KantorChatKey key) {
+  final list = kantorChatTimings[key] ?? const <KantorLoadTiming>[];
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        key: const ValueKey('chat-timings'),
+        duration: const Duration(seconds: 8),
+        content: Text(
+          list.isEmpty
+              ? 'Belum ada pemuatan tercatat untuk chat ini.'
+              : [
+                  'Pemuatan terakhir:',
+                  for (final t in list) t.label,
+                ].join('\n'),
+        ),
+      ),
+    );
 }
