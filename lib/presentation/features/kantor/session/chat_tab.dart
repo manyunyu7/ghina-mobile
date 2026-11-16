@@ -42,6 +42,11 @@ import 'permission_card.dart';
 const _pollEvery = Duration(seconds: 15);
 const _toolFold = 3;
 
+/// Items asked for on the first open of a chat that is not cached yet, and
+/// per page when scrolling back.
+const _firstPage = 40;
+const _olderPage = 40;
+
 /// Conversation of one session from its transcript: user bubbles on the right,
 /// Claude on the left (markdown), tool calls folded into small rows, the
 /// permission and question cards of this session, and the message box.
@@ -89,6 +94,67 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   late final KantorChatKey _chatKey;
   List<Map<String, dynamic>>? _raw;
   String? _cursor;
+
+  /// Where [_raw] sits in the daemon's transcript, for paging back.
+  int? _first;
+  String? _gen;
+  bool _older = false;
+
+  /// Older lines were paged in during this visit: the window on screen may
+  /// then hold more than the 200 kept in the cache, and is not trimmed.
+  bool _paged = false;
+  bool _loadingOlder = false;
+  DateTime? _olderFailedAt;
+
+  KantorTranscriptWindow? get _window {
+    final raw = _raw;
+    return raw == null
+        ? null
+        : (
+            items: raw,
+            cursor: _cursor,
+            first: _first,
+            gen: _gen,
+            older: _older,
+          );
+  }
+
+  void _setWindow(KantorTranscriptWindow w) {
+    _raw = w.items;
+    _cursor = w.cursor;
+    _first = w.first;
+    _gen = w.gen;
+    _older = w.older;
+  }
+
+  void _remember() {
+    final raw = _raw;
+    if (raw == null) return;
+    // the cache keeps the newest 200 and moves `first` along when trimming
+    _transcripts.put(
+      _chatKey,
+      KantorTranscriptSnap(
+        items: raw,
+        cursor: _cursor,
+        size: _size,
+        at: _syncedAt ?? DateTime.now(),
+        first: _first,
+        gen: _gen,
+        older: _older,
+      ),
+    );
+  }
+
+  /// Records [t] for the hidden meter and fills in its `tampil` time at the
+  /// first frame after the setState that came just before.
+  void _recordShown(KantorLoadTiming t) {
+    kantorRecordTiming(_chatKey, t);
+    final sw = Stopwatch()..start();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      t.shown = sw.elapsed;
+      if (mounted) _maybeLoadOlder();
+    });
+  }
 
   /// False until the daemon answered once in this visit: the history may then
   /// come from the cache and the chat shows that it is still syncing.
@@ -140,20 +206,34 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     final held = _transcripts.get(_chatKey);
     if (held != null) {
       // history only grows, so it can show at once; the delta follows below
+      final sw = Stopwatch()..start();
       _raw = held.items;
       _cursor = held.cursor;
+      _first = held.first;
+      _gen = held.gen;
+      _older = held.older;
       _size = held.size;
       _syncedAt = held.at;
       _entries = buildChat(held.items);
+      _recordShown(
+        KantorLoadTiming(
+          source: 'cache',
+          items: held.items.length,
+          build: sw.elapsed,
+        ),
+      );
     }
     _input.value = _memory.draft;
     _input.addListener(_saveDraft);
     _scroll = ScrollController(initialScrollOffset: _memory.scrollOffset)
-      ..addListener(_saveScroll);
+      ..addListener(_saveScroll)
+      ..addListener(_maybeLoadOlder);
     _openKey = kantorOpenChatKey(_connection, widget.feed.officeId, widget.sid);
     kantorOpenChats[_openKey] = (kantorOpenChats[_openKey] ?? 0) + 1;
+    final viaOpen = _raw == null && !kantorNoOpenRoute.contains(_connection);
     _load();
-    _loadAtts();
+    // a first open through GET /open brings the attachments along
+    if (!viaOpen) _loadAtts();
     _timer = Timer.periodic(_pollEvery, (_) => _load());
     WidgetsBinding.instance.addObserver(this);
     widget.feed.addListener(_onFeed);
@@ -204,14 +284,53 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       return;
     }
     _loading = true;
+    var attsDone = false;
     try {
-      final data = asJson(
+      final net = Stopwatch()..start();
+      var source = 'delta';
+      Json? data;
+      var noOpen = false;
+      if (_raw == null && !kantorNoOpenRoute.contains(_connection)) {
+        // first open without a cached history: a light page plus the
+        // attachments in one round trip
+        try {
+          final o = await api.get(
+            '/api/sessions/${widget.sid}/open',
+            query: {'n': _firstPage, 'after': ?_cursor},
+          );
+          final t = o is Map ? o['transcript'] : null;
+          if (t is Map) {
+            data = Map<String, dynamic>.from(t);
+            source = 'open';
+            final a = o['attachments'];
+            if (a != null && _active) {
+              attsDone = true;
+              _applyAtts(a);
+            }
+          } else {
+            noOpen = true;
+          }
+        } on KantorException catch (e) {
+          if (e.kind != KantorFailure.notFound) rethrow;
+          noOpen = true; // older daemon: no /open route
+        }
+      }
+      data ??= asJson(
         await api.get(
           '/api/sessions/${widget.sid}/transcript',
           query: {'n': 200, 'delta': 1, 'after': ?_cursor},
         ),
       );
+      // remembered only once the separate route answered, so a 404 for an
+      // unknown chat does not turn /open off for the whole connection
+      if (noOpen) kantorNoOpenRoute.add(_connection);
+      final network = net.elapsed;
       if (!_active) return;
+      if (noOpen) {
+        attsDone = true;
+        _loadAtts();
+      }
+      final build = Stopwatch()..start();
       final wasSynced = _synced && !_syncFailed;
       _synced = true;
       _syncFailed = false;
@@ -222,35 +341,50 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
           data['size'] != null &&
           data['size'] == _size &&
           _entries != null;
-      final merged = same ? null : mergeTranscript(_raw, data);
+      final replaced = data['cursor'] == null || data['reset'] != false;
+      final merged = same
+          ? null
+          : applyTranscriptDelta(
+              _window,
+              data,
+              keep: _paged && !replaced ? 1 << 30 : 200,
+            );
       if (merged != null) {
-        _raw = merged.items;
-        _cursor = merged.cursor;
+        if (replaced) _paged = false;
+        _setWindow(merged.window);
       }
       _size = data['size'];
-      final raw = _raw;
-      if (raw != null) {
-        _transcripts.put(
-          _chatKey,
-          KantorTranscriptSnap(
-            items: raw,
-            cursor: _cursor,
-            size: _size,
-            at: _syncedAt!,
-          ),
-        );
-      }
+      _remember();
       if (merged == null || (!merged.changed && _entries != null)) {
-        if (!wasSynced) setState(() => _error = null); // drop the sync badge
+        if (!wasSynced) {
+          setState(() => _error = null); // drop the sync badge
+          _recordShown(
+            KantorLoadTiming(
+              source: source,
+              items: _raw?.length ?? 0,
+              network: network,
+              build: build.elapsed,
+            ),
+          );
+        }
         return;
       }
-      _loadAtts();
+      if (!attsDone) _loadAtts();
+      final entries = buildChat(merged.window.items);
+      final timing = KantorLoadTiming(
+        source: source,
+        items: merged.window.items.length,
+        network: network,
+        build: build.elapsed,
+      );
       setState(() {
-        _entries = buildChat(merged.items);
+        _entries = entries;
         _error = null;
       });
+      _recordShown(timing);
     } catch (e) {
       if (!_active) return;
+      if (_raw == null && !attsDone) _loadAtts();
       if (_entries == null) {
         setState(() => _error = e);
       } else if (!_syncFailed) {
@@ -262,6 +396,69 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         _loadAgain = false;
         unawaited(_load());
       }
+    }
+  }
+
+  /// Near the oldest end of the chat (the top: the list is reversed) with
+  /// older lines on the daemon: fetch the page before them.
+  void _maybeLoadOlder() {
+    if (!_older || _first == null || _loadingOlder || !_active) return;
+    if (!_scroll.hasClients) return;
+    final failed = _olderFailedAt;
+    if (failed != null &&
+        DateTime.now().difference(failed) < const Duration(seconds: 5)) {
+      return;
+    }
+    final p = _scroll.position;
+    if (!p.hasContentDimensions) return;
+    if (p.maxScrollExtent - p.pixels > 800) return;
+    unawaited(_loadOlder());
+  }
+
+  Future<void> _loadOlder() async {
+    final api = _api;
+    final w = _window;
+    if (!_active || api == null || w == null) return;
+    final at = w.first;
+    if (_loadingOlder || !w.older || at == null) return;
+    setState(() => _loadingOlder = true);
+    try {
+      final net = Stopwatch()..start();
+      final data = asJson(
+        await api.get(
+          '/api/sessions/${widget.sid}/transcript',
+          query: {'before': at, 'gen': ?w.gen, 'n': _olderPage},
+        ),
+      );
+      final network = net.elapsed;
+      final now = _window;
+      if (!_active || now == null) return;
+      // the window moved meanwhile (reset or trimmed): this page no longer
+      // lines up; the next scroll asks again from the new start
+      if (now.first != at || now.gen != w.gen) return;
+      final build = Stopwatch()..start();
+      final m = prependTranscript(now, data);
+      _setWindow(m.window);
+      if (!m.changed) return; // reset or nothing older: paging stops here
+      _paged = true;
+      _remember();
+      final entries = buildChat(m.window.items);
+      final timing = KantorLoadTiming(
+        source: 'before',
+        items: m.window.items.length,
+        network: network,
+        build: build.elapsed,
+      );
+      setState(() {
+        _entries = entries;
+        _loadingOlder = false;
+      });
+      _recordShown(timing);
+    } catch (_) {
+      _olderFailedAt = DateTime.now(); // try again on a later scroll
+    } finally {
+      if (_loadingOlder && mounted) setState(() => _loadingOlder = false);
+      _loadingOlder = false;
     }
   }
 
@@ -280,14 +477,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         '/api/sessions/${widget.sid}/attachments',
         query: _showOld ? {'all': 1} : null,
       );
-      final list = parseAttachments(data);
-      final hidden = _showOld ? 0 : hiddenBeforeClear(data);
-      if (_active && (!_sameAtts(list) || hidden != _oldN)) {
-        setState(() {
-          _atts = list;
-          _oldN = hidden;
-        });
-      }
+      if (_active) _applyAtts(data);
     } catch (_) {
       // keep what we have
     } finally {
@@ -296,6 +486,17 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         _attsAgain = false;
         unawaited(_loadAtts());
       }
+    }
+  }
+
+  void _applyAtts(Object? data) {
+    final list = parseAttachments(data);
+    final hidden = _showOld ? 0 : hiddenBeforeClear(data);
+    if (!_sameAtts(list) || hidden != _oldN) {
+      setState(() {
+        _atts = list;
+        _oldN = hidden;
+      });
     }
   }
 
@@ -900,14 +1101,26 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   /// Shown over a history that came from the in-memory cache until the
   /// daemon confirms it, or that could not be refreshed.
   Widget _syncBadge(BuildContext context) {
-    final g = context.ghina;
     final at = _syncedAt;
     String two(int n) => n.toString().padLeft(2, '0');
     final label = _syncFailed
         ? 'Belum tersinkron${at == null ? '' : ' · terakhir ${two(at.hour)}:${two(at.minute)}'}'
         : 'Menyinkronkan…';
-    return Container(
+    return KeyedSubtree(
       key: const ValueKey('chat-sync-badge'),
+      child: _pill(context, label, busy: !_syncFailed),
+    );
+  }
+
+  Widget _olderSpinner(BuildContext context) => Padding(
+    key: const ValueKey('chat-older-loading'),
+    padding: const EdgeInsets.symmetric(vertical: GhinaSpace.sm),
+    child: Center(child: _pill(context, 'memuat pesan lama…', busy: true)),
+  );
+
+  Widget _pill(BuildContext context, String label, {required bool busy}) {
+    final g = context.ghina;
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: g.surface.withValues(alpha: 0.92),
@@ -917,7 +1130,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!_syncFailed)
+          if (busy)
             const SizedBox(
               width: 10,
               height: 10,
@@ -1007,10 +1220,11 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       reverse: true,
       physics: _pinching ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(GhinaSpace.md),
-      itemCount: rev.length + (_oldN > 0 ? 1 : 0),
+      itemCount: rev.length + (_oldN > 0 ? 1 : 0) + (_loadingOlder ? 1 : 0),
       itemBuilder: (context, i) {
         // the oldest end of the chat is the last item of the reversed list
-        if (i == rev.length) return _oldFiles(view);
+        if (i == rev.length && _oldN > 0) return _oldFiles(view);
+        if (i >= rev.length) return _olderSpinner(context);
         final e = rev[i];
         final last = i == 0;
         final row = Padding(

@@ -307,6 +307,8 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             },
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
+              // hidden: how long the last load of this chat took
+              onLongPress: _timings,
               onTap: widget.embedded
                   ? null
                   : () => showKantorAgentSwitcher(
@@ -409,6 +411,16 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     );
   }
 
+  /// Hidden load meter of this chat (long-press on the header).
+  void _timings() {
+    final api = ref.read(kantorApiProvider);
+    showKantorChatTimings(context, (
+      connection: api == null ? '' : kantorConnectionKey(api.config),
+      office: widget.feed.officeId,
+      sid: widget.sid,
+    ));
+  }
+
   Future<void> _profile() async {
     FocusManager.instance.primaryFocus?.unfocus();
     final selected = await Navigator.of(context).push<int>(
@@ -455,6 +467,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             sess: s,
             style: view.style,
             onTap: _profile,
+            onLongPress: _timings,
           ),
           actions: [
             // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
