@@ -286,8 +286,9 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     final s = widget.feed.session(widget.sid)!;
     final view = ref.watch(chatViewPrefsProvider);
     // mode meja (Fold setengah terbuka, engsel mendatar): layar tetap menyala
-    // selama posisi ini; di tab Chat/Terminal AppBar dan bar konteks diganti
-    // header mini dan chip agen di layar meja (lihat kantor_tabletop.dart)
+    // selama posisi ini; di tab Chat/Terminal AppBar, bar konteks, dan strip
+    // avatar diganti header mini (atas) dan grid kartu agen (bawah engsel),
+    // lihat kantor_tabletop.dart
     final table = _table;
     return KantorKeepAwake(
       on: kantorTabletopHinge(context) != null,
@@ -308,11 +309,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
               )
             : null,
         agents: table
-            ? KantorAgentStrip(
-                currentSid: widget.sid,
-                onOpen: _openAgent,
-                chips: true,
-              )
+            ? KantorTabletopAgents(currentSid: widget.sid, onOpen: _openAgent)
             : null,
         child: view.messenger ? _messengerScaffold(s, view) : _plainScaffold(s),
       ),
@@ -473,12 +470,13 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
   /// Strip avatar agen di bawah header: hanya layar sempit (di layar lebar
   /// daftar agen ada di panel kiri), di tab Chat dan Terminal, dan tidak saat
   /// keyboard terbuka. Slotnya selalu ada (tinggi 0 saat sembunyi) supaya isi
-  /// tab di bawahnya tidak dibuat ulang.
+  /// tab di bawahnya tidak dibuat ulang. Mode meja: tidak tampil (kartu
+  /// agen di bawah engsel menggantikannya).
   Widget _strip() {
     final narrow =
         !widget.embedded &&
         MediaQuery.sizeOf(context).width < kKantorTwoPaneMin;
-    final on = narrow && (_shown == 0 || _shown == 1);
+    final on = narrow && !_table && (_shown == 0 || _shown == 1);
     final show =
         on && _stripShown && MediaQuery.viewInsetsOf(context).bottom == 0;
     return ClipRect(

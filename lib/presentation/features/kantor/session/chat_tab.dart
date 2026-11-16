@@ -789,10 +789,10 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
               for (final i in widget.feed.inbox)
                 if (i['sid'] == widget.sid) i,
             ];
-            // mode meja: isi chat di atas engsel, izin + chip agen + composer
-            // di bawah. Isi chat dan composer memakai GlobalKey, jadi masuk /
-            // keluar mode meja memindahkan widget yang sama (scroll, draf, dan
-            // fokus tetap; chat tidak dimuat ulang).
+            // mode meja: isi chat, kartu izin/login, dan composer di atas
+            // engsel; kartu agen di bawah. Isi chat dan composer memakai
+            // GlobalKey, jadi masuk / keluar mode meja memindahkan widget yang
+            // sama (scroll, draf, dan fokus tetap; chat tidak dimuat ulang).
             final table = kantorTabletopActive(context) != null;
             final list = KeyedSubtree(
               key: _listKey,
@@ -845,16 +845,20 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ChatSubagentsPanel(subs: asJsonList(_sess['subs'])),
-                    if (!view.messenger)
+                    // mode meja: status sudah tampil di header mini dan chip
+                    // cepat disembunyikan, jadi composer tinggal satu baris
+                    // ketik dan chat di atas engsel tetap lega
+                    if (!view.messenger && !table)
                       _StatusLine(feed: widget.feed, sess: _sess),
-                    _Quick(
-                      scale: view.scale,
-                      shape: view.bubble,
-                      enabled: can,
-                      onSay: _say,
-                      onEsc: () => _act('esc'),
-                      onCompact: () => _act('compact'),
-                    ),
+                    if (!table)
+                      _Quick(
+                        scale: view.scale,
+                        shape: view.bubble,
+                        enabled: can,
+                        onSay: _say,
+                        onEsc: () => _act('esc'),
+                        onCompact: () => _act('compact'),
+                      ),
                     if (dictating)
                       DictationBar(
                         onStop: _dictation.stop,
@@ -862,14 +866,15 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                       ),
                     AttachmentTray(items: _staged, onRemove: _unstage),
                     if (view.messenger)
-                      _messengerComposer(view, can, dictating)
+                      _messengerComposer(view, can, dictating, table)
                     else
                       Container(
+                        // mode meja: rapat, tinggi baris ketik ±60px
                         padding: EdgeInsets.fromLTRB(
                           GhinaSpace.md,
-                          GhinaSpace.xs,
+                          table ? 2 : GhinaSpace.xs,
                           GhinaSpace.md,
-                          GhinaSpace.sm,
+                          table ? 1 : GhinaSpace.sm,
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -924,7 +929,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                                       ? 'Sesi sudah selesai'
                                       : 'Tidak bisa mengetik ke sesi ini dari sini',
                                   minLines: 1,
-                                  maxLines: 5,
+                                  // mode meja: membesar paling banyak 3 baris
+                                  maxLines: table ? 3 : 5,
                                   textInputAction: TextInputAction.newline,
                                 ),
                               ),
@@ -967,13 +973,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     style: view.style,
     item: p,
     who: sessionName(widget.feed, _sess),
-    onDismiss: () async {
-      try {
-        await _actions?.dismiss('${p['id']}');
-      } catch (e) {
-        if (_active) _err(e);
-      }
-    },
+    onDismiss: () => _dismiss(p),
     onDecide: (b) => _decide(p, b),
     onSubmit: (answers) async {
       try {
@@ -1018,7 +1018,16 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     ),
   );
 
-  /// Izinkan / Tolak, dipakai kartu izin dan tombol besar mode meja.
+  /// Tutup kartu izin tanpa menjawab.
+  Future<void> _dismiss(Json p) async {
+    try {
+      await _actions?.dismiss('${p['id']}');
+    } catch (e) {
+      if (_active) _err(e);
+    }
+  }
+
+  /// Izinkan / Tolak dari kartu izin (biasa maupun ringkas mode meja).
   Future<void> _decide(Json p, String behavior) async {
     try {
       await _actions?.decide('${p['id']}', behavior);
@@ -1027,19 +1036,9 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     }
   }
 
-  /// "Izinkan selalu" (mode meja, hanya alat edit): izinkan sekarang lalu
-  /// mode izin sesi jadi Edit otomatis. Lihat [kantorAllowAlwaysTools].
-  Future<void> _allowAlways(Json p) async {
-    try {
-      await _actions?.decide('${p['id']}', 'allow');
-      await _actions?.setMode(widget.sid, 'acceptEdits');
-    } catch (e) {
-      if (_active) _err(e);
-    }
-  }
-
-  /// Tata letak mode meja. Atas: header mini (dari halaman sesi) + isi chat.
-  /// Bawah: tombol izin besar, kartu login/pertanyaan, chip agen, composer.
+  /// Tata letak mode meja. Atas: header mini (dari halaman sesi), isi chat,
+  /// kartu login/izin inline (sama dengan mode biasa), lalu composer tepat di
+  /// atas engsel. Bawah: grid kartu agen dari halaman sesi.
   Widget _tabletop(
     Widget list,
     Widget blocker,
@@ -1048,6 +1047,12 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     Widget composer,
   ) {
     final scope = KantorTabletopScope.maybeOf(context);
+    // bagian atas cuma setinggi engsel: kartu login/izin dibatasi ±40%
+    // supaya header, chat, dan composer tetap muat (kartunya bisa digulir).
+    // Izin Izinkan/Tolak memakai kartu ringkas (tombol selalu terlihat);
+    // pertanyaan tetap kartu lengkap karena opsinya perlu ruang.
+    final hinge = kantorTabletopHinge(context);
+    final cap = (hinge?.top ?? MediaQuery.sizeOf(context).height / 2) * .4;
     final who = sessionName(widget.feed, _sess);
     return KantorTabletopLayout(
       key: const ValueKey('chat-tabletop'),
@@ -1055,53 +1060,53 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         children: [
           ?scope?.header,
           Expanded(child: list),
-        ],
-      ),
-      bottom: Column(
-        children: [
-          Expanded(
+          ConstrainedBox(
+            key: const ValueKey('tabletop-top-extras'),
+            constraints: BoxConstraints(maxHeight: cap),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                GhinaSpace.md,
-                GhinaSpace.sm,
-                GhinaSpace.md,
-                0,
-              ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   blocker,
                   for (final p in perms)
-                    kantorPermissionCanDecide(p)
-                        ? KantorTabletopPermissionBar(
-                            item: p,
-                            who: who,
-                            onDecide: (b) => _decide(p, b),
-                            onAlways: kantorAllowAlwaysFits(p)
-                                ? () => _allowAlways(p)
-                                : null,
-                          )
-                        : Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: GhinaSpace.sm,
-                            ),
-                            child: _permCard(p, view),
-                          ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        GhinaSpace.sm,
+                        GhinaSpace.xs,
+                        GhinaSpace.sm,
+                        0,
+                      ),
+                      child: kantorPermissionCanDecide(p)
+                          ? KantorTabletopPermissionCard(
+                              item: p,
+                              who: who,
+                              onDecide: (b) => _decide(p, b),
+                              onDismiss: () => _dismiss(p),
+                            )
+                          : _permCard(p, view),
+                    ),
                 ],
               ),
             ),
           ),
-          ?scope?.agents,
           composer,
         ],
       ),
+      bottom: scope?.agents ?? const SizedBox.shrink(),
     );
   }
 
-  Widget _messengerComposer(ChatViewPrefs view, bool can, bool dictating) {
+  Widget _messengerComposer(
+    ChatViewPrefs view,
+    bool can,
+    bool dictating, [
+    bool table = false,
+  ]) {
     final c = ChatStyleColors.of(context, view.style);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+      // mode meja: lebih rapat supaya chat di atas engsel lebih lega
+      padding: EdgeInsets.fromLTRB(8, table ? 4 : 6, 8, table ? 4 : 10),
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: _input,
         builder: (context, value, _) {

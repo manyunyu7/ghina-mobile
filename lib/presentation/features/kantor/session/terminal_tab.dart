@@ -9,8 +9,6 @@ import 'package:xterm/xterm.dart';
 
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
-import '../../../state/platform/platform_state.dart';
-import 'chat_dictation.dart';
 import 'kantor_tabletop.dart';
 import 'terminal_clipboard.dart';
 import 'terminal_prefs.dart';
@@ -79,14 +77,6 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
   /// Layar terminal: dipindah utuh (GlobalKey) saat masuk/keluar mode meja.
   final _viewKey = GlobalKey(debugLabel: 'kantor-term-view');
 
-  /// Kolom ketik mode meja (dikte masuk ke sini juga).
-  final _line = TextEditingController();
-  late final ChatDictation _dictation = ChatDictation(
-    ref: ref,
-    context: () => context,
-    text: _line,
-  );
-
   @override
   bool get wantKeepAlive => true;
 
@@ -116,8 +106,6 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     _sub?.cancel();
     _ws?.close();
     _focus.dispose();
-    _dictation.dispose();
-    _line.dispose();
     _controller
       ..removeListener(_onSelection)
       ..dispose();
@@ -317,20 +305,6 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     }
   }
 
-  /// Kirim isi kolom ketik mode meja lalu Enter. Kosong = Enter saja. Teks
-  /// multi-baris masuk sebagai tempelan (aman bila program memakai bracketed
-  /// paste), satu baris dikirim seperti diketik.
-  void _sendLine() {
-    final text = _line.text;
-    if (text.contains('\n')) {
-      _terminal.paste(pasteReady(text));
-    } else if (text.isNotEmpty) {
-      _send(text);
-    }
-    _send('\r');
-    _line.clear();
-  }
-
   void _zoom(double d) => ref
       .read(terminalPrefsProvider.notifier)
       .update((p) => p.copyWith(fontSize: p.fontSize + d));
@@ -341,8 +315,6 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
     final g = context.ghina;
     final look = ref.watch(terminalPrefsProvider);
     final font = look.fontSize;
-    ref.listen(dictationControllerProvider, _dictation.onChange);
-    final dictating = ref.watch(dictationControllerProvider).isActive;
     final view = KeyedSubtree(
       key: _viewKey,
       child: GestureDetector(
@@ -369,129 +341,101 @@ class _KantorTerminalPanelState extends ConsumerState<KantorTerminalPanel>
         ),
       ),
     );
-    // mode meja: layar terminal di atas engsel, tombol besar + kolom ketik di
-    // bawah (lewat jalur input websocket yang sama)
+    final bar = Container(
+      color: g.surface,
+      padding: const EdgeInsets.symmetric(
+        horizontal: GhinaSpace.md,
+        vertical: 2,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _closed ? g.textMuted : GhinaColors.green.base,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              _closed ? 'terputus' : 'live',
+              style: GhinaType.caption.copyWith(color: g.textSecondary),
+            ),
+          ),
+          if (_closed)
+            TextButton(onPressed: _connect, child: const Text('Sambung ulang')),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Perkecil huruf',
+            icon: const Icon(Icons.remove_rounded, size: 18),
+            onPressed: font > termFontMin ? () => _zoom(-1) : null,
+          ),
+          Text(
+            '${font.round()}',
+            style: GhinaType.caption.copyWith(color: g.textSecondary),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Perbesar huruf',
+            icon: const Icon(Icons.add_rounded, size: 18),
+            onPressed: font < termFontMax ? () => _zoom(1) : null,
+          ),
+          if (_selecting)
+            TextButton.icon(
+              key: const ValueKey('term-copy'),
+              onPressed: _copySelection,
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: const Text('Salin'),
+            )
+          else
+            IconButton(
+              key: const ValueKey('term-copy-screen'),
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Salin layar',
+              icon: const Icon(Icons.copy_all_rounded, size: 18),
+              onPressed: _copyScreen,
+            ),
+          IconButton(
+            key: const ValueKey('term-paste'),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Tempel',
+            icon: const Icon(Icons.content_paste_rounded, size: 18),
+            onPressed: _paste,
+          ),
+        ],
+      ),
+    );
+    final keys = _KeyBar(
+      ctrl: _ctrl,
+      onCtrl: () => setState(() => _ctrl = !_ctrl),
+      onSeq: _send,
+      onArrow: _arrow,
+    );
+    // mode meja: header mini + bar + layar + tombol kecil yang sama dengan
+    // mode biasa di atas engsel, grid kartu agen di bawah. Layar terminal
+    // memakai GlobalKey, jadi berpindah utuh saat masuk/keluar mode meja.
     if (kantorTabletopActive(context) != null) {
-      final header = KantorTabletopScope.maybeOf(context)?.header;
+      final scope = KantorTabletopScope.maybeOf(context);
       return KantorTabletopLayout(
         key: const ValueKey('term-tabletop'),
         top: Column(
           children: [
-            ?header,
-            if (_closed)
-              Material(
-                color: g.surface,
-                child: Row(
-                  children: [
-                    const SizedBox(width: GhinaSpace.md),
-                    Expanded(
-                      child: Text(
-                        'terputus',
-                        style: GhinaType.caption.copyWith(
-                          color: g.textSecondary,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _connect,
-                      child: const Text('Sambung ulang'),
-                    ),
-                  ],
-                ),
-              ),
+            ?scope?.header,
+            bar,
             Expanded(child: view),
+            keys,
           ],
         ),
-        bottom: KantorTabletopTermKeys(
-          onSeq: _send,
-          onArrow: _arrow,
-          onPaste: _paste,
-          onCopyScreen: _copyScreen,
-          line: _line,
-          onSend: _sendLine,
-          onMic: _dictation.toggle,
-          dictating: dictating,
-        ),
+        bottom: scope?.agents ?? const SizedBox.shrink(),
       );
     }
     return Column(
       children: [
-        Container(
-          color: g.surface,
-          padding: const EdgeInsets.symmetric(
-            horizontal: GhinaSpace.md,
-            vertical: 2,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: _closed ? g.textMuted : GhinaColors.green.base,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  _closed ? 'terputus' : 'live',
-                  style: GhinaType.caption.copyWith(color: g.textSecondary),
-                ),
-              ),
-              if (_closed)
-                TextButton(
-                  onPressed: _connect,
-                  child: const Text('Sambung ulang'),
-                ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Perkecil huruf',
-                icon: const Icon(Icons.remove_rounded, size: 18),
-                onPressed: font > termFontMin ? () => _zoom(-1) : null,
-              ),
-              Text(
-                '${font.round()}',
-                style: GhinaType.caption.copyWith(color: g.textSecondary),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Perbesar huruf',
-                icon: const Icon(Icons.add_rounded, size: 18),
-                onPressed: font < termFontMax ? () => _zoom(1) : null,
-              ),
-              if (_selecting)
-                TextButton.icon(
-                  key: const ValueKey('term-copy'),
-                  onPressed: _copySelection,
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text('Salin'),
-                )
-              else
-                IconButton(
-                  key: const ValueKey('term-copy-screen'),
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Salin layar',
-                  icon: const Icon(Icons.copy_all_rounded, size: 18),
-                  onPressed: _copyScreen,
-                ),
-              IconButton(
-                key: const ValueKey('term-paste'),
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Tempel',
-                icon: const Icon(Icons.content_paste_rounded, size: 18),
-                onPressed: _paste,
-              ),
-            ],
-          ),
-        ),
+        bar,
         Expanded(child: view),
-        _KeyBar(
-          ctrl: _ctrl,
-          onCtrl: () => setState(() => _ctrl = !_ctrl),
-          onSeq: _send,
-          onArrow: _arrow,
-        ),
+        keys,
       ],
     );
   }
