@@ -100,7 +100,9 @@ class KantorOfficeFeed extends ChangeNotifier {
     if (api == null) return;
     try {
       final results = await Future.wait([
-        api.get('/api/offices/$officeId'),
+        // lite: without the roles' notebooks (hundreds of KB on big offices);
+        // the role page reads those from /roles. Older daemons ignore it.
+        api.get('/api/offices/$officeId', query: {'lite': 1}),
         api.get('/api/inbox'),
       ]);
       office = asJson(results[0]);

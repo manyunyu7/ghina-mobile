@@ -79,6 +79,19 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
   List<ChatEntry>? _entries;
   Object? _error;
   Object? _size;
+
+  /// Raw transcript items behind [_entries], the daemon's delta cursor, and
+  /// the shared in-memory cache they are kept in between visits.
+  late final KantorTranscriptCache _transcripts;
+  late final KantorChatKey _chatKey;
+  List<Map<String, dynamic>>? _raw;
+  String? _cursor;
+
+  /// False until the daemon answered once in this visit: the history may then
+  /// come from the cache and the chat shows that it is still syncing.
+  bool _synced = false;
+  bool _syncFailed = false;
+  DateTime? _syncedAt;
   bool _loading = false;
   bool _sending = false;
   List<KantorAttachment> _atts = const [];
@@ -111,11 +124,24 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
     super.initState();
     _api = ref.read(kantorApiProvider);
     _connection = _api == null ? '' : kantorConnectionKey(_api.config);
-    _memory = ref.read(kantorChatMemoryProvider).putIfAbsent((
+    _chatKey = (
       connection: _connection,
       office: widget.feed.officeId,
       sid: widget.sid,
-    ), KantorChatMemory.new);
+    );
+    _memory = ref
+        .read(kantorChatMemoryProvider)
+        .putIfAbsent(_chatKey, KantorChatMemory.new);
+    _transcripts = ref.read(kantorTranscriptCacheProvider);
+    final held = _transcripts.get(_chatKey);
+    if (held != null) {
+      // history only grows, so it can show at once; the delta follows below
+      _raw = held.items;
+      _cursor = held.cursor;
+      _size = held.size;
+      _syncedAt = held.at;
+      _entries = buildChat(held.items);
+    }
     _input.value = _memory.draft;
     _input.addListener(_saveDraft);
     _scroll = ScrollController(initialScrollOffset: _memory.scrollOffset)
@@ -170,20 +196,54 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
       final data = asJson(
         await api.get(
           '/api/sessions/${widget.sid}/transcript',
-          query: {'n': 200},
+          query: {'n': 200, 'delta': 1, 'after': ?_cursor},
         ),
       );
       if (!_active) return;
-      if (data['size'] != null && data['size'] == _size && _entries != null)
-        return;
+      final wasSynced = _synced && !_syncFailed;
+      _synced = true;
+      _syncFailed = false;
+      _syncedAt = DateTime.now();
+      // daemons without delta support: unchanged size means nothing new
+      final same =
+          data['cursor'] == null &&
+          data['size'] != null &&
+          data['size'] == _size &&
+          _entries != null;
+      final merged = same ? null : mergeTranscript(_raw, data);
+      if (merged != null) {
+        _raw = merged.items;
+        _cursor = merged.cursor;
+      }
       _size = data['size'];
+      final raw = _raw;
+      if (raw != null) {
+        _transcripts.put(
+          _chatKey,
+          KantorTranscriptSnap(
+            items: raw,
+            cursor: _cursor,
+            size: _size,
+            at: _syncedAt!,
+          ),
+        );
+      }
+      if (merged == null || (!merged.changed && _entries != null)) {
+        if (!wasSynced) setState(() => _error = null); // drop the sync badge
+        return;
+      }
       _loadAtts();
       setState(() {
-        _entries = buildChat(asJsonList(data['items']));
+        _entries = buildChat(merged.items);
         _error = null;
       });
     } catch (e) {
-      if (_active && _entries == null) setState(() => _error = e);
+      if (!_active) return;
+      if (_entries == null) {
+        setState(() => _error = e);
+      } else if (!_syncFailed) {
+        setState(() => _syncFailed = true);
+      }
     } finally {
       _loading = false;
     }
@@ -465,7 +525,20 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
                     onPointerMove: _pinchMove,
                     onPointerUp: _pinchEnd,
                     onPointerCancel: _pinchEnd,
-                    child: _list(context, api, outbox, view),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: _list(context, api, outbox, view),
+                        ),
+                        if (_entries != null && (!_synced || _syncFailed))
+                          Positioned(
+                            top: GhinaSpace.sm,
+                            left: GhinaSpace.md,
+                            right: GhinaSpace.md,
+                            child: Center(child: _syncBadge(context)),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 if (perms.isNotEmpty)
@@ -783,6 +856,48 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab> {
       ref.read(chatViewPrefsProvider.notifier).commit();
     }
     if (_pinching && _pointers.length < 2) setState(() => _pinching = false);
+  }
+
+  /// Shown over a history that came from the in-memory cache until the
+  /// daemon confirms it, or that could not be refreshed.
+  Widget _syncBadge(BuildContext context) {
+    final g = context.ghina;
+    final at = _syncedAt;
+    String two(int n) => n.toString().padLeft(2, '0');
+    final label = _syncFailed
+        ? 'Belum tersinkron${at == null ? '' : ' · terakhir ${two(at.hour)}:${two(at.minute)}'}'
+        : 'Menyinkronkan…';
+    return Container(
+      key: const ValueKey('chat-sync-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: g.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: g.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_syncFailed)
+            const SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            )
+          else
+            Icon(Icons.cloud_off_outlined, size: 12, color: g.textMuted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GhinaType.caption.copyWith(color: g.textMuted),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _list(
