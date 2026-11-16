@@ -30,6 +30,19 @@ typedef _Col = ({Object key, String name, String kind});
 
 const _kindNames = ['Antre', 'Siap', 'Dikerjakan', 'Review', 'Selesai'];
 
+/// From this board width up (tablet, unfolded Fold) the kanban shows several
+/// fixed-width columns side by side; below it, one column per screen.
+const kBoardWideMin = 600.0;
+
+/// Width of one kanban column on a board [width] wide (>= [kBoardWideMin]):
+/// as many columns as fit when each lands at 300-350dp, else a fixed 320dp
+/// so the next column peeks in as a scroll hint.
+double kBoardColumnWidth(double width) {
+  final n = (width / 300).floor();
+  final w = n > 0 ? width / n : width;
+  return w <= 350 ? w : 320;
+}
+
 List<_Col> _colsOf(KBoard b) => b.all
     ? [
         for (var i = 0; i < kantorKinds.length; i++)
@@ -56,6 +69,10 @@ class _KantorBoardTabState extends ConsumerState<KantorBoardTab> {
   final _search = TextEditingController();
   PageController? _pages;
   double _fraction = 0;
+
+  /// Layout of the last kanban build: wide = several columns side by side.
+  bool _wide = false;
+  double _colWidth = 0;
   final _scrolls = <int, ScrollController>{};
   Timer? _dragTimer;
   Offset _dragPos = Offset.zero;
@@ -110,6 +127,10 @@ class _KantorBoardTabState extends ConsumerState<KantorBoardTab> {
     final size = MediaQuery.sizeOf(context);
     final p = _dragPos;
     final pc = _pages;
+    if (_wide && pc != null && pc.hasClients && _colWidth > 0) {
+      _dragTickWide(pc, p);
+      return;
+    }
     if (pc != null && pc.hasClients) {
       final now = DateTime.now();
       if (now.difference(_lastPage).inMilliseconds > 550) {
@@ -147,6 +168,53 @@ class _KantorBoardTabState extends ConsumerState<KantorBoardTab> {
             (pos.pixels + d).clamp(pos.minScrollExtent, pos.maxScrollExtent),
           );
       }
+    }
+  }
+
+  /// [_dragTick] on a wide board: edges of the board itself (it may sit in a
+  /// panel), one column per step, and the column under the finger scrolls.
+  void _dragTickWide(PageController pc, Offset p) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final origin = box.localToGlobal(Offset.zero);
+    final pos = pc.position;
+    final w = _colWidth;
+    final now = DateTime.now();
+    if (now.difference(_lastPage).inMilliseconds > 550) {
+      double? to;
+      if (p.dx < origin.dx + 48 && pos.pixels > pos.minScrollExtent + 0.5) {
+        to = ((pos.pixels - 1) / w).floor() * w;
+      } else if (p.dx > origin.dx + box.size.width - 48 &&
+          pos.pixels < pos.maxScrollExtent - 0.5) {
+        to = ((pos.pixels + 1) / w).ceil() * w;
+      }
+      if (to != null) {
+        _lastPage = now;
+        pc.animateTo(
+          to.clamp(pos.minScrollExtent, pos.maxScrollExtent),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+    if (_colCount == 0) return;
+    final col = ((pos.pixels + p.dx - origin.dx) / w).floor().clamp(
+      0,
+      _colCount - 1,
+    );
+    final sc = _scrolls[col];
+    if (sc == null || !sc.hasClients) return;
+    final v = sc.position;
+    final top = origin.dy;
+    final h = box.size.height;
+    double d = 0;
+    if (p.dy < top + 150 && p.dy > top - 40) {
+      d = -14;
+    } else if (p.dy > top + h - 90) {
+      d = 14;
+    }
+    if (d != 0) {
+      v.jumpTo((v.pixels + d).clamp(v.minScrollExtent, v.maxScrollExtent));
     }
   }
 
@@ -553,16 +621,27 @@ class _KantorBoardTabState extends ConsumerState<KantorBoardTab> {
   /* ----- kanban ----- */
 
   Widget _kanban(List<KCard> cards, KBoard board, KOffice? office, KFilter f) {
-    final width = MediaQuery.sizeOf(context).width;
-    final fraction = width > 600 ? (330 / width).clamp(0.2, 0.9) : 0.88;
-    final pc = _pagesFor(fraction);
     final cols = _colsOf(board);
     _colCount = cols.length;
-    return PageView.builder(
-      controller: pc,
-      padEnds: false,
-      itemCount: cols.length,
-      itemBuilder: (_, i) => _column(i, cols[i], cards, board, office, f),
+    // The board's own width, not the screen's: it may sit in a panel.
+    return LayoutBuilder(
+      builder: (_, box) {
+        final width = box.maxWidth.isFinite
+            ? box.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        _wide = width >= kBoardWideMin;
+        // Wide: fixed-width columns side by side, snapping per column.
+        // Narrow (phone): one column per screen with the next one peeking.
+        final fraction = _wide ? kBoardColumnWidth(width) / width : 0.88;
+        _colWidth = width * fraction;
+        final pc = _pagesFor(fraction);
+        return PageView.builder(
+          controller: pc,
+          padEnds: false,
+          itemCount: cols.length,
+          itemBuilder: (_, i) => _column(i, cols[i], cards, board, office, f),
+        );
+      },
     );
   }
 
@@ -736,7 +815,7 @@ class _KantorBoardTabState extends ConsumerState<KantorBoardTab> {
     KOffice? office,
     List<KCard> colCards,
   ) {
-    final width = MediaQuery.sizeOf(context).width * _fraction;
+    final width = _colWidth;
     return DragTarget<KCard>(
       onWillAcceptWithDetails: (d) => d.data.id != c.id,
       onAcceptWithDetails: (d) => _drop(d.data, col, c, f, lane, colCards),
