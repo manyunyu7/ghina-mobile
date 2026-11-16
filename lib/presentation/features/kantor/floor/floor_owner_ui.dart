@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import 'floor_panels.dart';
 import 'floor_sim.dart';

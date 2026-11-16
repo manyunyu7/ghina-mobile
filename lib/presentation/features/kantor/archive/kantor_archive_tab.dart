@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../roles/kantor_role.dart';
 import '../roles/kantor_shift_sheet.dart' show kantorPermModes;

@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../kantor_data.dart';
 import '../plan/plan_thumb.dart';

@@ -1,4 +1,4 @@
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import 'kantor_feed.dart';
 
 /// One row of Claude Code's own `/model` picker, as the daemon read it off the screen.

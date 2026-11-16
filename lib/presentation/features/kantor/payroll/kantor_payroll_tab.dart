@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_sprite.dart';
 import '../widgets/kantor_states.dart';

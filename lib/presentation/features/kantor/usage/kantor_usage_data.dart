@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 
 /// `GET /api/usage/limits`: Claude 5-hour / weekly and Codex quota windows.

@@ -36,6 +36,17 @@ android {
         versionName = flutter.versionName
     }
 
+    buildFeatures { buildConfig = true }
+
+    flavorDimensions += "app"
+    productFlavors {
+        create("ghina") { dimension = "app" }
+        create("ravel") {
+            dimension = "app"
+            applicationId = "com.henryaugusta.ravel"
+        }
+    }
+
     signingConfigs {
         if (keystoreProperties.containsKey("storeFile")) {
             create("release") {

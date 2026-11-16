@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import 'attachment_model.dart';
 
 /// Downloads an attachment's raw bytes to the cache (streamed, with the

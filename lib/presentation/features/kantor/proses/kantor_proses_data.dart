@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 
 /// One process of the office dock (`GET /api/offices/<id>/procs`).
 final class KantorProc {

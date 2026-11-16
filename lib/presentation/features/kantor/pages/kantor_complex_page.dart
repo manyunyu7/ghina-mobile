@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../session/kantor_adopt.dart';
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../kantor_data.dart';
 import '../kantor_format.dart';
@@ -85,9 +85,9 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
     // Opened with go() (resume, Kompleks button, deep link) there is nothing under /kantor:
     // back would close the app, so send it home instead.
     return PopScope(
-      canPop: GoRouter.of(context).canPop(),
+      canPop: ref.watch(kantorOnlyProvider) || GoRouter.of(context).canPop(),
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) context.go('/home');
+        if (!didPop && !ref.read(kantorOnlyProvider)) context.go('/home');
       },
       child: _body(context),
     );

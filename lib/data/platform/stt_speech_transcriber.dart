@@ -13,10 +13,15 @@ import 'platform_bridge.dart';
 /// (`SpeechRecognizer.checkRecognitionSupport`, Android 13+) because the plugin
 /// can't report it without prompting for permission.
 final class SttSpeechTranscriber implements SpeechTranscriber {
-  SttSpeechTranscriber({SpeechToText? speech, PlatformBridge? bridge})
-    : _stt = speech ?? SpeechToText(),
-      _bridge = bridge ?? PlatformBridge();
+  SttSpeechTranscriber({
+    SpeechToText? speech,
+    PlatformBridge? bridge,
+    this.useBluetooth = true,
+  }) : _stt = speech ?? SpeechToText(),
+       _bridge = bridge ?? PlatformBridge();
 
+  /// Ravel uses the device microphone without Bluetooth permissions.
+  final bool useBluetooth;
   final SpeechToText _stt;
   final PlatformBridge _bridge;
   bool _initialized = false;
@@ -79,6 +84,7 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
     final ok = await _stt.initialize(
+      options: useBluetooth ? null : [SpeechToText.androidNoBluetooth],
       onStatus: (s) {
         final mapped = switch (s) {
           SpeechToText.listeningStatus => SpeechSessionStatus.listening,

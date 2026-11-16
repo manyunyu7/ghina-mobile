@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/num_safe.dart';
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../../../shared/widgets/chart_empty.dart';
 import '../payroll/kantor_payroll_tab.dart' show tok, usd, num_;

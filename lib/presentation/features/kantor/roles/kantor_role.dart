@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 
 /// Shared Kantor office data for the Roles, Meetings, Archive and Files tabs.
 

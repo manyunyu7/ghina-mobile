@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import 'attach_picker.dart';
 import 'attachment_model.dart';
 import 'attachment_notifier.dart';

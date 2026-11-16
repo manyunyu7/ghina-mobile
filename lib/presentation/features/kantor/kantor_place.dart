@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../di/di.dart';
+import '../../../di/kantor_providers.dart';
 
 /// Where the owner last was inside one complex: an office with its tab and,
 /// when a session was open, that session with its tab (chat, terminal, ...).

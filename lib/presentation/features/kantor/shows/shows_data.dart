@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import 'shows_model.dart';
 
 /// Open shows (newest first), unseen count and the latest live arrival.

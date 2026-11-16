@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import 'chat_model.dart';
 

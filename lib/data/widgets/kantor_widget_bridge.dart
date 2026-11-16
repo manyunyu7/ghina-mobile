@@ -51,7 +51,9 @@ abstract final class KantorWidgetBridge {
   static Future<void> _push(String payload) async {
     try {
       await HomeWidget.saveWidgetData<String>(_dataKey, payload);
-      await HomeWidget.updateWidget(androidName: providerName);
+      await HomeWidget.updateWidget(
+        qualifiedAndroidName: 'com.henryaugusta.ghina.$providerName',
+      );
     } catch (_) {
       // No widget placed / plugin missing: nothing to update.
     }

@@ -4,7 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 
 /// Stable routing identity without exposing an authentication token in keys or
 /// the persisted outbox. A different account on the same URL is a different chat.

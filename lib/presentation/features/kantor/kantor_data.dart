@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../di/di.dart';
+import '../../../di/kantor_providers.dart';
 
 /// Shared Kantor reads. They refetch when the daemon pushes a relevant event.
 

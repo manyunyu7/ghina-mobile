@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 
 /// What the metrics dashboard asks the daemon for. Value-equal so the family
 /// provider caches per range.

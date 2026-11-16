@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../di/di.dart';
+import '../../di/kantor_providers.dart';
 import '../../presentation/features/shell/notification_navigation.dart';
 import 'kantor_widget_bridge.dart';
 
@@ -13,9 +13,10 @@ import 'kantor_widget_bridge.dart';
 /// [KantorWidgetBridge.scheduleBackground]. Mounted once, inside the
 /// [NotificationRouteGate], in `app.dart`.
 class KantorWidgetSync extends ConsumerStatefulWidget {
-  const KantorWidgetSync({super.key, required this.child});
+  const KantorWidgetSync({super.key, required this.child, this.onOpen});
 
   final Widget child;
+  final void Function(String route)? onOpen;
 
   @override
   ConsumerState<KantorWidgetSync> createState() => _KantorWidgetSyncState();
@@ -49,7 +50,11 @@ class _KantorWidgetSyncState extends ConsumerState<KantorWidgetSync> {
 
   void _open(String route) {
     if (!mounted || !route.startsWith('/kantor')) return;
-    NotificationRouteGate.maybeOf(context)?.open(route);
+    if (widget.onOpen case final open?) {
+      open(route);
+    } else {
+      NotificationRouteGate.maybeOf(context)?.open(route);
+    }
   }
 
   void _refresh() {

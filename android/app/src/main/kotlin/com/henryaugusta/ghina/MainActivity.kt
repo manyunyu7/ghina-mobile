@@ -74,19 +74,19 @@ class MainActivity : FlutterFragmentActivity() {
             handleShareIntent(intent)
             handleKantorIntent(intent)
         }
-        ListenerWatchdogJob.schedule(this)
+        if (BuildConfig.FLAVOR != "ravel") ListenerWatchdogJob.schedule(this)
     }
 
     override fun onResume() {
         super.onResume()
-        NotificationListenerWatchdog.check(this, "resume")
+        if (BuildConfig.FLAVOR != "ravel") NotificationListenerWatchdog.check(this, "resume")
     }
 
     override fun onStop() {
         super.onStop()
         // A new launcher icon closes the task launched from the old one: switch it
         // only once Ghina is in the background.
-        if (!isChangingConfigurations) LauncherIcon.applyPending(this)
+        if (BuildConfig.FLAVOR != "ravel" && !isChangingConfigurations) LauncherIcon.applyPending(this)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -499,7 +499,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onDestroy() {
         io.shutdown()
         super.onDestroy()
-        if (!isChangingConfigurations) handOverNotificationListener()
+        if (BuildConfig.FLAVOR != "ravel" && !isChangingConfigurations) handOverNotificationListener()
         uiEngine = null
     }
 

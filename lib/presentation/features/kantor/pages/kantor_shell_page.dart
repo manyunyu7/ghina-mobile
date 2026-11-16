@@ -5,7 +5,7 @@ import '../session/chat_context.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../di/di.dart';
+import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../agents/kantor_agents_tab.dart';
 import '../archive/kantor_archive_tab.dart';

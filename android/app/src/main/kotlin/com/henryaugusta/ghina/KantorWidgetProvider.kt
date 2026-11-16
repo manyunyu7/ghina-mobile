@@ -67,7 +67,7 @@ class KantorWidgetProvider : AppWidgetProvider() {
             when {
                 data == null -> {
                     views.setTextViewText(R.id.kw_count, "–")
-                    views.setTextViewText(R.id.kw_label, "Buka Ghina & isi token Kantor")
+                    views.setTextViewText(R.id.kw_label, "Buka ${context.applicationInfo.loadLabel(context.packageManager)} & isi token Kantor")
                     views.setTextViewText(R.id.kw_stats, "")
                     views.setTextViewText(R.id.kw_updated, "")
                 }

@@ -141,3 +141,6 @@ final kantorPratinjauItemProvider = FutureProvider.autoDispose
       });
       return api.pratinjauGet(arg.$1, arg.$2);
     });
+
+/// Standalone Kantor shell, without Ghina navigation or authentication.
+final kantorOnlyProvider = Provider<bool>((ref) => false);
