@@ -43,6 +43,13 @@ const _toolFold = 3;
 /// Conversation of one session from its transcript: user bubbles on the right,
 /// Claude on the left (markdown), tool calls folded into small rows, the
 /// permission and question cards of this session, and the message box.
+/// Lebar maksimum bubble (dp): pecahan lebar layar sesuai pengaturan, tetapi
+/// tidak lebih dari 560dp supaya tetap enak dibaca di layar lebar (Fold).
+const kKantorBubbleCapDp = 560.0;
+
+double kantorBubbleMaxWidth(double screenWidth, double fraction) =>
+    (screenWidth * fraction).clamp(0.0, kKantorBubbleCapDp);
+
 class KantorChatTab extends ConsumerStatefulWidget {
   const KantorChatTab({super.key, required this.feed, required this.sid});
 
@@ -1186,8 +1193,10 @@ class _Bubble extends StatelessWidget {
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxWidth:
-                MediaQuery.sizeOf(context).width * view.bubbleWidth.fraction,
+            maxWidth: kantorBubbleMaxWidth(
+              MediaQuery.sizeOf(context).width,
+              view.bubbleWidth.fraction,
+            ),
           ),
           child: Padding(
             padding: EdgeInsets.only(
@@ -1232,7 +1241,9 @@ class _Bubble extends StatelessWidget {
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: flat ? double.infinity : w * view.bubbleWidth.fraction,
+          maxWidth: flat
+              ? double.infinity
+              : kantorBubbleMaxWidth(w, view.bubbleWidth.fraction),
         ),
         child: Padding(
           // room for the mascot sitting on the bubble
