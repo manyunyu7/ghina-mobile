@@ -779,7 +779,8 @@ class _MessengerAgentListState extends ConsumerState<_MessengerAgentList> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            onPressed: () => _newChat(context),
+            // which roles are off shift is not known until the daemon answers
+            onPressed: feed.fromDisk ? null : () => _newChat(context),
             child: const Icon(Icons.add_comment_rounded),
           ),
         ),
@@ -868,6 +869,7 @@ class _AgentList extends StatelessWidget {
     final waiting = <_Row>[];
     final working = <_Row>[];
     final idle = <_Row>[];
+    final syncing = <_Row>[]; // from the disk snapshot, status not known yet
     final off = <Json>[];
     final inboxSids = {for (final i in feed.inbox) i['sid']};
 
@@ -891,7 +893,9 @@ class _AgentList extends StatelessWidget {
         role: role,
         boss: boss,
       );
-      if (w != null || status == 'waiting') {
+      if (status == '') {
+        syncing.add(row('menyinkronkan…'));
+      } else if (w != null || status == 'waiting') {
         if (inboxSids.contains(s['sid'])) return; // shown as a card above
         final what = w?['tool'] == 'AskUserQuestion'
             ? 'bertanya'
@@ -1051,6 +1055,7 @@ class _AgentList extends StatelessWidget {
             ),
             group('Bekerja', working.length, working.map(tile).toList()),
             group('Idle', idle.length, idle.map(tile).toList()),
+            group('Menyinkronkan', syncing.length, syncing.map(tile).toList()),
             if (off.isNotEmpty)
               Theme(
                 data: Theme.of(
@@ -1083,12 +1088,15 @@ class _AgentList extends StatelessWidget {
                             look: r,
                             name: '${r['name']}',
                             job: '${r['title'] ?? ''}',
-                            sub:
-                                'Ketuk untuk mulai shift - ${feed.roomName(r['room'] as String?)}',
+                            sub: feed.fromDisk
+                                ? 'menyinkronkan…'
+                                : 'Ketuk untuk mulai shift - ${feed.roomName(r['room'] as String?)}',
                             role: r,
                             boss: r['isMgr'] == true,
                           ),
-                          onTap: () => _startShift(context, r),
+                          onTap: feed.fromDisk
+                              ? null
+                              : () => _startShift(context, r),
                         ),
                       ),
                   ],
@@ -1116,7 +1124,7 @@ class _AgentTile extends StatelessWidget {
 
   final _Row row;
   final bool open;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

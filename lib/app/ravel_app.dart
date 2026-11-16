@@ -10,6 +10,7 @@ import '../data/widgets/kantor_widget_sync.dart';
 import '../di/kantor_providers.dart';
 import '../presentation/design_system/design_system.dart';
 import '../presentation/features/kantor/kantor_data.dart';
+import '../presentation/features/kantor/session/kantor_snapshot_store.dart';
 import '../presentation/features/settings/pages/error_log_page.dart';
 import '../presentation/features/settings/widgets/error_card.dart';
 import '../presentation/state/appearance_provider.dart';
@@ -110,6 +111,10 @@ class _RavelServicesState extends ConsumerState<_RavelServices> {
     if (launch != null) unawaited(_openNotice(launch));
     ref.listenManual(kantorConfigProvider, (_, _) => _seen = null);
     unawaited(RavelNotifications.requestPermission());
+    // after the first frame: start reading the offline snapshot from disk
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(kantorSnapshotStoreProvider);
+    });
   }
 
   @override

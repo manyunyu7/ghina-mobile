@@ -8,6 +8,7 @@ import '../../../design_system/design_system.dart';
 import '../kantor_data.dart';
 import '../session/chat_view_prefs.dart';
 import 'kantor_daemon_settings.dart';
+import 'kantor_offline_cache_tile.dart';
 
 /// URL and token of the Kantor daemon, with a connection test.
 class KantorSettingsPage extends ConsumerStatefulWidget {
@@ -229,6 +230,8 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
             onTap: () =>
                 showChatViewSheet(context, scope: ViewSheetScope.terminal),
           ),
+          GhinaSpace.gapSm,
+          const KantorOfflineCacheTile(),
           const SizedBox(height: GhinaSpace.xl),
           Text(
             'Token disimpan terenkripsi di perangkat (Keychain / Keystore) dan '

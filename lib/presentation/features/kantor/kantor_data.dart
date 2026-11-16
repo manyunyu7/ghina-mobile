@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../di/kantor_providers.dart';
+import 'session/kantor_snapshot_store.dart';
 
 /// Shared Kantor reads. They refetch when the daemon pushes a relevant event.
 
@@ -40,7 +41,11 @@ final kantorStateProvider = FutureProvider.autoDispose<Map<String, dynamic>>((
   // the office picker opens often: keep the last answer (small, and refetched
   // on events anyway) instead of starting from empty every time
   ref.keepAlive();
-  return Map<String, dynamic>.from(await api.get('/api/state') as Map);
+  // the office list (no inbox, no sessions) is kept on disk; see the store
+  final store = ref.read(kantorSnapshotStoreProvider);
+  final state = Map<String, dynamic>.from(await api.get('/api/state') as Map);
+  store.putState(state);
+  return state;
 });
 
 /// `GET /api/offices/<id>`; the complex pseudo-office needs no fetch.

@@ -9,6 +9,7 @@ import '../session/chat_context.dart';
 import '../session/chat_view_prefs.dart';
 import '../session/kantor_feed.dart';
 import '../session/kantor_session_page.dart';
+import '../session/kantor_snapshot_store.dart';
 import '../widgets/kantor_states.dart';
 import 'kantor_agents_tab.dart';
 
@@ -90,16 +91,19 @@ Future<void> kantorOpenFromList(
   String sid,
 ) async {
   final pane = KantorPaneScope.read(context);
-  if (pane != null) {
-    pane.onSelect(sid);
-    return;
-  }
   final c = ProviderScope.containerOf(context, listen: false);
   final chat = (
     connection: kantorPaneConnection(c.read(kantorApiProvider)),
     office: office,
     sid: sid,
   );
+  // a chat kept on disk but not in memory shows at once too
+  await kantorWarmChat(c, chat);
+  if (!context.mounted) return;
+  if (pane != null) {
+    pane.onSelect(sid);
+    return;
+  }
   final notifier = c.read(kantorPaneProvider.notifier)..routed(chat);
   await context.push(_sessionPath(office, sid));
   notifier.left(chat);
