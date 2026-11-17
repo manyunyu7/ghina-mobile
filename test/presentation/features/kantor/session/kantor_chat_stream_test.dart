@@ -13,6 +13,7 @@ import 'package:ghina/presentation/features/kantor/session/chat_model.dart';
 import 'package:ghina/presentation/features/kantor/session/chat_stream.dart';
 import 'package:ghina/presentation/features/kantor/session/chat_tab.dart';
 import 'package:ghina/presentation/features/kantor/session/kantor_feed.dart';
+import 'package:ghina/presentation/features/kantor/widgets/kantor_markdown.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Map<String, dynamic> _text(String s) => {'k': 'text', 's': s};
@@ -28,14 +29,60 @@ Future<void> _settle(WidgetTester t) async {
   }
 }
 
-/// Beberapa frame supaya teks sementara selesai muncul bertahap.
+/// Beberapa frame supaya teks sementara selesai muncul bertahap (laju dasar
+/// ±50 grafem/dtk, sisa teks terkejar dalam ±0,9 dtk).
 Future<void> _frames(WidgetTester t) async {
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < 12; i++) {
     await t.pump(const Duration(milliseconds: 100));
   }
 }
 
 final _live = find.byKey(const ValueKey('chat-live'));
+
+/// Teks markdown yang tampil di bubble sementara (isi terbaru saat crossfade).
+String _shown(WidgetTester t) {
+  final md = find.byKey(const ValueKey('chat-live-md'));
+  if (md.evaluate().isEmpty) return '';
+  return t
+      .widgetList<RichText>(
+        find.descendant(of: md.last, matching: find.byType(RichText)),
+      )
+      .map((r) => r.text.toPlainText(includePlaceholders: false))
+      .join('\n');
+}
+
+/// Semua TextSpan berisi teks di bubble sementara.
+List<TextSpan> _spans(WidgetTester t) {
+  final out = <TextSpan>[];
+  for (final r in t.widgetList<RichText>(
+    find.descendant(
+      of: find.byKey(const ValueKey('chat-live-md')).last,
+      matching: find.byType(RichText),
+    ),
+  )) {
+    r.text.visitChildren((s) {
+      if (s is TextSpan && (s.text ?? '').isNotEmpty) out.add(s);
+      return true;
+    });
+  }
+  return out;
+}
+
+Future<void> _pumpLive(
+  WidgetTester t,
+  String text, {
+  bool animate = true,
+  bool partial = false,
+}) => t.pumpWidget(
+  MaterialApp(
+    theme: GhinaTheme.light(),
+    home: Scaffold(
+      body: SingleChildScrollView(
+        child: KantorLiveText(text: text, animate: animate, partial: partial),
+      ),
+    ),
+  ),
+);
 
 void main() {
   group('kantorStreamCovered', () {
@@ -55,6 +102,245 @@ void main() {
         const UserEntry('pertanyaan baru', ''),
       ];
       expect(kantorStreamCovered('Halo', e), isFalse);
+    });
+  });
+
+  group('kantorLiveMarkdown', () {
+    test('penanda terbuka di ekor ditutup sementara', () {
+      expect(kantorLiveMarkdown('Ini **teb'), 'Ini **teb**');
+      expect(kantorLiveMarkdown('Ini *mir'), 'Ini *mir*');
+      expect(kantorLiveMarkdown('pakai `kod'), 'pakai `kod`');
+      expect(
+        kantorLiveMarkdown('```dart\nvar a = 1;'),
+        '```dart\nvar a = 1;\n```',
+      );
+      expect(
+        kantorLiveMarkdown('lihat [docs](https://ex'),
+        'lihat [docs](https://ex)',
+      );
+      expect(kantorLiveMarkdown('**a `b'), '**a `b`**');
+      expect(kantorLiveMarkdown('* butir **teb'), '* butir **teb**');
+    });
+
+    test('pembuka tanpa isi dibuang, yang sudah lengkap tidak diubah', () {
+      expect(kantorLiveMarkdown('Ini **'), 'Ini');
+      expect(kantorLiveMarkdown('Ini `'), 'Ini');
+      expect(
+        kantorLiveMarkdown('Ini **tebal** dan `kode`'),
+        'Ini **tebal** dan `kode`',
+      );
+      expect(kantorLiveMarkdown('2 * 3 = 6'), '2 * 3 = 6');
+      expect(kantorLiveMarkdown('- satu\n- dua'), '- satu\n- dua');
+      // paragraf sebelumnya sudah selesai: tidak disentuh
+      expect(kantorLiveMarkdown('a **b\n\nc'), 'a **b\n\nc');
+      expect(kantorLiveMarkdown('```\nx\n```\n\nok'), '```\nx\n```\n\nok');
+    });
+
+    test('kursor hanya di tempat yang aman', () {
+      const m = kantorCursorMark;
+      expect(kantorLiveMarkdown('Halo', cursor: true), 'Halo$m');
+      expect(kantorLiveMarkdown('Halo\n\n', cursor: true), 'Halo$m');
+      expect(kantorLiveMarkdown('**teb', cursor: true), '**teb**$m');
+      expect(kantorLiveMarkdown('# Judul', cursor: true), '# Judul$m');
+      for (final s in ['```\nx', '| a | b |', '- ', '1.', '#', '    kode()']) {
+        expect(
+          kantorLiveMarkdown(s, cursor: true),
+          isNot(endsWith(m)),
+          reason: s,
+        );
+      }
+    });
+
+    test('kepala dipotong hanya di batas blok yang aman', () {
+      expect(kantorLiveSplit('Satu'), 0);
+      expect(kantorLiveSplit('Satu\n\nDua'), 6);
+      expect(kantorLiveSplit('- a\n\n- b'), 0);
+      expect(kantorLiveSplit('Teks\n\n    kode'), 0);
+      const fenced = '```\nx\n\ny\n```\n\nZ';
+      expect(kantorLiveSplit(fenced), fenced.indexOf('Z'));
+    });
+
+    test('laju: dasar ±50/dtk, backlog besar terkejar dalam 0,9 dtk', () {
+      expect(kantorLiveRate(10), kantorLiveBase);
+      expect(kantorLiveRate(900), closeTo(1000, 0.01));
+      expect(900 / kantorLiveRate(900), lessThanOrEqualTo(1));
+    });
+  });
+
+  group('KantorLiveText', () {
+    testWidgets('pacing: 0,5 dtk sebagian, ~1 dtk penuh', (t) async {
+      final text = List.filled(20, 'kata ').join().trim(); // 99 karakter
+      await _pumpLive(t, text);
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 500));
+      final half = _shown(t);
+      expect(half.length, inInclusiveRange(30, 80));
+      expect(text.startsWith(half.trim()), isTrue);
+      await t.pump(const Duration(milliseconds: 450));
+      expect(_shown(t), text);
+    });
+
+    testWidgets('teks pendek mengalir di laju dasar, tidak sekaligus', (
+      t,
+    ) async {
+      await _pumpLive(t, 'Halo semua orang');
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 100));
+      expect(_shown(t).length, inInclusiveRange(3, 8));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(_shown(t), 'Halo semua orang');
+    });
+
+    testWidgets('backlog besar (bongkah Claude) terkejar <= 1 dtk', (t) async {
+      final big = List.filled(600, 'baris ').join().trim();
+      await _pumpLive(t, big.substring(0, 100));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 300));
+      // bongkah baru datang: laju naik supaya sisanya terkejar ±0,9 dtk
+      await _pumpLive(t, big);
+      await t.pump(const Duration(milliseconds: 400));
+      final mid = _shown(t);
+      expect(mid.length, greaterThan(200));
+      expect(mid.length, lessThan(big.length));
+      await t.pump(const Duration(milliseconds: 560));
+      expect(_shown(t), big);
+    });
+
+    testWidgets('emoji dan grafem gabungan tidak pernah terpotong', (t) async {
+      final text = List.filled(
+        12,
+        '👍🏽 👨‍👩‍👧 caf\u00e9 e\u0301 ',
+      ).join().trim();
+      final all = text.characters.toList();
+      await _pumpLive(t, text);
+      for (var i = 0; i < 90; i++) {
+        await t.pump(const Duration(milliseconds: 16));
+        final s = _shown(t);
+        final n = s.characters.length;
+        expect(all.take(n).join(), s, reason: 'frame $i: "$s"');
+        for (var k = 0; k < s.length; k++) {
+          final u = s.codeUnitAt(k);
+          if (u >= 0xD800 && u <= 0xDBFF) {
+            final v = k + 1 < s.length ? s.codeUnitAt(k + 1) : 0;
+            expect(v >= 0xDC00 && v <= 0xDFFF, isTrue, reason: 'surrogate');
+          }
+        }
+      }
+      expect(_shown(t), text);
+    });
+
+    testWidgets('markdown ringan dirender tanpa penanda mentah', (t) async {
+      const src =
+          '# Judul Besar\n\nIni **tebal**, *miring*, dan `kode`.\n\n'
+          '- satu\n- dua\n\n```dart\nprint(1);\n```\n\nEkor **belum ditutup';
+      await _pumpLive(t, src, animate: false);
+      await t.pump();
+      final shown = _shown(t);
+      for (final raw in ['**', '`', '# ', '```']) {
+        expect(shown, isNot(contains(raw)), reason: raw);
+      }
+      for (final w in [
+        'Judul Besar',
+        'tebal',
+        'miring',
+        'kode',
+        'satu',
+        'print(1);',
+        'belum ditutup',
+      ]) {
+        expect(shown, contains(w));
+      }
+      final spans = _spans(t);
+      TextStyle? styleOf(String w) =>
+          spans.firstWhere((s) => s.text!.contains(w)).style;
+      final body = styleOf('Ini')!;
+      expect(styleOf('Judul Besar')!.fontSize, greaterThan(body.fontSize!));
+      expect(styleOf('tebal')!.fontWeight!.value, greaterThanOrEqualTo(700));
+      expect(
+        styleOf('belum ditutup')!.fontWeight!.value,
+        greaterThanOrEqualTo(700),
+      );
+      expect(styleOf('miring')!.fontStyle, FontStyle.italic);
+      expect(styleOf('kode')!.fontFamily, 'monospace');
+      expect(styleOf('print(1);')!.fontFamily, 'monospace');
+      // blok kode berlatar seperti di bubble final
+      expect(
+        find.ancestor(
+          of: find.textContaining('print(1);'),
+          matching: find.byWidgetPredicate(
+            (w) => w is Container && w.decoration is BoxDecoration,
+          ),
+        ),
+        findsWidgets,
+      );
+      expect(find.text('•'), findsNWidgets(2));
+    });
+
+    testWidgets('blok kode yang belum ditutup tetap monospace', (t) async {
+      await _pumpLive(t, 'Contoh:\n\n```dart\nvar a = 1;', animate: false);
+      await t.pump();
+      expect(_shown(t), isNot(contains('```')));
+      final code = _spans(t).firstWhere((s) => s.text!.contains('var a = 1;'));
+      expect(code.style!.fontFamily, 'monospace');
+    });
+
+    testWidgets('teks dikoreksi server: tidak mundur ke awal', (t) async {
+      await _pumpLive(t, 'Halo dunia yang indah sekali');
+      await t.pump();
+      await t.pump(const Duration(seconds: 1));
+      expect(_shown(t), 'Halo dunia yang indah sekali');
+      await _pumpLive(t, 'Hai semua, ini teks yang sudah diperbaiki');
+      await t.pump();
+      final s = _shown(t);
+      expect(s.length, greaterThanOrEqualTo(25));
+      expect('Hai semua, ini teks yang sudah diperbaiki'.startsWith(s), isTrue);
+      await t.pump(const Duration(seconds: 1));
+      expect(_shown(t), 'Hai semua, ini teks yang sudah diperbaiki');
+    });
+
+    testWidgets('partial: "…" dan keterangan di awal bubble', (t) async {
+      await _pumpLive(t, 'lanjutan jawaban', partial: true, animate: false);
+      expect(find.byKey(const ValueKey('chat-live-partial')), findsOneWidget);
+      expect(find.text('…'), findsOneWidget);
+      expect(find.text('awal jawaban tidak terlihat'), findsOneWidget);
+      await _pumpLive(t, 'lanjutan jawaban', animate: false);
+      expect(find.text('awal jawaban tidak terlihat'), findsNothing);
+    });
+
+    testWidgets('KantorHandoff: crossfade singkat, tinggi tidak meloncat', (
+      t,
+    ) async {
+      await t.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: KantorHandoff(
+              from: SizedBox(height: 100, width: 50, child: Text('lama')),
+              child: SizedBox(height: 40, width: 50, child: Text('baru')),
+            ),
+          ),
+        ),
+      );
+      final box = find.byType(KantorHandoff);
+      expect(find.text('lama'), findsOneWidget);
+      expect(find.text('baru'), findsNothing);
+      expect(t.getSize(box).height, 100);
+      await t.pump(); // frame berikutnya: crossfade mulai
+      await t.pump(const Duration(milliseconds: 60));
+      expect(find.text('lama'), findsOneWidget);
+      expect(find.text('baru'), findsOneWidget);
+      expect(t.getSize(box).height, greaterThan(40));
+      // fade selesai, lalu tinggi menyusut halus (bukan langsung)
+      await t.pump(const Duration(milliseconds: 120));
+      await t.pump();
+      expect(find.text('lama'), findsNothing);
+      expect(t.getSize(box).height, greaterThan(40));
+      for (var i = 0; i < 5; i++) {
+        await t.pump(const Duration(milliseconds: 60));
+      }
+      expect(find.text('baru'), findsOneWidget);
+      expect(t.getSize(box).height, 40);
     });
   });
 
@@ -388,6 +674,61 @@ void main() {
       expect(pos.pixels, 0);
       expect(_live, findsOneWidget);
       expect(jump, findsNothing);
+      await close(t);
+    });
+
+    testWidgets('final menggantikan bubble lewat crossfade, tanpa duplikat, '
+        'tetap di dasar', (t) async {
+      final events = StreamController<Map<String, dynamic>>.broadcast();
+      addTearDown(events.close);
+      await pumpChat(t, events: events.stream);
+      await _settle(t);
+      events.add(ev('## Hasil\n\nSudah **beres** di `main.dart`', 1));
+      await _frames(t);
+      expect(_live, findsOneWidget);
+      expect(_shown(t), isNot(contains('**')));
+
+      next = [_text('## Hasil\n\nSudah **beres** di `main.dart`.')];
+      events.add({'t': 'transcript', 'office': 'o', 'sid': 's1'});
+      await t.pump(const Duration(milliseconds: 200));
+      await _settle(t);
+      expect(_live, findsNothing);
+      expect(find.byKey(const ValueKey('chat-handoff')), findsOneWidget);
+      expect(find.text('sedang menulis…'), findsNothing);
+      expect(find.textContaining('beres'), findsOneWidget);
+      expect(find.textContaining('Hasil'), findsOneWidget);
+      final list = find.byKey(const ValueKey('chat-list'));
+      expect(t.widget<ListView>(list).controller!.position.pixels, 0);
+      await close(t);
+    });
+
+    testWidgets('partial: tanda "…" di bubble, final tetap menggantikan', (
+      t,
+    ) async {
+      final events = StreamController<Map<String, dynamic>>.broadcast();
+      addTearDown(events.close);
+      await pumpChat(t, events: events.stream);
+      await _settle(t);
+      events.add({
+        ...ev('bagian tengah jawaban yang panjang', 1),
+        'partial': true,
+      });
+      await _frames(t);
+      expect(_live, findsOneWidget);
+      expect(find.text('…'), findsOneWidget);
+      expect(find.text('awal jawaban tidak terlihat'), findsOneWidget);
+
+      next = [
+        _text(
+          'Awal jawaban. Lalu bagian tengah jawaban yang panjang. Selesai.',
+        ),
+      ];
+      events.add({'t': 'transcript', 'office': 'o', 'sid': 's1'});
+      await t.pump(const Duration(milliseconds: 200));
+      await _settle(t);
+      expect(_live, findsNothing);
+      expect(find.text('awal jawaban tidak terlihat'), findsNothing);
+      expect(find.textContaining('Awal jawaban. Lalu'), findsOneWidget);
       await close(t);
     });
   });

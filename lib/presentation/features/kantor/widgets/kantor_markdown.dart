@@ -48,6 +48,7 @@ class KantorMarkdown extends StatelessWidget {
     this.lineHeight = 1.45,
     this.codeScale = 1,
     this.wrapCode = false,
+    this.cursor,
   });
 
   final String text;
@@ -62,11 +63,18 @@ class KantorMarkdown extends StatelessWidget {
   /// Code blocks wrap long lines instead of scrolling sideways.
   final bool wrapCode;
 
+  /// Kursor bubble "sedang menulis": [kantorCursorMark] di [text] diganti
+  /// widget ini, sebaris dengan teksnya. Gambar lain tampil sebagai teks alt.
+  final Widget? cursor;
+
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
     final base = Theme.of(context).textTheme;
-    final body = GhinaType.body.copyWith(color: g.textPrimary, height: lineHeight);
+    final body = GhinaType.body.copyWith(
+      color: g.textPrimary,
+      height: lineHeight,
+    );
     final sheet = MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
       p: body,
       h1: GhinaType.h2.copyWith(color: g.textPrimary),
@@ -99,10 +107,38 @@ class KantorMarkdown extends StatelessWidget {
       styleSheet: styled,
       selectable: selectable,
       shrinkWrap: true,
-      builders: wrapCode
-          ? {'pre': _WrapCodeBuilder(styled, selectable)}
-          : const {},
+      builders: {
+        if (wrapCode) 'pre': _WrapCodeBuilder(styled, selectable),
+        if (cursor != null) 'img': _CursorBuilder(cursor!),
+      },
     );
+  }
+}
+
+/// Penanda kursor di sumber markdown; dirender oleh [KantorMarkdown.cursor].
+const kantorCursorMark = '![](kantor-cursor)';
+
+/// Gambar `kantor-cursor` jadi kursor sebaris (WidgetSpan, jadi kursornya
+/// tetap di ujung baris terakhir); gambar lain hanya teks alt-nya.
+class _CursorBuilder extends MarkdownElementBuilder {
+  _CursorBuilder(this.cursor);
+
+  final Widget cursor;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    Object element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final attrs = (element as dynamic).attributes as Map<String, String>;
+    if (attrs['src'] == 'kantor-cursor') {
+      return Text.rich(
+        WidgetSpan(alignment: PlaceholderAlignment.middle, child: cursor),
+      );
+    }
+    return Text.rich(TextSpan(text: attrs['alt'] ?? '', style: parentStyle));
   }
 }
 

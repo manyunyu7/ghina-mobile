@@ -101,6 +101,17 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   String? _live;
   int? _liveSeq;
 
+  /// `partial: true`: awal jawaban sudah tidak terlihat di layar terminal.
+  bool _livePartial = false;
+
+  /// Isi bubble sementara. Diperbarui tanpa setState di sini supaya tiap
+  /// event hanya membangun ulang bubble itu, bukan seluruh daftar chat.
+  final _liveNote = ValueNotifier<KantorLive>((text: '', partial: false));
+
+  /// Bubble sementara yang baru diganti jawaban final [KantorHandoff]: final
+  /// itu dirender dengan crossfade dari cuplikan bubble sementara.
+  ({String at, String text, KantorLive from})? _handoff;
+
   /// `done:true` sudah datang: bubble menunggu jawaban final di transkrip
   /// (paling lama [_liveEnd]) supaya tidak hilang dulu lalu final menyusul.
   bool _liveDone = false;
@@ -324,7 +335,13 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   void _onScrollLive() {
     if (!_scroll.hasClients) return;
     final b = _scroll.offset <= _bottomSlack;
-    if (b != _atBottom) setState(() => _atBottom = b);
+    if (b == _atBottom) return;
+    // kembali ke dasar: bubble menyusul teks terbaru
+    final live = _live;
+    if (b && live != null) {
+      _liveNote.value = (text: live, partial: _livePartial);
+    }
+    setState(() => _atBottom = b);
   }
 
   /// Event `stream` (atau jawaban `GET /stream`) untuk sesi ini.
@@ -337,16 +354,31 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       _liveSeq = seq;
     }
     final text = m['text'];
+    final partial = m['partial'] == true;
     final entries = _entries;
     if (text is String && text.trim().isNotEmpty && m['done'] != true) {
       // sama dengan pesan asisten terakhir di transkrip: sudah final
-      if (entries != null && kantorStreamCovered(text, entries)) {
+      if (entries != null &&
+          kantorStreamCovered(text, entries, partial: partial)) {
+        _handoffTo(entries);
         _clearLive();
         return;
       }
       _liveEnd?.cancel();
       _liveDone = false;
-      if (text != _live) setState(() => _live = text);
+      if (text == _live && partial == _livePartial) return;
+      final was = _live;
+      _live = text;
+      _livePartial = partial;
+      if (_atBottom) {
+        _liveView = text;
+        _liveNote.value = (text: text, partial: partial);
+      }
+      // baru muncul (atau final sebelumnya masih dirender sebagai pergantian):
+      // daftar berubah; selebihnya cukup bubble-nya lewat [_liveNote]
+      if (was == null || _handoff != null) {
+        setState(() => _handoff = null);
+      }
       return;
     }
     if (_live == null) return;
@@ -378,6 +410,19 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     });
   }
 
+  /// Bubble sementara yang sedang tampil diganti jawaban final terakhir di
+  /// [entries]: final itu muncul lewat crossfade di tempat yang sama.
+  void _handoffTo(List<ChatEntry> entries) {
+    final shown = _liveView;
+    final now = kantorLastClaude(entries);
+    if (shown == null || now == null) return;
+    _handoff = (
+      at: now.at,
+      text: now.text,
+      from: (text: shown, partial: _livePartial),
+    );
+  }
+
   /// Dipanggil di dalam setState yang memasang transkrip baru: bubble
   /// sementara hilang di frame yang sama dengan bubble finalnya.
   void _dropLiveFor(List<ChatEntry> before, List<ChatEntry> after) {
@@ -388,7 +433,9 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     final fresh =
         now != null &&
         (was == null || was.at != now.at || was.text != now.text);
-    if (kantorStreamCovered(live, after) || (_liveDone && fresh)) {
+    if (kantorStreamCovered(live, after, partial: _livePartial) ||
+        (_liveDone && fresh)) {
+      _handoffTo(after);
       _live = null;
       _liveView = null;
       _liveDone = false;
@@ -409,6 +456,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     _bump?.cancel();
     _watch?.dispose();
     _liveEnd?.cancel();
+    _liveNote.dispose();
     widget.feed.removeListener(_onFeed);
     _dictation.dispose();
     // Draf dan scroll sudah disimpan oleh listener di setiap perubahan. Tidak
@@ -1534,21 +1582,16 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       itemBuilder: (context, index) {
         // bubble "sedang menulis" paling bawah, di bawah pesan terakhir
         if (live != null && index == 0) {
+          // hanya bubble ini yang dibangun ulang per event / per frame
           return Padding(
             key: const ValueKey('chat-live'),
             padding: EdgeInsets.only(
               bottom: GhinaSpace.sm * view.density.factor,
             ),
-            child: _Bubble(
-              text: live,
-              at: '',
-              mine: false,
-              view: view,
-              body: KantorLiveText(
-                text: live,
-                follow: _atBottom,
-                lineHeight: view.lineHeight.value,
-                codeScale: view.codeScale,
+            child: RepaintBoundary(
+              child: ValueListenableBuilder<KantorLive>(
+                valueListenable: _liveNote,
+                builder: (context, v, _) => _liveBubble(view, v),
               ),
             ),
           );
@@ -1563,12 +1606,7 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
           padding: EdgeInsets.only(bottom: GhinaSpace.sm * view.density.factor),
           child: switch (e) {
             UserEntry() => _userRow(e, view),
-            ClaudeEntry() => _Bubble(
-              text: e.text,
-              at: e.at,
-              mine: false,
-              view: view,
-            ),
+            ClaudeEntry() => _claudeBubble(e, view),
             AttachmentEntry() => AttachmentBubble(
               key: ValueKey('a${e.item.id}'),
               item: e.item,
@@ -1663,6 +1701,37 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
           ],
         );
       },
+    );
+  }
+
+  /// Bubble "sedang menulis" ([still]: tampil penuh tanpa animasi, cuplikan
+  /// untuk crossfade ke final).
+  Widget _liveBubble(ChatViewPrefs view, KantorLive v, {bool still = false}) =>
+      _Bubble(
+        text: v.text,
+        at: '',
+        mine: false,
+        view: view,
+        body: KantorLiveText(
+          text: v.text,
+          partial: v.partial,
+          follow: _atBottom,
+          animate: !still,
+          lineHeight: view.lineHeight.value,
+          codeScale: view.codeScale,
+          wrapCode: view.wrapCode,
+        ),
+      );
+
+  /// Pesan asisten; yang baru menggantikan bubble sementara di-crossfade.
+  Widget _claudeBubble(ClaudeEntry e, ChatViewPrefs view) {
+    final bubble = _Bubble(text: e.text, at: e.at, mine: false, view: view);
+    final h = _handoff;
+    if (h == null || h.at != e.at || h.text != e.text) return bubble;
+    return KantorHandoff(
+      key: const ValueKey('chat-handoff'),
+      from: _liveBubble(view, h.from, still: true),
+      child: bubble,
     );
   }
 
