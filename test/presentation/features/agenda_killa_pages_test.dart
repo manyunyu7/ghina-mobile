@@ -465,7 +465,10 @@ void main() {
       );
       await t.tap(find.byKey(const ValueKey('killa-dictate')));
       await settle(t);
-      expect(find.text('Dikte belum bisa dipakai'), findsOneWidget);
+      expect(
+        find.text('Paket suara Indonesia belum ada di HP ini'),
+        findsOneWidget,
+      );
       expect(
         find.text('Kamu tetap bisa mengetik pesannya, ya.'),
         findsOneWidget,

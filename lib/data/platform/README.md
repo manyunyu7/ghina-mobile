@@ -114,17 +114,25 @@ final d = ref.watch(dictationControllerProvider);
 final c = ref.read(dictationControllerProvider.notifier);
 await c.start();                 // false → see d.phase (unavailable + d.hint, or error)
 d.committed / d.partial / d.text // show partial greyed while listening
-final text = await c.stop();     // waits for the final result (≤ 3 s)
+final text = await c.stop();     // waits for the final result (≤ 2 s)
 insertAtCursor(c.takeText());    // returns + clears
 ```
 
 - Continuous: Android ends a recognizer session after a few seconds of silence; the
-  controller transparently starts a new one (`phase: restarting` for ~250 ms) until the user
-  presses stop. After 3 consecutive sessions without words it stops by itself (`idle`).
+  controller starts the next one ~30 ms after the session's final result (it does not wait
+  for the plugin's own end-of-session timer) until the user presses stop. Silence never
+  ends dictation; only after 2 min without voice/words `d.stopIn` counts down 10 s
+  ("Masih mendengarkan?", cancelled by speaking or `c.keepListening()`), then it stops.
 - Partial results replace each other within a session; finals are appended with a space.
-  Late duplicate finals are ignored.
-- Fatal errors (network, language unavailable, permission, busy, audio) → `phase: error`,
-  `d.error.kind`; text recognised so far is kept.
+  `committed` only grows. A session that ends without a final commits its last partial; a
+  final that still arrives later only adds its extra words (`lateFinalExtra`).
+- Light errors (busy, client, server, network, audio, other) restart with backoff
+  0.2/0.5/1/2/3 s; the 6th in a row without words → `phase: error`. Permission, language
+  unavailable and no recognizer fail at once (`SpeechErrorKind.message` = Indonesian text).
+- While active the recognizer beeps are muted (`DictationAudio`, channel
+  `app/dictation_audio` → MainActivity `DictationAudioMuter`), restored on stop / error /
+  background / dispose and at the next app start after a crash.
+- Session events → `DictationLog` (Diagnostik › Log error › Log dikte, max 200 entries).
 - `c.cancel()` drops the live partial, keeps committed text.
 
 ### Offline availability & fallback hint
@@ -242,11 +250,11 @@ permanent. `openAppSettings()` opens the app's settings page (Android; returns f
 
 - **No simultaneous record + transcribe** (see §1). No on-device transcription of saved clips.
 - Android recognizer sessions stop after ~2–5 s of silence (system-imposed, not
-  configurable on most devices) — handled by auto-restart; a short word can be lost at the
-  boundary.
-- Some Android ROMs / Google-app versions play a start sound at every recognizer session;
-  with auto-restart that can mean a short beep after each pause. Not suppressible from the
-  app — verify on the Infinix device.
+  configurable on most devices) — handled by auto-restart (~30 ms gap); a word spoken
+  exactly in that gap can still be lost.
+- Android ROMs / Google-app versions play a start/stop sound at every recognizer session.
+  Dictation mutes the notification, system and media streams while active (ring and alarm
+  untouched) — verify on the device which stream the beep uses.
 - The offline check needs Android 13+ and a recognizer that implements
   `checkRecognitionSupport`; many OEM/Google-app builds return nothing → `unknown`.
 - Recording pauses during a phone call (`record`'s interruption handling); the reported

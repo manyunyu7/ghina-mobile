@@ -632,12 +632,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   String _dictationError(SpeechErrorKind? k) => switch (k) {
     SpeechErrorKind.network =>
       'Dikte butuh paket suara offline. Rekaman suara tetap bisa, ya',
-    SpeechErrorKind.languageUnavailable =>
-      'Bahasa Indonesia belum tersedia untuk dikte di HP ini',
-    SpeechErrorKind.busy =>
-      'Mikrofon lagi dipakai aplikasi lain. Coba lagi sebentar, ya',
-    SpeechErrorKind.audio => 'Mikrofon bermasalah. Coba lagi, ya',
-    _ => 'Dikte berhenti. Coba lagi, yuk',
+    _ => k?.message ?? 'Dikte berhenti. Coba lagi, yuk',
   };
 
   Future<void> _toggleDictation() async {
@@ -655,8 +650,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     if (!avail.canDictate(
       allowNetwork: ref.read(dictationAllowsNetworkProvider),
     )) {
-      await showDictationUnavailable(context, ref, avail);
-      return;
+      // "Mulai dikte" (pack ready) / "Pakai online dulu" → go on.
+      final go = await showDictationUnavailable(context, ref, avail);
+      if (!go || !mounted) return;
     }
     if (!await ensureMicReady(context, ref, MicPurpose.dictate)) return;
     if (!mounted) return;

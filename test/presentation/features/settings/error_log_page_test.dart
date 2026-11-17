@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghina/data/diagnostics/dictation_log.dart';
 import 'package:ghina/data/diagnostics/error_log.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/settings/pages/error_log_page.dart';
@@ -31,6 +32,36 @@ void main() {
     await tester.pump(const Duration(seconds: 1)); // mascot loops forever
     expect(log.entries, isEmpty);
     expect(find.text('Belum ada error'), findsOneWidget);
+  });
+
+  testWidgets('Log dikte: session events, readable and shareable', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final dir = Directory.systemTemp.createTempSync('errpage');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final log = ErrorLog(file: () async => File('${dir.path}/l.json'));
+    final dict = DictationLog.memory()
+      ..record('mulai', 'id-ID · offline')
+      ..record('sesi', 'kosong · error_no_match')
+      ..record('sesi', 'kosong · error_no_match')
+      ..record('selesai', '01:02 · 12 kata · 4 sesi · 0 ulang · stop');
+
+    await tester.pumpWidget(
+      _app(ErrorLogPage(logOverride: log, dictationLogOverride: dict)),
+    );
+    expect(find.textContaining('3 kejadian'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('dictation-log-tile')));
+    await tester.pumpAndSettle();
+    final text = tester
+        .widget<SelectableText>(
+          find.byKey(const ValueKey('dictation-log-text')),
+        )
+        .data!;
+    expect(text, contains('mulai · id-ID'));
+    expect(text, contains('sesi x2 · kosong'));
+    expect(text.indexOf('mulai'), lessThan(text.indexOf('selesai')));
   });
 
   testWidgets('error card renders compactly without Theme or Navigator', (

@@ -6,8 +6,10 @@ import 'dart:async';
 
 import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/audio_playback.dart';
+import '../../domain/services/dictation_audio.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/share_intake.dart';
+import '../../domain/services/speech_model_installer.dart';
 import '../../domain/services/speech_transcriber.dart';
 import '../../domain/services/voice_recorder.dart';
 
@@ -99,6 +101,25 @@ final class NoopSpeechTranscriber implements SpeechTranscriber {
   Stream<double> get levels => const Stream.empty();
   @override
   Future<void> dispose() async {}
+}
+
+final class NoopDictationAudio implements DictationAudio {
+  const NoopDictationAudio();
+  @override
+  Future<void> mute() async {}
+  @override
+  Future<void> unmute() async {}
+}
+
+final class NoopSpeechModelInstaller implements SpeechModelInstaller {
+  const NoopSpeechModelInstaller();
+  @override
+  Future<SpeechModelDownloadStart> download(String locale) async =>
+      SpeechModelDownloadStart.unsupported;
+  @override
+  Stream<SpeechModelEvent> get events => const Stream.empty();
+  @override
+  Future<SpeechSettingsScreen?> openSettings() async => null;
 }
 
 final class NoopShareIntake implements ShareIntake {
@@ -245,6 +266,9 @@ final class FakeSpeechTranscriber implements SpeechTranscriber {
     _errors.add(SpeechError(kind, permanent: permanent));
   }
 
+  /// Mic level 0..1 (voice activity for the dictation silence guard).
+  void level(double v) => _levels.add(v);
+
   @override
   Future<SpeechAvailability> availability({
     String locale = kDefaultSpeechLocale,
@@ -298,6 +322,48 @@ final class FakeSpeechTranscriber implements SpeechTranscriber {
     await _status.close();
     await _errors.close();
     await _levels.close();
+  }
+}
+
+/// Records `mute` / `unmute` calls.
+final class FakeDictationAudio implements DictationAudio {
+  final calls = <String>[];
+
+  bool get muted => calls.isNotEmpty && calls.last == 'mute';
+
+  @override
+  Future<void> mute() async => calls.add('mute');
+  @override
+  Future<void> unmute() async => calls.add('unmute');
+}
+
+/// Scriptable model installer: [emit] pushes native events.
+final class FakeSpeechModelInstaller implements SpeechModelInstaller {
+  FakeSpeechModelInstaller({
+    this.start = SpeechModelDownloadStart.progress,
+    this.screen = SpeechSettingsScreen.googleOffline,
+  });
+
+  SpeechModelDownloadStart start;
+  SpeechSettingsScreen? screen;
+  final calls = <String>[];
+  final _events = StreamController<SpeechModelEvent>.broadcast(sync: true);
+
+  void emit(SpeechModelEvent e) => _events.add(e);
+
+  @override
+  Future<SpeechModelDownloadStart> download(String locale) async {
+    calls.add('download:$locale');
+    return start;
+  }
+
+  @override
+  Stream<SpeechModelEvent> get events => _events.stream;
+
+  @override
+  Future<SpeechSettingsScreen?> openSettings() async {
+    calls.add('openSettings');
+    return screen;
   }
 }
 

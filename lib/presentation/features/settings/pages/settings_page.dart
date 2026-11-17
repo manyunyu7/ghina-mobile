@@ -19,6 +19,7 @@ import '../../../state/session_controller.dart';
 import '../../../state/sync_status_provider.dart';
 import '../../food/widgets/food_link_widgets.dart' show showFoodCategorySheet;
 import '../../habits/lock/habit_lock_gate.dart' show HabitLockSettingTile;
+import '../../notes/widgets/speech_model_sheet.dart' show DictationOfflineTile;
 import '../../shell/sync_indicator.dart';
 import '../widgets/daily_goal_picker.dart';
 
@@ -340,6 +341,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
             ],
+            GhinaSpace.gapXl,
+            const SectionHeader(title: 'Dikte'),
+            const ChunkyCard(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: DictationOfflineTile(framed: false),
+            ),
             GhinaSpace.gapXl,
             const SectionHeader(title: 'Pengingat'),
             ChunkyCard(

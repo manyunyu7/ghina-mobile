@@ -25,6 +25,12 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
   final SpeechToText _stt;
   final PlatformBridge _bridge;
   bool _initialized = false;
+
+  /// While the previous session is being cancelled before a restart: its
+  /// late `notListening`/`done`/errors must not look like the end of the new
+  /// session.
+  bool _closingPrevious = false;
+  bool _sessionStarted = false;
   SpeechSupportInfo? _support;
   String? _supportLocale;
 
@@ -92,10 +98,12 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
           SpeechToText.doneStatus || 'doneNoResult' => SpeechSessionStatus.done,
           _ => null,
         };
-        if (mapped != null && !_status.isClosed) _status.add(mapped);
+        if (mapped != null && !_closingPrevious && !_status.isClosed) {
+          _status.add(mapped);
+        }
       },
       onError: (SpeechRecognitionError e) {
-        if (!_errors.isClosed) {
+        if (!_closingPrevious && !_errors.isClosed) {
           _errors.add(
             SpeechError(
               mapSpeechErrorCode(e.errorMsg),
@@ -123,6 +131,21 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
     bool preferOffline = true,
   }) async {
     await _ensureInitialized();
+    // The plugin keeps a session "listening" until its pauseFor timer runs
+    // out, even after Android delivered the final result — and natively
+    // refuses a new listen meanwhile (silently: no error, no status). Close
+    // it quietly so the next session starts at once. Always done (a no-op
+    // when nothing listens), since the Dart and native "listening" flags can
+    // disagree after an error.
+    if (_sessionStarted) {
+      _closingPrevious = true;
+      try {
+        await _stt.cancel();
+      } catch (_) {
+      } finally {
+        _closingPrevious = false;
+      }
+    }
     final support = preferOffline ? await _supportFor(locale) : null;
     // Only force the dedicated on-device service when it really has the
     // language — otherwise it fails with "language unavailable" while the
@@ -135,6 +158,7 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
               (t) => localeMatches(t, locale),
             ) ??
             false);
+    _sessionStarted = true;
     try {
       await _stt.listen(
         onResult: (SpeechRecognitionResult r) {
@@ -156,10 +180,14 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
           listenMode: ListenMode.dictation,
           cancelOnError: false,
           localeId: locale,
-          // Android caps silence at a few seconds anyway; the dictation
-          // controller restarts sessions for continuous dictation.
-          pauseFor: const Duration(seconds: 5),
-          listenFor: const Duration(minutes: 1),
+          // pauseFor also becomes EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH;
+          // Google's recognizer caps silence at a few seconds anyway, so a
+          // longer value only helps where it is honoured. The dictation
+          // controller restarts a session as soon as its final result is in
+          // (it doesn't wait for the plugin's pauseFor timer), so the long
+          // value adds no dead time. listenFor is a safety cap per session.
+          pauseFor: const Duration(seconds: 10),
+          listenFor: const Duration(minutes: 5),
         ),
       );
     } on ListenFailedException catch (e) {
@@ -195,11 +223,18 @@ SpeechErrorKind mapSpeechErrorCode(String code) {
   if (c.contains('no_match')) return SpeechErrorKind.noMatch;
   if (c.contains('speech_timeout')) return SpeechErrorKind.speechTimeout;
   if (c.contains('busy') || c.contains('too_many')) return SpeechErrorKind.busy;
-  if (c.contains('network') || c.contains('server')) {
+  if (c.contains('network') || c.contains('disconnected')) {
     return SpeechErrorKind.network;
   }
+  if (c.contains('server')) return SpeechErrorKind.server;
+  if (c.contains('client')) return SpeechErrorKind.client;
   if (c.contains('language')) return SpeechErrorKind.languageUnavailable;
   if (c.contains('permission')) return SpeechErrorKind.permission;
+  if (c.contains('not_available') ||
+      c.contains('notavailable') ||
+      c.contains('recognizer null')) {
+    return SpeechErrorKind.notAvailable;
+  }
   if (c.contains('audio')) return SpeechErrorKind.audio;
   return SpeechErrorKind.other;
 }

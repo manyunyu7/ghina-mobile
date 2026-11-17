@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'core/formatters.dart';
+import 'data/diagnostics/dictation_log.dart';
 import 'data/diagnostics/error_log.dart';
 import 'di/di.dart';
 import 'presentation/state/appearance_provider.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   ErrorLog.install();
   ErrorWidget.builder = ghinaErrorWidgetBuilder;
   await ErrorLog.instance.load();
+  await DictationLog.instance.load();
   await Fmt.initFormatting();
   final privacy = await preloadBalancePrivacy();
   final mascot = await preloadMascotKind();

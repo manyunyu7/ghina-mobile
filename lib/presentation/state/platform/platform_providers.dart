@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/diagnostics/dictation_log.dart';
 import '../../../data/platform/platform.dart';
 import '../../../domain/services/services.dart';
 
@@ -37,6 +38,22 @@ final speechTranscriberProvider = Provider<SpeechTranscriber>((ref) {
   ref.onDispose(t.dispose);
   return t;
 });
+
+/// Mutes the recognizer beeps while dictation runs.
+final dictationAudioProvider = Provider<DictationAudio>(
+  (ref) => createDictationAudio(),
+);
+
+/// In-app download of the offline `id-ID` speech pack.
+final speechModelInstallerProvider = Provider<SpeechModelInstaller>(
+  (ref) => createSpeechModelInstaller(),
+);
+
+/// Dictation session events for Diagnostik (persisted on devices only, so
+/// tests never touch the disk or leave a save timer behind).
+final dictationLogProvider = Provider<DictationLog>(
+  (ref) => isMobileDevice ? DictationLog.instance : DictationLog.memory(),
+);
 
 final shareIntakeProvider = Provider<ShareIntake>((ref) {
   final s = createShareIntake();
@@ -63,9 +80,25 @@ final maxVoiceDurationProvider = Provider<Duration>(
 final speechLocaleProvider = Provider<String>((ref) => kDefaultSpeechLocale);
 
 /// Whether dictation may use the recognizer's network mode when no offline
-/// `id-ID` model is known to be installed. Spec: no cloud transcription in v1
-/// → false. ([OfflineSpeechSupport.unknown] is still allowed, best effort.)
-final dictationAllowsNetworkProvider = Provider<bool>((ref) => false);
+/// `id-ID` model is known to be installed. Spec: no cloud transcription by
+/// default → false, until the user picks "Pakai online dulu" in the speech
+/// pack sheet ([dictationOnlineOptInProvider], this app run only).
+/// ([OfflineSpeechSupport.unknown] is still allowed, best effort.)
+final dictationAllowsNetworkProvider = Provider<bool>(
+  (ref) => ref.watch(dictationOnlineOptInProvider),
+);
+
+/// "Pakai online dulu": the user accepted the online recognizer while the
+/// offline pack is missing. Not persisted — next app start asks again.
+final dictationOnlineOptInProvider =
+    NotifierProvider<DictationOnlineOptIn, bool>(DictationOnlineOptIn.new);
+
+class DictationOnlineOptIn extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void allow() => state = true;
+}
 
 /// Offline speech readiness for [speechLocaleProvider] — drives the "Dikte"
 /// button state and the hint text. `ref.invalidate` it after the user comes

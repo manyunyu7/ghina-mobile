@@ -13,18 +13,21 @@ import '../../domain/services/app_shortcuts.dart';
 import '../../domain/services/gmail_authorizer.dart';
 import '../../domain/services/launcher_icon.dart';
 import '../../domain/services/audio_playback.dart';
+import '../../domain/services/dictation_audio.dart';
 import '../../domain/services/killa_media_picker.dart';
 import '../../domain/services/microphone_permission.dart';
 import '../../domain/services/notification_listener.dart';
 import '../../domain/services/notification_log_export.dart';
 import '../../domain/services/prayer_reminders.dart';
 import '../../domain/services/share_intake.dart';
+import '../../domain/services/speech_model_installer.dart';
 import '../../domain/services/speech_transcriber.dart';
 import '../../domain/services/voice_recorder.dart';
 import '../datasources/local/app_database.dart';
 import 'battery_optimization_bridge.dart';
 import 'channel_share_intake.dart';
 import 'device_location.dart';
+import 'dictation_channels.dart';
 import 'device_microphone_permission.dart';
 import 'fakes.dart';
 import 'google_gmail_authorizer.dart';
@@ -66,6 +69,15 @@ AudioPlayback createAudioPlayback() =>
 
 SpeechTranscriber createSpeechTranscriber() =>
     isMobileDevice ? SttSpeechTranscriber() : const NoopSpeechTranscriber();
+
+/// Silences the recognizer beeps during dictation (Android only).
+DictationAudio createDictationAudio() =>
+    _isAndroid ? ChannelDictationAudio() : const NoopDictationAudio();
+
+/// In-app download of the offline speech pack (Android only).
+SpeechModelInstaller createSpeechModelInstaller() => _isAndroid
+    ? ChannelSpeechModelInstaller()
+    : const NoopSpeechModelInstaller();
 
 MicrophonePermission createMicrophonePermission() => isMobileDevice
     ? DeviceMicrophonePermission()

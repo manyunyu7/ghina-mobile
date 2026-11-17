@@ -1,6 +1,7 @@
 package com.henryaugusta.ghina
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -10,6 +11,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.OpenableColumns
 import android.provider.Settings
+import android.speech.ModelDownloadListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
@@ -65,6 +67,10 @@ class MainActivity : FlutterFragmentActivity() {
     private var kantorChannel: MethodChannel? = null
     private var kantorDartReady = false
 
+    // Dikte: in-app download of the offline speech pack ("app/speech_model").
+    private var speechModelChannel: MethodChannel? = null
+    private var modelRecognizer: SpeechRecognizer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Restored (rotation / process death) or reopened from Recents: the share /
         // shortcut was already handled — don't import or open it twice.
@@ -85,6 +91,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // Dictation stops in the background (Dart); give the beeps back regardless.
+        DictationAudioMuter.unmute(this)
         // A new launcher icon closes the task launched from the old one: switch it
         // only once Ghina is in the background.
         if (BuildConfig.FLAVOR != "ravel" && !isChangingConfigurations) LauncherIcon.applyPending(this)
@@ -142,6 +150,30 @@ class MainActivity : FlutterFragmentActivity() {
                     kantorRoute = null
                 } else {
                     result.notImplemented()
+                }
+            }
+        }
+
+        // Dikte: recognizer beeps muted while dictating (DictationAudioMuter). A
+        // crash mid-dictation left them muted → restore first.
+        DictationAudioMuter.unmute(this)
+        MethodChannel(messenger, DICTATION_AUDIO).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "mute" -> result.success(DictationAudioMuter.mute(this))
+                "unmute" -> result.success(DictationAudioMuter.unmute(this))
+                else -> result.notImplemented()
+            }
+        }
+
+        // Dikte: offline speech pack download with progress / settings fallback.
+        speechModelChannel = MethodChannel(messenger, SPEECH_MODEL).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "download" -> result.success(
+                        downloadSpeechModelWithProgress(call.argument<String>("locale") ?: "id-ID")
+                    )
+                    "openSettings" -> result.success(openSpeechSettings())
+                    else -> result.notImplemented()
                 }
             }
         }
@@ -469,6 +501,107 @@ class MainActivity : FlutterFragmentActivity() {
         }.getOrDefault(false)
     }
 
+    /**
+     * "Unduh sekarang" in the speech-pack sheet. Returns "progress" (Android 14+:
+     * events progress / success / scheduled / error follow on [SPEECH_MODEL]),
+     * "triggered" (Android 13: no progress, Dart polls the availability) or
+     * "unsupported" (older Android / request refused → settings fallback).
+     */
+    private fun downloadSpeechModelWithProgress(locale: String): String {
+        if (Build.VERSION.SDK_INT < 33) return "unsupported"
+        return runCatching {
+            releaseModelRecognizer()
+            val onDevice = SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
+            val recognizer = if (onDevice) {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+            } else {
+                SpeechRecognizer.createSpeechRecognizer(this)
+            }
+            modelRecognizer = recognizer
+            val intent = recognizeIntent(locale)
+            if (Build.VERSION.SDK_INT >= 34) {
+                recognizer.triggerModelDownload(intent, mainExecutor, object : ModelDownloadListener {
+                    override fun onProgress(completedPercent: Int) {
+                        sendModelEvent("progress", mapOf("percent" to completedPercent))
+                    }
+
+                    override fun onSuccess() {
+                        sendModelEvent("success", null)
+                        releaseModelRecognizer()
+                    }
+
+                    override fun onScheduled() {
+                        sendModelEvent("scheduled", null)
+                        releaseModelRecognizer()
+                    }
+
+                    override fun onError(error: Int) {
+                        if (error == SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS) {
+                            // The service can download but not report: plain request,
+                            // Dart polls the availability instead.
+                            val ok = runCatching {
+                                recognizer.triggerModelDownload(intent)
+                                true
+                            }.getOrDefault(false)
+                            sendModelEvent(if (ok) "triggered" else "error", mapOf("code" to error))
+                            main.postDelayed({ releaseModelRecognizer() }, 10_000)
+                        } else {
+                            sendModelEvent("error", mapOf("code" to error))
+                            releaseModelRecognizer()
+                        }
+                    }
+                })
+                "progress"
+            } else {
+                recognizer.triggerModelDownload(intent)
+                // Give the service time to take the request before unbinding.
+                main.postDelayed({ releaseModelRecognizer() }, 10_000)
+                "triggered"
+            }
+        }.getOrElse {
+            releaseModelRecognizer()
+            "unsupported"
+        }
+    }
+
+    private fun sendModelEvent(method: String, args: Map<String, Any?>?) {
+        main.post { runCatching { speechModelChannel?.invokeMethod(method, args) } }
+    }
+
+    private fun releaseModelRecognizer() {
+        val r = modelRecognizer ?: return
+        modelRecognizer = null
+        runCatching { r.destroy() }
+    }
+
+    /**
+     * Fallback when the in-app download isn't possible: the most specific screen
+     * that opens — Google's offline speech language packs, Android voice input
+     * (on-device recognition), languages, settings home. Starting the activity is
+     * the check (resolveActivity can't see the Google app without <queries>).
+     */
+    private fun openSpeechSettings(): String? {
+        val candidates = listOf(
+            "google_offline" to Intent().setComponent(
+                ComponentName(
+                    "com.google.android.googlequicksearchbox",
+                    "com.google.android.voicesearch.greco3.languagepack.InstallActivity",
+                )
+            ),
+            "voice_input" to Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            "language" to Intent(Settings.ACTION_LOCALE_SETTINGS),
+            "settings" to Intent(Settings.ACTION_SETTINGS),
+        )
+        for ((key, intent) in candidates) {
+            val opened = runCatching {
+                startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            }.getOrDefault(false)
+            if (opened) return key
+        }
+        return null
+    }
+
     private fun recognizeIntent(locale: String) = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
@@ -516,6 +649,9 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        releaseModelRecognizer()
+        speechModelChannel = null
+        DictationAudioMuter.unmute(this)
         io.shutdown()
         super.onDestroy()
         if (BuildConfig.FLAVOR != "ravel" && !isChangingConfigurations) handOverNotificationListener()
@@ -527,6 +663,8 @@ class MainActivity : FlutterFragmentActivity() {
         private const val SHARE_EVENTS = "com.henryaugusta.ghina/share"
         private const val KANTOR_WIDGET = "com.henryaugusta.ghina/kantor_widget"
         private const val SCREEN = "ravel/screen"
+        private const val DICTATION_AUDIO = "app/dictation_audio"
+        private const val SPEECH_MODEL = "app/speech_model"
         private const val MAX_IMAGES = 20
         private const val MAX_IMAGE_BYTES = 25L * 1024 * 1024
         private const val MAX_PDF_BYTES = 11L * 1024 * 1024

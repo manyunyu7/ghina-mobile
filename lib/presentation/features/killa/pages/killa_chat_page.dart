@@ -222,16 +222,8 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
     }
   }
 
-  String _dictationError(SpeechErrorKind? k) => switch (k) {
-    SpeechErrorKind.network =>
-      'Dikte butuh paket suara offline. Ketik dulu pesannya, ya',
-    SpeechErrorKind.languageUnavailable =>
-      'Bahasa Indonesia belum tersedia untuk dikte di HP ini',
-    SpeechErrorKind.busy =>
-      'Mikrofon lagi dipakai aplikasi lain. Coba lagi sebentar, ya',
-    SpeechErrorKind.audio => 'Mikrofon bermasalah. Coba lagi, ya',
-    _ => 'Dikte berhenti. Coba lagi, yuk',
-  };
+  String _dictationError(SpeechErrorKind? k) =>
+      k?.message ?? 'Dikte berhenti. Coba lagi, yuk';
 
   Future<void> _toggleDictation() async {
     final c = ref.read(dictationControllerProvider.notifier);
@@ -248,8 +240,14 @@ class _KillaChatPageState extends ConsumerState<KillaChatPage>
     if (!avail.canDictate(
       allowNetwork: ref.read(dictationAllowsNetworkProvider),
     )) {
-      await showDictationUnavailable(context, ref, avail, fallback: fallback);
-      return;
+      // "Mulai dikte" (pack ready) / "Pakai online dulu" → go on.
+      final go = await showDictationUnavailable(
+        context,
+        ref,
+        avail,
+        fallback: fallback,
+      );
+      if (!go || !mounted) return;
     }
     if (!await ensureMicReady(context, ref, MicPurpose.dictate)) return;
     if (!mounted) return;

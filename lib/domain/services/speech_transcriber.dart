@@ -133,15 +133,53 @@ enum SpeechErrorKind {
   /// Nothing recognised / silence — harmless, just restart.
   noMatch,
   speechTimeout,
+
+  /// Recognizer still busy with the previous session (`error_busy`,
+  /// `error_too_many_requests`) — common right after a restart on Samsung.
   busy,
+
+  /// `error_client`: the recognizer rejected the call (often right after a
+  /// cancel/restart) — retry.
+  client,
+
+  /// `error_server` (the recognition service itself hiccupped) — retry.
+  server,
   network,
   languageUnavailable,
   permission,
+
+  /// No speech recognition service usable on the device.
+  notAvailable,
   audio,
   other;
 
-  /// Continuous dictation simply starts a new session on these.
-  bool get isTransient => this == noMatch || this == speechTimeout;
+  /// Android ends a session after silence with these: start the next one
+  /// right away (no backoff, not counted as a failure).
+  bool get isSilence => this == noMatch || this == speechTimeout;
+
+  /// Dictation can't go on: stop at once with a clear message. Everything
+  /// else is retried (with backoff) by the dictation controller.
+  bool get isFatal =>
+      this == permission || this == languageUnavailable || this == notAvailable;
+
+  /// Continuous dictation starts a new session on these (silence right away,
+  /// the others after a short backoff, a few times in a row).
+  bool get isTransient => !isFatal;
+
+  /// Indonesian message when dictation stopped because of this error.
+  String get message => switch (this) {
+    permission => 'Izin mikrofon dibutuhkan untuk dikte',
+    languageUnavailable =>
+      'Bahasa Indonesia belum tersedia untuk dikte di HP ini. '
+          'Unduh paket suaranya dulu, ya',
+    notAvailable => 'HP ini belum punya layanan pengenalan suara untuk dikte',
+    network =>
+      'Dikte terputus: layanan suara butuh internet atau paket suara offline',
+    busy => 'Mikrofon lagi dipakai aplikasi lain. Coba lagi sebentar, ya',
+    audio => 'Mikrofon bermasalah. Coba lagi, ya',
+    client || server => 'Layanan suara HP lagi bermasalah. Coba lagi, ya',
+    noMatch || speechTimeout || other => 'Dikte berhenti. Coba lagi, yuk',
+  };
 }
 
 final class SpeechError {

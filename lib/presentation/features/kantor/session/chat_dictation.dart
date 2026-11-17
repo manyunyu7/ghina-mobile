@@ -57,16 +57,8 @@ class ChatDictation {
     }
   }
 
-  String _error(SpeechErrorKind? k) => switch (k) {
-    SpeechErrorKind.network =>
-      'Dikte butuh paket suara offline. Ketik dulu pesannya, ya',
-    SpeechErrorKind.languageUnavailable =>
-      'Bahasa Indonesia belum tersedia untuk dikte di HP ini',
-    SpeechErrorKind.busy =>
-      'Mikrofon lagi dipakai aplikasi lain. Coba lagi sebentar, ya',
-    SpeechErrorKind.audio => 'Mikrofon bermasalah. Coba lagi, ya',
-    _ => 'Dikte berhenti. Coba lagi, yuk',
-  };
+  String _error(SpeechErrorKind? k) =>
+      k?.message ?? 'Dikte berhenti. Coba lagi, yuk';
 
   Future<void> toggle() async => active ? stop() : start();
 
@@ -83,8 +75,14 @@ class ChatDictation {
     if (!avail.canDictate(
       allowNetwork: ref.read(dictationAllowsNetworkProvider),
     )) {
-      await showDictationUnavailable(ctx, ref, avail, fallback: fallback);
-      return;
+      // "Mulai dikte" (pack ready) / "Pakai online dulu" → go on.
+      final go = await showDictationUnavailable(
+        ctx,
+        ref,
+        avail,
+        fallback: fallback,
+      );
+      if (!go || _disposed || !ctx.mounted) return;
     }
     if (!await ensureMicReady(ctx, ref, MicPurpose.dictate)) return;
     if (_disposed || !ctx.mounted) return;

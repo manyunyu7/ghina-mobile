@@ -4,10 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../domain/services/services.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/platform/platform_state.dart';
+import 'speech_model_sheet.dart';
 
-/// Live "Dikte" panel docked above the editor toolbar: mic level, the live
-/// partial text (greyed — final text lands in the body as you speak), the
-/// best-effort offline hint, Selesai / Batal.
+export 'speech_model_sheet.dart'
+    show DictationOfflineTile, showSpeechModelSheet;
+
+/// Live "Dikte" panel docked above the editor / chat composer: mic level,
+/// "Mendengarkan…" with the running time (mm:ss), the live partial text
+/// (greyed — final text lands in the field as you speak), the silence
+/// warning ("Masih mendengarkan?"), the best-effort offline hint, Selesai /
+/// Batal.
 class DictationBar extends ConsumerWidget {
   const DictationBar({super.key, required this.onStop, required this.onCancel});
 
@@ -18,13 +24,15 @@ class DictationBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final g = context.ghina;
     final d = ref.watch(dictationControllerProvider);
+    // Listening and the short restarts in between read the same: the label
+    // must not blink at every recognizer session.
     final status = switch (d.phase) {
       DictationPhase.starting => 'Menyiapkan mikrofon…',
-      DictationPhase.restarting => 'Masih mendengarkan…',
       DictationPhase.stopping => 'Merapikan teks…',
-      _ => 'Mendengarkan… ngomong aja',
+      _ => 'Mendengarkan…',
     };
     final bestEffort = d.availability?.offline == OfflineSpeechSupport.unknown;
+    final warning = d.stopIn;
     return Container(
       key: const ValueKey('dictation-bar'),
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -49,23 +57,46 @@ class DictationBar extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      status,
-                      style: GhinaType.bodyS
-                          .w(900)
-                          .copyWith(color: GhinaColors.blue.base),
-                    ),
-                    if (d.partial.isNotEmpty)
-                      Text(
-                        d.partial,
-                        key: const ValueKey('dictation-partial'),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GhinaType.body.copyWith(
-                          color: g.textMuted,
-                          fontStyle: FontStyle.italic,
-                        ),
+                    // One Text (not a Row): never overflows in a narrow
+                    // composer (Fold cover screen).
+                    Text.rich(
+                      TextSpan(
+                        text: status,
+                        style: GhinaType.bodyS
+                            .w(900)
+                            .copyWith(color: GhinaColors.blue.base),
+                        children: [
+                          TextSpan(
+                            text: '  ${formatDictationElapsed(d.elapsed)}',
+                            style: GhinaType.bodyS.copyWith(
+                              color: g.textSecondary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
+                      key: const ValueKey('dictation-status'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Always one line tall: the bar doesn't jump when the
+                    // live text comes and goes between utterances.
+                    Text(
+                      d.partial.isEmpty ? 'ngomong aja…' : d.partial,
+                      key: d.partial.isEmpty
+                          ? const ValueKey('dictation-idle-line')
+                          : const ValueKey('dictation-partial'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GhinaType.body.copyWith(
+                        color: d.partial.isEmpty
+                            ? g.textMuted.withValues(alpha: 0.6)
+                            : g.textMuted,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -85,6 +116,15 @@ class DictationBar extends ConsumerWidget {
               ),
             ],
           ),
+          if (warning != null) ...[
+            const SizedBox(height: 8),
+            _SilenceWarning(
+              secondsLeft: warning,
+              onKeep: ref
+                  .read(dictationControllerProvider.notifier)
+                  .keepListening,
+            ),
+          ],
           if (bestEffort && d.hint != null) ...[
             const SizedBox(height: 6),
             Text(
@@ -93,6 +133,53 @@ class DictationBar extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// "Masih mendengarkan? Dikte berhenti dalam 10 dtk" + Lanjutkan. The whole
+/// strip is tappable; speaking dismisses it too.
+class _SilenceWarning extends StatelessWidget {
+  const _SilenceWarning({required this.secondsLeft, required this.onKeep});
+
+  final int secondsLeft;
+  final VoidCallback onKeep;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = context.ghina;
+    return Material(
+      key: const ValueKey('dictation-silence-warning'),
+      color: GhinaColors.orange.tint(g.brightness),
+      borderRadius: GhinaRadii.rMd,
+      child: InkWell(
+        borderRadius: GhinaRadii.rMd,
+        onTap: onKeep,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+          child: Row(
+            children: [
+              Icon(
+                Icons.hourglass_bottom_rounded,
+                size: 18,
+                color: GhinaColors.orange.base,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Masih mendengarkan? Dikte berhenti dalam $secondsLeft dtk',
+                  style: GhinaType.bodyS.w(800).copyWith(color: g.textPrimary),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('dictation-keep'),
+                onPressed: onKeep,
+                child: const Text('Lanjutkan'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -136,57 +223,13 @@ class _MicLevel extends StatelessWidget {
 }
 
 /// Explains why "Dikte" can't start here (offline pack missing, no speech
-/// service…) with "Unduh" when the OS can fetch the id-ID model. [fallback]
-/// names what still works instead (default: the Notes voice recorder).
-Future<void> showDictationUnavailable(
+/// service…) in the speech-pack sheet: in-app download with progress, "Pakai
+/// online dulu", settings fallback. [fallback] names what still works
+/// instead (default: the Notes voice recorder). Returns true when dictation
+/// may start now (pack ready, or online allowed).
+Future<bool> showDictationUnavailable(
   BuildContext context,
   WidgetRef ref,
   SpeechAvailability availability, {
   String fallback = 'Tenang, "Rekam suara" tetap bisa dipakai kapan saja.',
-}) async {
-  final canDownload = availability.offline == OfflineSpeechSupport.downloadable;
-  final download = await showChunkyDialog<bool>(
-    context,
-    builder: (c) => ChunkyDialog(
-      title: 'Dikte belum bisa dipakai',
-      message:
-          availability.hint ??
-          'Pengenalan suara belum tersedia di perangkat ini.',
-      mood: MascotMood.thinking,
-      content: Text(
-        fallback,
-        textAlign: TextAlign.center,
-        style: GhinaType.bodyS.copyWith(color: c.ghina.textSecondary),
-      ),
-      actions: [
-        if (canDownload)
-          ChunkyButton(
-            key: const ValueKey('dictation-download'),
-            label: 'Unduh paket suara',
-            icon: Icons.download_rounded,
-            onPressed: () => Navigator.of(c).pop(true),
-          ),
-        ChunkyButton(
-          label: 'Oke',
-          variant: canDownload
-              ? ChunkyButtonVariant.ghost
-              : ChunkyButtonVariant.primary,
-          onPressed: () => Navigator.of(c).pop(false),
-        ),
-      ],
-    ),
-  );
-  if (download != true) return;
-  final ok = await ref
-      .read(dictationControllerProvider.notifier)
-      .downloadOfflineModel();
-  if (!context.mounted) return;
-  showToastBadge(
-    context,
-    message: ok
-        ? 'Paket suara lagi diunduh. Coba Dikte lagi sebentar lagi, ya'
-        : 'Unduh lewat Google › Pengenalan ucapan offline › Bahasa Indonesia',
-    icon: Icons.download_rounded,
-    color: GhinaColors.blue,
-  );
-}
+}) => showSpeechModelSheet(context, fallback: fallback);

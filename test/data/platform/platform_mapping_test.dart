@@ -127,8 +127,36 @@ void main() {
     );
     expect(mapSpeechErrorCode('error_audio_error'), SpeechErrorKind.audio);
     expect(mapSpeechErrorCode('weird'), SpeechErrorKind.other);
+    expect(mapSpeechErrorCode('error_client'), SpeechErrorKind.client);
+    expect(mapSpeechErrorCode('error_server'), SpeechErrorKind.server);
+    expect(
+      mapSpeechErrorCode('error_too_many_requests'),
+      SpeechErrorKind.busy,
+    );
+    expect(
+      mapSpeechErrorCode('Speech recognizer null'),
+      SpeechErrorKind.notAvailable,
+    );
     expect(SpeechErrorKind.noMatch.isTransient, isTrue);
-    expect(SpeechErrorKind.network.isTransient, isFalse);
+    expect(SpeechErrorKind.noMatch.isSilence, isTrue);
+    // Light errors are retried with backoff by the dictation controller.
+    for (final k in [
+      SpeechErrorKind.busy,
+      SpeechErrorKind.client,
+      SpeechErrorKind.server,
+      SpeechErrorKind.network,
+    ]) {
+      expect(k.isTransient, isTrue, reason: '$k');
+      expect(k.isSilence, isFalse, reason: '$k');
+    }
+    for (final k in [
+      SpeechErrorKind.permission,
+      SpeechErrorKind.languageUnavailable,
+      SpeechErrorKind.notAvailable,
+    ]) {
+      expect(k.isFatal, isTrue, reason: '$k');
+      expect(k.message, isNotEmpty);
+    }
   });
 
   test('level normalisation', () {

@@ -7,6 +7,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/appearance_provider.dart';
 import '../../../state/mascot_kind_provider.dart';
+import '../../notes/widgets/speech_model_sheet.dart';
 import '../../settings/pages/appearance_page.dart' show themeModeLabel;
 import '../kantor_data.dart';
 import '../session/chat_view_prefs.dart';
@@ -263,6 +264,8 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
             onTap: () =>
                 showChatViewSheet(context, scope: ViewSheetScope.terminal),
           ),
+          GhinaSpace.gapSm,
+          const DictationOfflineTile(),
           GhinaSpace.gapSm,
           const KantorOfflineCacheTile(),
           const SizedBox(height: GhinaSpace.xl),

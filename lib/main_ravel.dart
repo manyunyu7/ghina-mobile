@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/ravel_app.dart';
 import 'app/ravel_notifications.dart';
 import 'core/formatters.dart';
+import 'data/diagnostics/dictation_log.dart';
 import 'data/diagnostics/error_log.dart';
 import 'data/platform/launcher_icon_bridge.dart';
 import 'data/platform/stt_speech_transcriber.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   ErrorLog.install();
   ErrorWidget.builder = ghinaErrorWidgetBuilder;
   await ErrorLog.instance.load();
+  await DictationLog.instance.load();
   await Fmt.initFormatting();
   final appearance = await preloadAppearance();
   final mascot = await preloadMascotKind();

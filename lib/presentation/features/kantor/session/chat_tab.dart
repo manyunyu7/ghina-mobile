@@ -957,7 +957,11 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     ref.listen(kantorEventsProvider, (_, next) => _onEvent(next.value));
     ref.listen(kantorUploadsProvider, _onUploads);
     ref.listen(dictationControllerProvider, _dictation.onChange);
-    final dictating = ref.watch(dictationControllerProvider).isActive;
+    // select: the dictation state ticks (mic level, timer) many times a
+    // second — only the on/off switch rebuilds the whole chat.
+    final dictating = ref.watch(
+      dictationControllerProvider.select((d) => d.isActive),
+    );
     final view = ref.watch(chatViewPrefsProvider);
     ref.watch(kantorApiProvider);
     final api = _api;

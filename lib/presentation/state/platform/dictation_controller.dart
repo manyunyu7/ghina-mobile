@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/diagnostics/dictation_log.dart';
 import '../../../domain/services/services.dart';
 import 'platform_providers.dart';
 import 'voice_recorder_controller.dart';
@@ -14,7 +17,7 @@ enum DictationPhase {
   listening,
 
   /// Between two recognizer sessions (Android ends one after ~silence; we
-  /// start the next one right away).
+  /// start the next one right away, or after a short backoff on an error).
   restarting,
 
   /// User pressed stop; waiting for the final result.
@@ -36,6 +39,8 @@ final class DictationState {
     this.availability,
     this.error,
     this.permission,
+    this.elapsed = Duration.zero,
+    this.stopIn,
   });
 
   final DictationPhase phase;
@@ -52,6 +57,14 @@ final class DictationState {
   final SpeechAvailability? availability;
   final SpeechError? error;
   final MicPermissionStatus? permission;
+
+  /// How long this dictation has been running (ticks every second).
+  final Duration elapsed;
+
+  /// Seconds until dictation stops by itself after a long silence ("Masih
+  /// mendengarkan?"); null = no warning. Speaking or
+  /// [DictationController.keepListening] clears it.
+  final int? stopIn;
 
   /// Everything recognised so far (committed + live partial).
   String get text => joinTranscript(committed, partial);
@@ -74,6 +87,9 @@ final class DictationState {
     SpeechError? error,
     bool clearError = false,
     MicPermissionStatus? permission,
+    Duration? elapsed,
+    int? stopIn,
+    bool clearStopIn = false,
   }) => DictationState(
     phase: phase ?? this.phase,
     committed: committed ?? this.committed,
@@ -82,6 +98,8 @@ final class DictationState {
     availability: availability ?? this.availability,
     error: clearError ? null : (error ?? this.error),
     permission: permission ?? this.permission,
+    elapsed: elapsed ?? this.elapsed,
+    stopIn: clearStopIn ? null : (stopIn ?? this.stopIn),
   );
 }
 
@@ -93,16 +111,63 @@ String joinTranscript(String a, String b) {
   return '$x $y';
 }
 
-/// Continuous dictation ("Dikte"): live speech-to-text into the note body.
+/// `mm:ss` (or `h:mm:ss`) for the dictation timer.
+String formatDictationElapsed(Duration d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
+  return h > 0 ? '$h:${two(m)}:${two(s)}' : '${two(m)}:${two(s)}';
+}
+
+int _wordCount(String s) {
+  final t = s.trim();
+  return t.isEmpty ? 0 : t.split(RegExp(r'\s+')).length;
+}
+
+List<String> _words(String s) =>
+    s.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+
+/// What a late final (arriving after its session was already closed with the
+/// live partial committed) adds to the transcript: nothing when it's the same
+/// words (or a slight variant), only the extra words when it extends them,
+/// all of it when it's unrelated. Keeps the committed text append-only.
+String lateFinalExtra(String committedTail, String finalText) {
+  final tail = _words(committedTail), fin = _words(finalText);
+  if (fin.isEmpty) return '';
+  if (tail.isEmpty) return finalText.trim();
+  var i = 0;
+  while (i < tail.length && i < fin.length && tail[i] == fin[i]) {
+    i++;
+  }
+  if (i == tail.length) {
+    // The final repeats the tail and goes on: keep only what's new.
+    return finalText.trim().split(RegExp(r'\s+')).skip(i).join(' ');
+  }
+  final shared = fin.toSet().intersection(tail.toSet()).length;
+  if (shared * 2 >= math.min(tail.length, fin.length)) return ''; // variant
+  return finalText.trim();
+}
+
+/// Continuous dictation ("Dikte"): live speech-to-text into a text field.
 ///
 /// * Partial results are cumulative within one recognizer session → they
 ///   replace [DictationState.partial]; a final result is appended to
-///   [DictationState.committed].
-/// * Android ends a session after a few seconds of silence (and on
-///   `error_no_match`/`error_speech_timeout`); while the user hasn't pressed
-///   stop, a new session starts after [restartDelay]. After
-///   [maxSilentSessions] consecutive sessions without any words, dictation
-///   stops by itself.
+///   [DictationState.committed]. Committed text is append-only (the UI inserts
+///   its growth into the field); only the live partial at the end moves.
+/// * Android ends a session after a few seconds of silence. While the user
+///   hasn't pressed stop a new session starts right away ([restartDelay]):
+///   as soon as the final result is in, without waiting for the plugin's own
+///   end-of-session timer. Words of a session that ended without a final are
+///   committed from the last partial; a final that still shows up later is
+///   de-duplicated ([lateFinalExtra]).
+/// * Dictation runs until stop — silence alone never ends it. Only after
+///   [silenceTimeout] without any voice or words a warning shows
+///   ([DictationState.stopIn]) and [silenceGrace] later it stops.
+/// * Light errors (busy, client, server, network, audio…) restart with a
+///   backoff ([retryBackoff]); only permission / language / no recognizer, or
+///   too many errors in a row, end it with an error.
+/// * Mutes the recognizer beeps while active ([DictationAudio]), always
+///   restored on stop, error, app background and dispose.
+/// * Session events go to [DictationLog] (Diagnostik › Log dikte).
 /// * Starting dictation cancels a running voice recording (one mic owner).
 ///
 /// ```dart
@@ -112,41 +177,103 @@ String joinTranscript(String a, String b) {
 /// insertIntoBody(text);   // then .clear()
 /// ```
 class DictationController extends Notifier<DictationState> {
-  static const restartDelay = Duration(milliseconds: 250);
-  static const maxSilentSessions = 3;
+  /// Pause between the end of one recognizer session and the next.
+  static const restartDelay = Duration(milliseconds: 30);
 
-  /// How long to wait for the final result after stop / session end.
-  static const finalizeTimeout = Duration(seconds: 3);
+  /// Waits before restarting after consecutive light errors.
+  static const retryBackoff = [
+    Duration(milliseconds: 200),
+    Duration(milliseconds: 500),
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 3),
+  ];
+
+  /// Consecutive light errors (without any words in between) before giving up.
+  static int get maxRetries => retryBackoff.length;
+
+  /// How long to wait for the final result after stop.
+  static const finalizeTimeout = Duration(seconds: 2);
+
+  /// A started session that never reports `listening` counts as busy.
+  static const startTimeout = Duration(seconds: 3);
+
+  /// No voice / words this long → "Masih mendengarkan?" warning…
+  static const silenceTimeout = Duration(minutes: 2);
+
+  /// …and this much later dictation stops.
+  static const silenceGrace = Duration(seconds: 10);
+
+  /// Mic level (0..1) that counts as voice for the silence guard.
+  static const voiceLevel = 0.6;
 
   late SpeechTranscriber _t;
+  late DictationAudio _audio;
+  late DictationLog _logSink;
+
+  /// Last state set (readable in onDispose, where `state` isn't).
+  DictationState _last = const DictationState();
   final _subs = <StreamSubscription<Object?>>[];
   bool _want = false;
-  bool _sessionHadWords = false;
-  bool _sessionClosed = true;
-  bool _endHandled = true;
-  int _silentSessions = 0;
+
+  /// A recognizer session is running (started and not ended yet).
+  bool _sessionOpen = false;
+
+  /// The running session reported `listening` (statuses before that are
+  /// leftovers of the previous session).
+  bool _live = false;
+  bool _sessionHasPartial = false;
+  int _session = 0;
+  String _sessionText = '';
+  DateTime _sessionStartedAt = DateTime.now();
+
+  /// Text committed from a partial when its session ended without a final.
+  String _autoTail = '';
+  String _lastFinal = '';
+  int _errorStreak = 0;
+
+  int _quietSeconds = 0;
+  int _elapsedSeconds = 0;
+  int _sessions = 0;
+  int _retries = 0;
+  int _wordsAtStart = 0;
+  String _endReason = 'stop';
+
+  bool _muted = false;
+  AppLifecycleListener? _lifecycle;
+
   Timer? _restartTimer;
   Timer? _finalizeTimer;
+  Timer? _startWatchdog;
+  Timer? _ticker;
   Completer<String>? _stopCompleter;
 
   @override
   DictationState build() {
     final t = _t = ref.read(speechTranscriberProvider);
+    _audio = ref.read(dictationAudioProvider);
+    _logSink = ref.read(dictationLogProvider);
     ref.onDispose(() {
+      final wasActive = _want || _sessionOpen;
       _want = false;
-      _restartTimer?.cancel();
-      _finalizeTimer?.cancel();
+      _sessionOpen = false;
+      _cancelTimers();
       for (final s in _subs) {
         unawaited(s.cancel());
       }
       _subs.clear();
+      _lifecycle?.dispose();
+      _lifecycle = null;
+      _setMuted(false);
+      if (wasActive) _logSummary('tutup');
       if (t.isListening) unawaited(t.cancel());
     });
     return const DictationState();
   }
 
   void _set(DictationState s) {
-    if (ref.mounted) state = s;
+    if (!ref.mounted) return;
+    state = _last = s;
   }
 
   void _subscribe() {
@@ -155,7 +282,52 @@ class DictationController extends Notifier<DictationState> {
       ..add(_t.results.listen(_onResult))
       ..add(_t.status.listen(_onStatus))
       ..add(_t.errors.listen(_onError))
-      ..add(_t.levels.listen((l) => _set(state.copyWith(level: l))));
+      ..add(_t.levels.listen(_onLevel));
+  }
+
+  void _log(String event, [String detail = '']) {
+    try {
+      _logSink.record(event, detail);
+    } catch (_) {}
+  }
+
+  void _setMuted(bool on) {
+    if (_muted == on) return;
+    _muted = on;
+    try {
+      unawaited(on ? _audio.mute() : _audio.unmute());
+    } catch (_) {}
+  }
+
+  void _watchLifecycle() {
+    if (_lifecycle != null) return;
+    try {
+      _lifecycle = AppLifecycleListener(onStateChange: onAppLifecycle);
+    } catch (_) {
+      // No widgets binding (plain unit tests).
+    }
+  }
+
+  /// App went to the background: the mic can't keep listening there — stop
+  /// (keeping the words) and give the beeps back at once.
+  @visibleForTesting
+  void onAppLifecycle(AppLifecycleState s) {
+    if (s != AppLifecycleState.paused && s != AppLifecycleState.detached) {
+      return;
+    }
+    _setMuted(false);
+    if (state.isActive) unawaited(stop(reason: 'background'));
+  }
+
+  void _cancelTimers() {
+    _restartTimer?.cancel();
+    _restartTimer = null;
+    _finalizeTimer?.cancel();
+    _finalizeTimer = null;
+    _startWatchdog?.cancel();
+    _startWatchdog = null;
+    _ticker?.cancel();
+    _ticker = null;
   }
 
   /// Starts dictating (keeps previously committed text — call [clear] first
@@ -168,6 +340,8 @@ class DictationController extends Notifier<DictationState> {
         phase: DictationPhase.starting,
         partial: '',
         clearError: true,
+        clearStopIn: true,
+        elapsed: Duration.zero,
       ),
     );
 
@@ -178,14 +352,13 @@ class DictationController extends Notifier<DictationState> {
       }
     }
 
-    final availability = await _t.availability(
-      locale: ref.read(speechLocaleProvider),
-    );
+    final locale = ref.read(speechLocaleProvider);
+    final availability = await _t.availability(locale: locale);
     // Cancelled / stopped while starting → stay idle.
     if (!ref.mounted || state.phase != DictationPhase.starting) return false;
-    if (!availability.canDictate(
-      allowNetwork: ref.read(dictationAllowsNetworkProvider),
-    )) {
+    final allowNetwork = ref.read(dictationAllowsNetworkProvider);
+    if (!availability.canDictate(allowNetwork: allowNetwork)) {
+      _log('tidak tersedia', '$locale · ${availability.offline.name}');
       _set(
         state.copyWith(
           phase: DictationPhase.unavailable,
@@ -202,6 +375,7 @@ class DictationController extends Notifier<DictationState> {
     }
     if (!ref.mounted || state.phase != DictationPhase.starting) return false;
     if (!status.isGranted) {
+      _log('gagal', 'izin mikrofon: ${status.name}');
       _set(
         state.copyWith(
           phase: DictationPhase.error,
@@ -215,26 +389,56 @@ class DictationController extends Notifier<DictationState> {
 
     _subscribe();
     _want = true;
-    _silentSessions = 0;
+    _errorStreak = 0;
+    _quietSeconds = 0;
+    _elapsedSeconds = 0;
+    _sessions = 0;
+    _retries = 0;
+    _autoTail = '';
+    _lastFinal = '';
+    _endReason = 'stop';
+    _wordsAtStart = _wordCount(state.committed);
     _set(state.copyWith(availability: availability, permission: status));
+    _log(
+      'mulai',
+      '$locale · ${allowNetwork ? 'online boleh' : 'offline'} · '
+          'paket ${availability.offline.name}',
+    );
+    _setMuted(true);
+    _watchLifecycle();
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), _tick);
     return _listen();
   }
 
   Future<bool> _listen() async {
     _restartTimer?.cancel();
+    _restartTimer = null;
     _finalizeTimer?.cancel(); // stale timer of a previous session
     _finalizeTimer = null;
-    _sessionHadWords = false;
-    _sessionClosed = false;
-    _endHandled = false;
+    _startWatchdog?.cancel();
+    final session = ++_session;
+    _sessions++;
+    _sessionOpen = true;
+    _live = false;
+    _sessionHasPartial = false;
+    _sessionText = '';
+    _sessionStartedAt = DateTime.now();
     try {
       await _t.start(
         locale: ref.read(speechLocaleProvider),
         preferOffline: !ref.read(dictationAllowsNetworkProvider),
       );
     } on SpeechError catch (e) {
-      _fail(e);
-      return false;
+      if (!ref.mounted || session != _session) return false;
+      _sessionOpen = false;
+      if (!_want) return false;
+      if (e.kind.isFatal) {
+        _fail(e);
+        return false;
+      }
+      _retryAfter(e);
+      return _want;
     }
     if (!ref.mounted || !_want) {
       // Disposed (editor closed) or stopped/cancelled while the recognizer
@@ -242,97 +446,264 @@ class DictationController extends Notifier<DictationState> {
       unawaited(_t.cancel());
       return false;
     }
-    if (_want && state.phase != DictationPhase.stopping) {
+    if (session != _session) return true;
+    if (state.phase != DictationPhase.stopping) {
       _set(state.copyWith(phase: DictationPhase.listening));
+    }
+    if (!_live) {
+      _startWatchdog = Timer(startTimeout, () {
+        if (session != _session || !_sessionOpen || _live || !_want) return;
+        const e = SpeechError(SpeechErrorKind.busy, raw: 'listen_not_started');
+        _endSession(e.raw!);
+        _retryAfter(e);
+      });
     }
     return true;
   }
 
+  // --- events ------------------------------------------------------------------
+
+  /// Voice or words: the silence guard starts over (and its warning goes).
+  void _heard() {
+    _quietSeconds = 0;
+    if (state.stopIn != null) {
+      _log('lanjut', 'ada suara');
+      _set(state.copyWith(clearStopIn: true));
+    }
+  }
+
+  void _onLevel(double l) {
+    _set(state.copyWith(level: l));
+    if (l >= voiceLevel) _heard();
+  }
+
   void _onResult(TranscriptUpdate r) {
-    if (_sessionClosed) return; // late duplicate after the session ended
+    if (!_want && state.phase != DictationPhase.stopping) return;
     final text = r.text.trim();
-    if (text.isNotEmpty) {
-      _sessionHadWords = true;
-      _silentSessions = 0;
+    if (!r.isFinal) {
+      // A partial after its session ended is a leftover; an empty partial
+      // would blank the live line for a moment (flicker) — keep the last one.
+      if (!_sessionOpen || text.isEmpty) return;
+      _sessionHasPartial = true;
+      _sessionText = text;
+      _autoTail = '';
+      _errorStreak = 0;
+      _heard();
+      if (text != state.partial) _set(state.copyWith(partial: text));
+      return;
     }
-    if (r.isFinal) {
-      _sessionClosed = true;
-      _set(
-        state.copyWith(
-          committed: joinTranscript(state.committed, text),
-          partial: '',
-        ),
-      );
-      if (state.phase == DictationPhase.stopping) _finalize();
-    } else {
-      _set(state.copyWith(partial: text));
+
+    // Final result.
+    final ownSession =
+        _sessionOpen && (_sessionHasPartial || _autoTail.isEmpty);
+    if (!ownSession) {
+      // Late final of a session that already ended (its words were committed
+      // from the last partial), or a duplicate.
+      final extra = _autoTail.isNotEmpty
+          ? lateFinalExtra(_autoTail, text)
+          : (text == _lastFinal ? '' : text);
+      _autoTail = '';
+      if (text.isNotEmpty) _lastFinal = text;
+      if (extra.isNotEmpty) {
+        _heard();
+        _set(state.copyWith(committed: joinTranscript(state.committed, extra)));
+      }
+      return;
     }
+    // Some recognizers end with an empty final: the last partial is the text.
+    final words = text.isEmpty ? state.partial : text;
+    if (!_sessionHasPartial && words.isNotEmpty && words == _lastFinal) {
+      return; // plugin re-sent the previous session's final
+    }
+    if (words.isNotEmpty) {
+      _lastFinal = words;
+      _errorStreak = 0;
+      _heard();
+    }
+    _sessionText = words;
+    // One update: final into committed, live line cleared → no flicker.
+    _set(
+      state.copyWith(
+        committed: joinTranscript(state.committed, words),
+        partial: '',
+      ),
+    );
+    _endSession('final', hadFinal: true);
   }
 
   void _onStatus(SpeechSessionStatus s) {
-    if (s == SpeechSessionStatus.listening) return;
-    if (s == SpeechSessionStatus.notListening) {
-      // Wait for `done` (all results delivered) but don't hang if it never
-      // comes.
-      _finalizeTimer ??= Timer(finalizeTimeout, _sessionEnded);
+    if (s == SpeechSessionStatus.listening) {
+      if (_sessionOpen) {
+        _live = true;
+        _startWatchdog?.cancel();
+        _startWatchdog = null;
+      }
       return;
     }
-    _sessionEnded();
+    if (state.phase == DictationPhase.stopping) {
+      if (s == SpeechSessionStatus.done) {
+        _endSession('stop');
+      } else {
+        // Wait for the final result (`done` follows it).
+        _finalizeTimer ??= Timer(finalizeTimeout, () => _finalize());
+      }
+      return;
+    }
+    // Leftover of the previous session, or the session already ended (final).
+    if (!_sessionOpen || !_live) return;
+    _endSession('akhir sesi');
   }
 
   void _onError(SpeechError e) {
-    if (e.kind.isTransient) {
-      _sessionEnded();
+    if (!_want && state.phase != DictationPhase.stopping) return;
+    if (e.kind.isFatal) {
+      _fail(e);
       return;
     }
-    _fail(e);
+    final code = e.raw ?? e.kind.name;
+    if (state.phase == DictationPhase.stopping) {
+      _endSession(code);
+      return;
+    }
+    if (e.kind.isSilence) {
+      _errorStreak = 0;
+      _endSession(code); // no-op when the session already ended
+      return;
+    }
+    _endSession(code);
+    _retryAfter(e);
   }
 
   /// A recognizer session is over: commit leftovers, then restart or finish.
-  void _sessionEnded() {
-    _finalizeTimer?.cancel();
-    _finalizeTimer = null;
-    if (_endHandled) {
-      // Second signal for the same session (error + done, notListening + done).
+  void _endSession(String reason, {bool hadFinal = false}) {
+    if (!_sessionOpen) {
       if (state.phase == DictationPhase.stopping) _finalize();
       return;
     }
-    _endHandled = true;
-    if (!_sessionClosed) {
-      _sessionClosed = true;
-      if (state.partial.isNotEmpty) {
-        _set(
-          state.copyWith(
-            committed: joinTranscript(state.committed, state.partial),
-            partial: '',
-          ),
-        );
-      }
+    _sessionOpen = false;
+    _live = false;
+    _startWatchdog?.cancel();
+    _startWatchdog = null;
+    if (!hadFinal && state.partial.isNotEmpty) {
+      // No final for this session (yet): its last partial is the text. A
+      // final that still arrives later is de-duplicated against it.
+      _autoTail = state.partial;
+      _set(
+        state.copyWith(
+          committed: joinTranscript(state.committed, state.partial),
+          partial: '',
+        ),
+      );
     }
+    _logSession(reason);
     if (!ref.mounted) return;
     if (state.phase == DictationPhase.stopping || !_want) {
       _finalize();
       return;
     }
-    if (!_sessionHadWords) _silentSessions++;
-    if (_silentSessions >= maxSilentSessions) {
-      _want = false;
-      _finalize();
-      return;
+    _scheduleRestart(restartDelay);
+  }
+
+  void _scheduleRestart(Duration wait) {
+    _restartTimer?.cancel();
+    if (state.phase != DictationPhase.restarting) {
+      _set(state.copyWith(phase: DictationPhase.restarting, level: 0));
     }
-    if (state.phase == DictationPhase.restarting) return;
-    _set(state.copyWith(phase: DictationPhase.restarting, level: 0));
-    _restartTimer = Timer(restartDelay, () {
+    _restartTimer = Timer(wait, () {
+      _restartTimer = null;
       if (_want && ref.mounted) unawaited(_listen());
     });
   }
 
+  /// Light error: try again after a growing pause; give up after
+  /// [maxRetries] in a row.
+  void _retryAfter(SpeechError e) {
+    if (_errorStreak >= maxRetries) {
+      _fail(e);
+      return;
+    }
+    final wait = retryBackoff[_errorStreak];
+    _errorStreak++;
+    _retries++;
+    _log(
+      'ulang',
+      '${e.raw ?? e.kind.name} · coba $_errorStreak/$maxRetries · '
+          'tunggu ${wait.inMilliseconds} ms',
+    );
+    _scheduleRestart(wait);
+  }
+
+  void _tick(Timer _) {
+    if (!ref.mounted || !_want) return;
+    _elapsedSeconds++;
+    _quietSeconds++;
+    var stopIn = state.stopIn;
+    if (stopIn != null) {
+      stopIn--;
+      if (stopIn <= 0) {
+        _set(
+          state.copyWith(
+            elapsed: Duration(seconds: _elapsedSeconds),
+            clearStopIn: true,
+          ),
+        );
+        unawaited(stop(reason: 'diam ${silenceTimeout.inMinutes} menit'));
+        return;
+      }
+    } else if (_quietSeconds >= silenceTimeout.inSeconds) {
+      stopIn = silenceGrace.inSeconds;
+      _log('peringatan', 'tidak ada suara ${silenceTimeout.inMinutes} menit');
+    }
+    _set(
+      state.copyWith(
+        elapsed: Duration(seconds: _elapsedSeconds),
+        stopIn: stopIn,
+      ),
+    );
+  }
+
+  /// "Lanjutkan": the user is still there — dismiss the silence warning.
+  void keepListening() {
+    if (!state.isActive) return;
+    _quietSeconds = 0;
+    if (state.stopIn != null) {
+      _log('lanjut', 'ketuk');
+      _set(state.copyWith(clearStopIn: true));
+    }
+  }
+
+  // --- end -----------------------------------------------------------------------
+
+  void _logSession(String reason) {
+    final words = _wordCount(_sessionText);
+    if (words == 0) {
+      // Silent sessions fold into one line (x12) instead of flooding the log.
+      _log('sesi', 'kosong · $reason');
+      return;
+    }
+    final ms = DateTime.now().difference(_sessionStartedAt).inMilliseconds;
+    _log(
+      'sesi',
+      '#$_sessions · ${(ms / 1000).toStringAsFixed(1)} dtk · '
+          '$words kata · $reason',
+    );
+  }
+
+  void _logSummary(String reason) {
+    final words = math.max(0, _wordCount(_last.text) - _wordsAtStart);
+    _log(
+      'selesai',
+      '${formatDictationElapsed(Duration(seconds: _elapsedSeconds))} · '
+          '$words kata · $_sessions sesi · $_retries ulang · $reason',
+    );
+  }
+
   void _fail(SpeechError e) {
     _want = false;
-    _restartTimer?.cancel();
-    _finalizeTimer?.cancel();
-    _finalizeTimer = null;
-    _sessionClosed = _endHandled = true;
+    _sessionOpen = false;
+    _cancelTimers();
+    _setMuted(false);
+    _log('gagal', '${e.kind.name} · ${e.raw ?? '-'}');
     _set(
       state.copyWith(
         phase: DictationPhase.error,
@@ -340,24 +711,30 @@ class DictationController extends Notifier<DictationState> {
         partial: '',
         error: e,
         level: 0,
+        clearStopIn: true,
       ),
     );
+    _logSummary('error');
+    if (_t.isListening) unawaited(_t.cancel());
     _completeStop();
   }
 
   void _finalize() {
-    _restartTimer?.cancel();
-    _finalizeTimer?.cancel();
-    _finalizeTimer = null;
-    _sessionClosed = true;
+    final wasActive = _want || state.isActive;
+    _want = false;
+    _sessionOpen = false;
+    _cancelTimers();
+    _setMuted(false);
     _set(
       state.copyWith(
         phase: DictationPhase.idle,
         committed: joinTranscript(state.committed, state.partial),
         partial: '',
         level: 0,
+        clearStopIn: true,
       ),
     );
+    if (wasActive) _logSummary(_endReason);
     _completeStop();
   }
 
@@ -369,13 +746,16 @@ class DictationController extends Notifier<DictationState> {
 
   /// Stops listening; completes with the full transcript once the final
   /// result arrived (or after [finalizeTimeout]).
-  Future<String> stop() async {
+  Future<String> stop({String reason = 'stop'}) async {
     if (!state.isActive) return state.text;
     _want = false;
+    _endReason = reason;
     _restartTimer?.cancel();
+    _restartTimer = null;
+    _setMuted(false);
     if (state.phase == DictationPhase.restarting ||
         state.phase == DictationPhase.starting ||
-        _sessionClosed) {
+        !_sessionOpen) {
       _finalize();
       if (_t.isListening) await _t.cancel();
       return state.text;
@@ -391,11 +771,18 @@ class DictationController extends Notifier<DictationState> {
   Future<void> cancel() async {
     if (!state.isActive) return;
     _want = false;
-    _restartTimer?.cancel();
-    _finalizeTimer?.cancel();
-    _finalizeTimer = null;
-    _sessionClosed = true;
-    _set(state.copyWith(phase: DictationPhase.idle, partial: '', level: 0));
+    _sessionOpen = false;
+    _cancelTimers();
+    _setMuted(false);
+    _set(
+      state.copyWith(
+        phase: DictationPhase.idle,
+        partial: '',
+        level: 0,
+        clearStopIn: true,
+      ),
+    );
+    _logSummary('batal');
     _completeStop();
     await _t.cancel();
   }
@@ -409,6 +796,7 @@ class DictationController extends Notifier<DictationState> {
 
   void clear() {
     if (state.isActive) return;
+    _autoTail = '';
     _set(
       DictationState(
         phase: state.phase == DictationPhase.unavailable

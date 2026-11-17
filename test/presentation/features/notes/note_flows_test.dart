@@ -282,7 +282,10 @@ void main() {
       h.notes.s.put(note('a', title: 'x'));
       await pumpNotes(t, h, location: '/notes/a');
       await tapKey(t, 'act-dictate');
-      expect(find.text('Dikte belum bisa dipakai'), findsOneWidget);
+      expect(
+        find.text('Paket suara Indonesia belum ada di HP ini'),
+        findsOneWidget,
+      );
       expect(h.transcriber.starts, 0);
       expect(h.mic.requests, 0);
       await tapKey(t, 'dictation-download', 4);
