@@ -452,6 +452,8 @@ void main() {
         );
         expect(t.takeException(), isNull);
         await t.pumpWidget(const SizedBox());
+        // kembali ke chat memulai lagi watch "sedang menulis": tunggu jawabannya
+        await _settle(t);
         await t.pump(const Duration(seconds: 4));
       },
     );

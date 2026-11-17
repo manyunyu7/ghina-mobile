@@ -28,6 +28,7 @@ import '../pratinjau/pratinjau_chat_bubble.dart';
 import 'chat_dictation.dart';
 import 'chat_context.dart';
 import 'chat_images.dart';
+import 'chat_stream.dart';
 import 'chat_subagents.dart';
 import 'chat_model.dart';
 import 'chat_view_prefs.dart';
@@ -90,6 +91,24 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
 
   Timer? _timer;
   Timer? _bump;
+
+  /// Teks yang sedang ditulis agen (dibaca daemon dari layar terminal), lihat
+  /// [KantorStreamWatch]. Hanya di memori State ini: tidak masuk cache
+  /// transkrip memori/disk supaya tidak pernah tampil basi.
+  KantorStreamWatch? _watch;
+  bool _appOn = true;
+  bool _tabOn = true;
+  String? _live;
+  int? _liveSeq;
+
+  /// `done:true` sudah datang: bubble menunggu jawaban final di transkrip
+  /// (paling lama [_liveEnd]) supaya tidak hilang dulu lalu final menyusul.
+  bool _liveDone = false;
+  Timer? _liveEnd;
+
+  /// Teks yang dipasang di bubble; dibekukan selama pengguna membaca ke atas.
+  String? _liveView;
+  bool _atBottom = true;
   List<ChatEntry>? _entries;
   Object? _error;
   Object? _size;
@@ -248,7 +267,22 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     _input.addListener(_saveDraft);
     _scroll = ScrollController(initialScrollOffset: _memory.scrollOffset)
       ..addListener(_saveScroll)
-      ..addListener(_maybeLoadOlder);
+      ..addListener(_maybeLoadOlder)
+      ..addListener(_onScrollLive);
+    _atBottom = _memory.scrollOffset <= _bottomSlack;
+    final api = _api;
+    if (api != null) {
+      _watch = KantorStreamWatch(
+        api: api,
+        sid: widget.sid,
+        onStream: _onStream,
+      );
+    }
+    final life = WidgetsBinding.instance.lifecycleState;
+    _appOn =
+        life != AppLifecycleState.paused &&
+        life != AppLifecycleState.hidden &&
+        life != AppLifecycleState.detached;
     _openKey = kantorOpenChatKey(_connection, widget.feed.officeId, widget.sid);
     kantorOpenChats[_openKey] = (kantorOpenChats[_openKey] ?? 0) + 1;
     final viaOpen = _raw == null && !kantorNoOpenRoute.contains(_connection);
@@ -262,11 +296,104 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
 
   String? _lastStatus;
   void _onFeed() {
+    _syncWatch();
     // a status change usually means new transcript lines
     final st = '${_sess['status']}|${_sess['tool']}';
     if (st != _lastStatus) {
       _lastStatus = st;
       _bumpLoad(700);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // tab lain di halaman sesi, panel yang tertutup halaman di atasnya, atau
+    // route di bawah: TickerMode mati, berarti chat tidak terlihat
+    _tabOn = TickerMode.valuesOf(context).enabled;
+    _syncWatch();
+  }
+
+  /// `POST /watch` hanya selama chat terlihat: app di depan dan tab Chat aktif.
+  /// Sesi yang sudah selesai tidak punya terminal untuk dibaca.
+  void _syncWatch() =>
+      _watch?.set(_active && _appOn && _tabOn && _sess['status'] != 'ended');
+
+  static const _bottomSlack = 40.0;
+
+  void _onScrollLive() {
+    if (!_scroll.hasClients) return;
+    final b = _scroll.offset <= _bottomSlack;
+    if (b != _atBottom) setState(() => _atBottom = b);
+  }
+
+  /// Event `stream` (atau jawaban `GET /stream`) untuk sesi ini.
+  void _onStream(Json m) {
+    if (!_active) return;
+    final seq = (m['seq'] as num?)?.toInt();
+    if (seq != null) {
+      final had = _liveSeq;
+      if (had != null && seq <= had) return; // lebih lama dari yang tampil
+      _liveSeq = seq;
+    }
+    final text = m['text'];
+    final entries = _entries;
+    if (text is String && text.trim().isNotEmpty && m['done'] != true) {
+      // sama dengan pesan asisten terakhir di transkrip: sudah final
+      if (entries != null && kantorStreamCovered(text, entries)) {
+        _clearLive();
+        return;
+      }
+      _liveEnd?.cancel();
+      _liveDone = false;
+      if (text != _live) setState(() => _live = text);
+      return;
+    }
+    if (_live == null) return;
+    if (m['done'] != true) {
+      _clearLive();
+      return;
+    }
+    // selesai: jawaban final segera masuk transkrip; bubble diganti di frame
+    // yang sama saat delta tiba, atau hilang sendiri bila tidak ada
+    _liveDone = true;
+    _bumpLoad(120);
+    _liveEnd?.cancel();
+    _liveEnd = Timer(const Duration(milliseconds: 1500), _clearLive);
+  }
+
+  void _clearLive() {
+    _liveEnd?.cancel();
+    _liveEnd = null;
+    _liveDone = false;
+    if (_live == null && _liveView == null) return;
+    if (!mounted) {
+      _live = null;
+      _liveView = null;
+      return;
+    }
+    setState(() {
+      _live = null;
+      _liveView = null;
+    });
+  }
+
+  /// Dipanggil di dalam setState yang memasang transkrip baru: bubble
+  /// sementara hilang di frame yang sama dengan bubble finalnya.
+  void _dropLiveFor(List<ChatEntry> before, List<ChatEntry> after) {
+    final live = _live;
+    if (live == null) return;
+    final was = before.isEmpty ? null : kantorLastClaude(before);
+    final now = kantorLastClaude(after);
+    final fresh =
+        now != null &&
+        (was == null || was.at != now.at || was.text != now.text);
+    if (kantorStreamCovered(live, after) || (_liveDone && fresh)) {
+      _live = null;
+      _liveView = null;
+      _liveDone = false;
+      _liveEnd?.cancel();
+      _liveEnd = null;
     }
   }
 
@@ -280,6 +407,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _bump?.cancel();
+    _watch?.dispose();
+    _liveEnd?.cancel();
     widget.feed.removeListener(_onFeed);
     _dictation.dispose();
     // Draf dan scroll sudah disimpan oleh listener di setiap perubahan. Tidak
@@ -404,9 +533,11 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         network: network,
         build: build.elapsed,
       );
+      final before = _entries ?? const <ChatEntry>[];
       setState(() {
         _entries = entries;
         _error = null;
+        _dropLiveFor(before, entries);
       });
       _recordShown(timing);
     } catch (e) {
@@ -546,12 +677,16 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       _timer?.cancel();
       _timer = Timer.periodic(_pollEvery, (_) => _load());
       _load();
+      _appOn = true;
     } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
       _timer?.cancel();
       _timer = null;
       _bump?.cancel();
+      _appOn = false;
     }
+    _syncWatch();
   }
 
   void _onEvent(Json? msg) {
@@ -568,11 +703,19 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       _bumpLoad(150); // the daemon says this transcript grew: fetch the delta
       return;
     }
+    if (msg != null &&
+        msg['t'] == 'stream' &&
+        msg['sid'] == widget.sid &&
+        (msg['office'] == null || msg['office'] == widget.feed.officeId)) {
+      _onStream(msg);
+      return;
+    }
     if (!_active ||
         msg == null ||
         msg['t'] != 'attachment' ||
-        msg['sid'] != widget.sid)
+        msg['sid'] != widget.sid) {
       return;
+    }
     final item = KantorAttachment.fromJson(asJson(msg['item']));
     if (item.id.isEmpty) return;
     // the daemon re-sends an item when it changes (frames ready, delivered)
@@ -805,6 +948,13 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                 child: Stack(
                   children: [
                     Positioned.fill(child: _list(context, api, outbox, view)),
+                    if (_entries != null && _live != null && !_atBottom)
+                      Positioned(
+                        bottom: GhinaSpace.sm,
+                        left: GhinaSpace.md,
+                        right: GhinaSpace.md,
+                        child: Center(child: _liveJump(context)),
+                      ),
                     if (_entries != null && (!_synced || _syncFailed))
                       Positioned(
                         top: GhinaSpace.sm,
@@ -1348,7 +1498,12 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
         if (!(view.tools == ChatToolMode.hidden && e is ToolsEntry)) e,
       for (final j in outbox) UploadEntry(j.id, ''),
     ];
-    if (entries.isEmpty) {
+    // teks sementara: ikut tumbuh hanya saat pengguna di dasar chat; saat
+    // membaca ke atas teksnya dibekukan (tombol "sedang menulis" yang muncul)
+    if (_atBottom || _live == null) _liveView = _live;
+    final live = _liveView;
+    final lead = live == null ? 0 : 1;
+    if (entries.isEmpty && live == null) {
       // agen tertahan (mis. belum login): kartunya di atas composer yang bicara
       if (_blocker != null) return const SizedBox.shrink();
       return Center(
@@ -1374,8 +1529,31 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
       reverse: true,
       physics: _pinching ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(GhinaSpace.md),
-      itemCount: rev.length + (_oldN > 0 ? 1 : 0) + (_loadingOlder ? 1 : 0),
-      itemBuilder: (context, i) {
+      itemCount:
+          lead + rev.length + (_oldN > 0 ? 1 : 0) + (_loadingOlder ? 1 : 0),
+      itemBuilder: (context, index) {
+        // bubble "sedang menulis" paling bawah, di bawah pesan terakhir
+        if (live != null && index == 0) {
+          return Padding(
+            key: const ValueKey('chat-live'),
+            padding: EdgeInsets.only(
+              bottom: GhinaSpace.sm * view.density.factor,
+            ),
+            child: _Bubble(
+              text: live,
+              at: '',
+              mine: false,
+              view: view,
+              body: KantorLiveText(
+                text: live,
+                follow: _atBottom,
+                lineHeight: view.lineHeight.value,
+                codeScale: view.codeScale,
+              ),
+            ),
+          );
+        }
+        final i = index - lead;
         // the oldest end of the chat is the last item of the reversed list
         if (i == rev.length && _oldN > 0) return _oldFiles(view);
         if (i >= rev.length) return _olderSpinner(context);
@@ -1488,6 +1666,44 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     );
   }
 
+  /// "↓ sedang menulis": pengguna sedang membaca ke atas saat agen menulis.
+  Widget _liveJump(BuildContext context) {
+    final g = context.ghina;
+    return Material(
+      key: const ValueKey('chat-live-jump'),
+      color: g.surface.withValues(alpha: 0.95),
+      shape: StadiumBorder(side: BorderSide(color: g.border)),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: () {
+          if (!_scroll.hasClients) return;
+          _scroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.arrow_downward_rounded, size: 14, color: g.textMuted),
+              const SizedBox(width: 4),
+              Icon(Icons.edit_rounded, size: 12, color: g.textMuted),
+              const SizedBox(width: 4),
+              Text(
+                'sedang menulis',
+                style: GhinaType.caption.copyWith(color: g.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// A prompt of the owner. A message from another Claude session shows as a
   /// card on the left; words the owner typed around it stay a normal bubble.
   Widget _userRow(UserEntry e, ChatViewPrefs view) {
@@ -1562,6 +1778,7 @@ class _Bubble extends StatelessWidget {
     required this.at,
     required this.mine,
     required this.view,
+    this.body,
   });
 
   final String text;
@@ -1569,26 +1786,31 @@ class _Bubble extends StatelessWidget {
   final bool mine;
   final ChatViewPrefs view;
 
+  /// Pengganti isi markdown (bubble "sedang menulis").
+  final Widget? body;
+
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
     if (view.messenger && (mine || !view.flatClaude)) {
       final c = ChatStyleColors.of(context, view.style);
-      final body = mine
-          ? SelectableText(
-              text,
-              style: GhinaType.body.copyWith(
-                color: view.useStyleMe ? c.ink : view.me.ink,
-                height: view.lineHeight.value,
-              ),
-            )
-          : KantorMarkdown(
-              text,
-              selectable: true,
-              lineHeight: view.lineHeight.value,
-              codeScale: view.codeScale,
-              wrapCode: view.wrapCode,
-            );
+      final body =
+          this.body ??
+          (mine
+              ? SelectableText(
+                  text,
+                  style: GhinaType.body.copyWith(
+                    color: view.useStyleMe ? c.ink : view.me.ink,
+                    height: view.lineHeight.value,
+                  ),
+                )
+              : KantorMarkdown(
+                  text,
+                  selectable: true,
+                  lineHeight: view.lineHeight.value,
+                  codeScale: view.codeScale,
+                  wrapCode: view.wrapCode,
+                ));
       return Align(
         alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
@@ -1622,21 +1844,23 @@ class _Bubble extends StatelessWidget {
       horizontal: flat ? 2 : GhinaSpace.md * (0.6 + 0.4 * d),
       vertical: GhinaSpace.sm * d,
     );
-    final body = mine
-        ? SelectableText(
-            text,
-            style: GhinaType.body.copyWith(
-              color: view.me.ink,
-              height: view.lineHeight.value,
-            ),
-          )
-        : KantorMarkdown(
-            text,
-            selectable: true,
-            lineHeight: view.lineHeight.value,
-            codeScale: view.codeScale,
-            wrapCode: view.wrapCode,
-          );
+    final body =
+        this.body ??
+        (mine
+            ? SelectableText(
+                text,
+                style: GhinaType.body.copyWith(
+                  color: view.me.ink,
+                  height: view.lineHeight.value,
+                ),
+              )
+            : KantorMarkdown(
+                text,
+                selectable: true,
+                lineHeight: view.lineHeight.value,
+                codeScale: view.codeScale,
+                wrapCode: view.wrapCode,
+              ));
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
