@@ -147,12 +147,119 @@ String lateFinalExtra(String committedTail, String finalText) {
   return finalText.trim();
 }
 
+final _nonWord = RegExp(r'[^\p{L}\p{N}]', unicode: true);
+
+/// Lowercased words without punctuation (for comparing transcripts).
+List<String> _norm(String s) => [
+  for (final w in s.toLowerCase().split(RegExp(r'\s+')))
+    if (w.replaceAll(_nonWord, '').isNotEmpty) w.replaceAll(_nonWord, ''),
+];
+
+bool _sameWord(String a, String b) =>
+    a == b ||
+    (a.length >= 2 && b.length >= 2 && (a.startsWith(b) || b.startsWith(a)));
+
+/// Whether the partial [next] is a revision / extension of the partial
+/// [prev] of the same recognizer session (cumulative partials), rather than
+/// the start of a new segment (on-device recognizers of Google / Samsung
+/// start the partials over after a segment of a long utterance).
+bool transcriptContinues(String prev, String next) {
+  final p = _norm(prev), n = _norm(next);
+  if (p.isEmpty || n.isEmpty) return true;
+  // Character level, so "di sana" → "disana" / "kepasar" → "ke pasar" count.
+  final pj = p.join(), nj = n.join();
+  var cp = 0;
+  while (cp < pj.length && cp < nj.length && pj[cp] == nj[cp]) {
+    cp++;
+  }
+  if (cp > 0 && cp * 2 >= pj.length) return true;
+  // The first words were revised ("saya mau ke pasar" → "Aku mau ke pasar").
+  if (n.length >= p.length) {
+    final rest = [...n];
+    var shared = 0;
+    for (final w in p) {
+      if (rest.remove(w)) shared++;
+    }
+    if (shared >= (p.length * 0.6).ceil()) return true;
+  }
+  return false;
+}
+
+/// The part of [next] that [covered] doesn't hold yet: drops the words at
+/// the start of [next] that repeat the end of [covered] (a cumulative result
+/// that still includes words committed before, or only overlaps their end).
+/// All of [next] when it's a fresh segment. Never touches [covered].
+String transcriptTail(String covered, String next) {
+  final raw = next.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+  final rawWords = raw.toList();
+  final c = _norm(covered);
+  if (c.isEmpty || rawWords.isEmpty) return next.trim();
+  // Keep raw and normalised words aligned (punctuation-only words drop out).
+  final keep = [
+    for (var i = 0; i < rawWords.length; i++)
+      if (rawWords[i].replaceAll(_nonWord, '').isNotEmpty) i,
+  ];
+  final n = [
+    for (final i in keep) rawWords[i].toLowerCase().replaceAll(_nonWord, ''),
+  ];
+  String after(int k) => k >= n.length ? '' : rawWords.skip(keep[k]).join(' ');
+  if (n.isEmpty) return next.trim();
+
+  // 1. Exact overlap: the end of covered == the start of next (≥ 2 words, or
+  //    all of covered — one shared word alone may be a coincidence).
+  for (var k = math.min(c.length, n.length); k >= 1; k--) {
+    if (k < 2 && k != c.length) break;
+    var ok = true;
+    for (var i = 0; i < k; i++) {
+      if (c[c.length - k + i] != n[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return after(k);
+  }
+  // 2. next spells covered out with other word breaks ("kepasar" → "ke
+  //    pasar") or a longer last word, then goes on.
+  final cj = c.join();
+  var seen = '';
+  for (var k = 0; k < n.length; k++) {
+    seen += n[k];
+    if (seen.length >= cj.length) {
+      if (seen.startsWith(cj)) return after(k + 1);
+      break;
+    }
+  }
+  // 3. Cumulative with a revision in the middle: same start, and covered's
+  //    last words show up again further on → keep what follows them.
+  if (_sameWord(c.first, n.first)) {
+    final tail = c.length >= 2 ? c.sublist(c.length - 2) : c;
+    for (var j = n.length - tail.length; j >= 1; j--) {
+      var ok = true;
+      for (var i = 0; i < tail.length; i++) {
+        if (n[j + i] != tail[i]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return after(j + tail.length);
+    }
+  }
+  return next.trim();
+}
+
 /// Continuous dictation ("Dikte"): live speech-to-text into a text field.
 ///
-/// * Partial results are cumulative within one recognizer session → they
-///   replace [DictationState.partial]; a final result is appended to
-///   [DictationState.committed]. Committed text is append-only (the UI inserts
-///   its growth into the field); only the live partial at the end moves.
+/// * Partial results replace [DictationState.partial]; a final result is
+///   appended to [DictationState.committed]. Committed text is append-only
+///   (the UI inserts its growth into the field); only the live partial at
+///   the end moves. Partials are usually cumulative per recognizer session,
+///   but on-device recognizers (Google / Samsung) split a long utterance into
+///   segments and start the partials over after each one, and their final
+///   may hold only the last segment: a partial that doesn't continue the
+///   previous one ([transcriptContinues]) or is marked as a segment end
+///   commits the live text first, and a final only adds what the session
+///   hasn't committed yet ([transcriptTail]). Results of a session that was
+///   closed for a restart ([TranscriptUpdate.stale]) never replace anything.
 /// * Android ends a session after a few seconds of silence. While the user
 ///   hasn't pressed stop a new session starts right away ([restartDelay]):
 ///   as soon as the final result is in, without waiting for the plugin's own
@@ -224,10 +331,27 @@ class DictationController extends Notifier<DictationState> {
   bool _live = false;
   bool _sessionHasPartial = false;
   int _session = 0;
+
+  /// Everything this session recognised so far (committed segments + live).
   String _sessionText = '';
   DateTime _sessionStartedAt = DateTime.now();
 
-  /// Text committed from a partial when its session ended without a final.
+  /// Segments of the running session already moved into committed (the
+  /// recognizer started its partials over after them).
+  String _sessionCommitted = '';
+
+  /// Last raw partial of the running session (to spot a segment restart).
+  String _lastRaw = '';
+
+  /// Words in committed when the running session started (log).
+  int _wordsAtSession = 0;
+
+  /// Text of the last session that recognised something — late results of
+  /// it are de-duplicated against this.
+  String _prevSessionText = '';
+
+  /// Whole text of a session that ended without a final (committed from its
+  /// partials); a final that still arrives is de-duplicated against it.
   String _autoTail = '';
   String _lastFinal = '';
   int _errorStreak = 0;
@@ -396,6 +520,7 @@ class DictationController extends Notifier<DictationState> {
     _retries = 0;
     _autoTail = '';
     _lastFinal = '';
+    _prevSessionText = '';
     _endReason = 'stop';
     _wordsAtStart = _wordCount(state.committed);
     _set(state.copyWith(availability: availability, permission: status));
@@ -423,6 +548,9 @@ class DictationController extends Notifier<DictationState> {
     _live = false;
     _sessionHasPartial = false;
     _sessionText = '';
+    _sessionCommitted = '';
+    _lastRaw = '';
+    _wordsAtSession = _wordCount(state.committed);
     _sessionStartedAt = DateTime.now();
     try {
       await _t.start(
@@ -480,16 +608,38 @@ class DictationController extends Notifier<DictationState> {
   void _onResult(TranscriptUpdate r) {
     if (!_want && state.phase != DictationPhase.stopping) return;
     final text = r.text.trim();
+    if (r.stale) {
+      // The previous session, closed for a restart: its partial is old news
+      // (its words were committed when it ended); a final may add words.
+      if (!r.isFinal || text.isEmpty) {
+        _log('abaikan', 'partial sesi lama · ${_wordCount(text)} kata');
+        return;
+      }
+      _addLateFinal(_prevSessionText, text, 'final sesi lama');
+      return;
+    }
     if (!r.isFinal) {
       // A partial after its session ended is a leftover; an empty partial
       // would blank the live line for a moment (flicker) — keep the last one.
-      if (!_sessionOpen || text.isEmpty) return;
+      if (text.isEmpty) return;
+      if (!_sessionOpen) {
+        _log('abaikan', 'partial di luar sesi · ${_wordCount(text)} kata');
+        return;
+      }
       _sessionHasPartial = true;
-      _sessionText = text;
       _autoTail = '';
       _errorStreak = 0;
       _heard();
-      if (text != state.partial) _set(state.copyWith(partial: text));
+      if (_lastRaw.isNotEmpty && !transcriptContinues(_lastRaw, text)) {
+        // The recognizer started over (new segment of a long utterance):
+        // the live words so far are final — never let them be replaced.
+        _commitSegment('mulai ulang');
+      }
+      _lastRaw = text;
+      final live = transcriptTail(_sessionCommitted, text);
+      _sessionText = joinTranscript(_sessionCommitted, live);
+      if (live != state.partial) _set(state.copyWith(partial: live));
+      if (r.segmentEnd) _commitSegment('final_result');
       return;
     }
 
@@ -499,20 +649,31 @@ class DictationController extends Notifier<DictationState> {
     if (!ownSession) {
       // Late final of a session that already ended (its words were committed
       // from the last partial), or a duplicate.
-      final extra = _autoTail.isNotEmpty
-          ? lateFinalExtra(_autoTail, text)
-          : (text == _lastFinal ? '' : text);
+      _addLateFinal(
+        _autoTail.isNotEmpty ? _autoTail : _prevSessionText,
+        text,
+        'final terlambat',
+      );
       _autoTail = '';
-      if (text.isNotEmpty) _lastFinal = text;
-      if (extra.isNotEmpty) {
-        _heard();
-        _set(state.copyWith(committed: joinTranscript(state.committed, extra)));
-      }
       return;
     }
-    // Some recognizers end with an empty final: the last partial is the text.
-    final words = text.isEmpty ? state.partial : text;
+    // The live words of the current segment, and what the final adds to the
+    // segments this session already committed. Some recognizers end with an
+    // empty final (the last partial is the text), some with only the last
+    // segment, some with the whole session.
+    final live = state.partial;
+    final fresh = transcriptTail(_sessionCommitted, text);
+    final String words;
+    if (fresh.isEmpty) {
+      words = live;
+    } else if (live.isEmpty || transcriptContinues(live, fresh)) {
+      words = fresh; // the final's wording wins
+    } else {
+      // The final covers only the end of the live words: keep them all.
+      words = joinTranscript(live, transcriptTail(live, fresh));
+    }
     if (!_sessionHasPartial && words.isNotEmpty && words == _lastFinal) {
+      _log('abaikan', 'final ganda · ${_wordCount(words)} kata');
       return; // plugin re-sent the previous session's final
     }
     if (words.isNotEmpty) {
@@ -520,7 +681,7 @@ class DictationController extends Notifier<DictationState> {
       _errorStreak = 0;
       _heard();
     }
-    _sessionText = words;
+    _sessionText = joinTranscript(_sessionCommitted, words);
     // One update: final into committed, live line cleared → no flicker.
     _set(
       state.copyWith(
@@ -529,6 +690,37 @@ class DictationController extends Notifier<DictationState> {
       ),
     );
     _endSession('final', hadFinal: true);
+  }
+
+  /// Moves the live words of the running session into committed (end of a
+  /// segment).
+  void _commitSegment(String reason) {
+    final live = state.partial;
+    if (live.isEmpty) return;
+    _sessionCommitted = joinTranscript(_sessionCommitted, live);
+    _set(
+      state.copyWith(
+        committed: joinTranscript(state.committed, live),
+        partial: '',
+      ),
+    );
+    _log('segmen', '#$_sessions · ${_wordCount(live)} kata · $reason');
+  }
+
+  /// A final of a session that is over: only the words not committed yet.
+  void _addLateFinal(String known, String text, String what) {
+    final extra = lateFinalExtra(known, text);
+    if (text.isNotEmpty) _lastFinal = text;
+    if (extra.isEmpty) {
+      if (text.isNotEmpty) {
+        _log('abaikan', '$what · ${_wordCount(text)} kata sudah ada');
+      }
+      return;
+    }
+    _heard();
+    _prevSessionText = joinTranscript(known, extra);
+    _set(state.copyWith(committed: joinTranscript(state.committed, extra)));
+    _log('susulan', '$what · +${_wordCount(extra)} kata');
   }
 
   void _onStatus(SpeechSessionStatus s) {
@@ -584,17 +776,21 @@ class DictationController extends Notifier<DictationState> {
     _live = false;
     _startWatchdog?.cancel();
     _startWatchdog = null;
-    if (!hadFinal && state.partial.isNotEmpty) {
+    if (!hadFinal) {
       // No final for this session (yet): its last partial is the text. A
-      // final that still arrives later is de-duplicated against it.
-      _autoTail = state.partial;
-      _set(
-        state.copyWith(
-          committed: joinTranscript(state.committed, state.partial),
-          partial: '',
-        ),
-      );
+      // final that still arrives later is de-duplicated against the whole
+      // session (it may repeat the segments committed before, too).
+      _autoTail = joinTranscript(_sessionCommitted, state.partial);
+      if (state.partial.isNotEmpty) {
+        _set(
+          state.copyWith(
+            committed: joinTranscript(state.committed, state.partial),
+            partial: '',
+          ),
+        );
+      }
     }
+    if (_sessionText.isNotEmpty) _prevSessionText = _sessionText;
     _logSession(reason);
     if (!ref.mounted) return;
     if (state.phase == DictationPhase.stopping || !_want) {
@@ -685,7 +881,8 @@ class DictationController extends Notifier<DictationState> {
     _log(
       'sesi',
       '#$_sessions · ${(ms / 1000).toStringAsFixed(1)} dtk · '
-          '$words kata · $reason',
+          '$words kata · $reason · '
+          'total $_wordsAtSession→${_wordCount(state.committed)} kata',
     );
   }
 
@@ -797,6 +994,7 @@ class DictationController extends Notifier<DictationState> {
   void clear() {
     if (state.isActive) return;
     _autoTail = '';
+    _prevSessionText = '';
     _set(
       DictationState(
         phase: state.phase == DictationPhase.unavailable

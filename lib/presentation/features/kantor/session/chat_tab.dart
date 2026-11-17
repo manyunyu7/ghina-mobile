@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../../../state/platform/platform_state.dart';
-import '../../notes/widgets/dictation_bar.dart';
 import '../widgets/kantor_markdown.dart';
 import 'attach_picker.dart';
 import 'blocker_card.dart';
@@ -216,8 +215,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
     ref: ref,
     context: () => context,
     text: _input,
+    onSend: () async => _send(),
   );
-  bool _holdMic = false;
 
   KantorActions? get _actions {
     return !_active || _api == null ? null : KantorActions(_api);
@@ -956,7 +955,6 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
   Widget build(BuildContext context) {
     ref.listen(kantorEventsProvider, (_, next) => _onEvent(next.value));
     ref.listen(kantorUploadsProvider, _onUploads);
-    ref.listen(dictationControllerProvider, _dictation.onChange);
     // select: the dictation state ticks (mic level, timer) many times a
     // second — only the on/off switch rebuilds the whole chat.
     final dictating = ref.watch(
@@ -1061,11 +1059,8 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                         onEsc: () => _act('esc'),
                         onCompact: () => _act('compact'),
                       ),
-                    if (dictating)
-                      DictationBar(
-                        onStop: _dictation.stop,
-                        onCancel: _dictation.cancel,
-                      ),
+                    // Dikte: pop-up with the live transcript
+                    // (chat_dictation_sheet.dart), no bar above the composer.
                     AttachmentTray(items: _staged, onRemove: _unstage),
                     if (view.messenger)
                       _messengerComposer(view, can, dictating, table)
@@ -1087,35 +1082,15 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
                               onPressed: _canAttach ? _attach : null,
                               icon: const Icon(Icons.attach_file_rounded),
                             ),
-                            GestureDetector(
-                              onLongPressStart: can
-                                  ? (_) {
-                                      if (_dictation.active) return;
-                                      _holdMic = true;
-                                      HapticFeedback.lightImpact();
-                                      _dictation.start();
-                                    }
-                                  : null,
-                              onLongPressEnd: can
-                                  ? (_) {
-                                      if (_holdMic) _dictation.stop();
-                                      _holdMic = false;
-                                    }
-                                  : null,
-                              child: IconButton(
-                                key: const ValueKey('kantor-mic'),
-                                tooltip: dictating
-                                    ? 'Selesai dikte'
-                                    : 'Dikte (ketuk atau tahan)',
-                                onPressed: can ? _dictation.toggle : null,
-                                icon: Icon(
-                                  dictating
-                                      ? Icons.stop_circle_rounded
-                                      : Icons.mic_rounded,
-                                  color: dictating
-                                      ? GhinaColors.blue.base
-                                      : null,
-                                ),
+                            IconButton(
+                              key: const ValueKey('kantor-mic'),
+                              tooltip: dictating ? 'Selesai dikte' : 'Dikte',
+                              onPressed: can ? _dictation.toggle : null,
+                              icon: Icon(
+                                dictating
+                                    ? Icons.stop_circle_rounded
+                                    : Icons.mic_rounded,
+                                color: dictating ? GhinaColors.blue.base : null,
                               ),
                             ),
                             Expanded(

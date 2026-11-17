@@ -89,6 +89,17 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
 
   Future<void> _ensureInitialized() async {
     if (_initialized) return;
+    // Android: the plugin's initialize() asks for RECORD_AUDIO itself (plus
+    // BLUETOOTH_CONNECT unless androidNoBluetooth) when it's missing. The app
+    // asks for the mic with its own explanation first, so never let the
+    // plugin show a second / different prompt.
+    if (_isAndroid && !await _stt.hasPermission) {
+      throw const SpeechError(
+        SpeechErrorKind.permission,
+        permanent: true,
+        raw: 'permission_denied',
+      );
+    }
     final ok = await _stt.initialize(
       options: useBluetooth ? null : [SpeechToText.androidNoBluetooth],
       onStatus: (s) {
@@ -168,6 +179,12 @@ final class SttSpeechTranscriber implements SpeechTranscriber {
               r.recognizedWords,
               isFinal: r.finalResult,
               confidence: r.hasConfidenceRating ? r.confidence : null,
+              // Android: a partial bundle with `final_result` = a finished
+              // segment of a long utterance (the partials may start over).
+              segmentEnd: r.resultTypeValue == ResultType.intermediate,
+              // The plugin has one result callback: what arrives while the
+              // previous session is being cancelled belongs to that session.
+              stale: _closingPrevious,
             ),
           );
         },

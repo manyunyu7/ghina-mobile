@@ -254,6 +254,19 @@ final class FakeSpeechTranscriber implements SpeechTranscriber {
   void finalResult(String text) =>
       _results.add(TranscriptUpdate(text, isFinal: true));
 
+  /// A partial the recognizer marks as a finished segment (Android
+  /// `final_result` in a partial bundle); later partials may start over.
+  void segment(String text) =>
+      _results.add(TranscriptUpdate(text, isFinal: false, segmentEnd: true));
+
+  /// A late result of the previous session, delivered while it was being
+  /// closed for a restart.
+  void staleResult(String text, {bool isFinal = false}) =>
+      _results.add(TranscriptUpdate(text, isFinal: isFinal, stale: true));
+
+  /// Raw status event (e.g. a late `done` of an earlier session).
+  void emitStatus(SpeechSessionStatus s) => _status.add(s);
+
   /// Ends the current session like Android does after silence.
   void endSession() {
     listening = false;

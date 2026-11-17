@@ -103,10 +103,19 @@ final class SpeechAvailability {
 }
 
 /// One recognition result. Within one listen session partial results are
-/// cumulative (each replaces the previous one); a final result closes the
-/// session's utterance.
+/// USUALLY cumulative (each replaces the previous one) and a final result
+/// closes the session's utterance — but not always: Google's / Samsung's
+/// on-device recognizers split a long utterance into segments, and after a
+/// segment the partials start over with only the new words (the final may
+/// then hold only the last segment). The dictation controller copes with both.
 final class TranscriptUpdate {
-  const TranscriptUpdate(this.text, {required this.isFinal, this.confidence});
+  const TranscriptUpdate(
+    this.text, {
+    required this.isFinal,
+    this.confidence,
+    this.segmentEnd = false,
+    this.stale = false,
+  });
 
   final String text;
   final bool isFinal;
@@ -114,9 +123,18 @@ final class TranscriptUpdate {
   /// 0..1 when the engine reports it.
   final double? confidence;
 
+  /// A partial the recognizer marked as a finished segment (Android
+  /// `final_result` in a partial bundle): the next partials may start over.
+  final bool segmentEnd;
+
+  /// Arrived while the previous session was being closed for a restart — it
+  /// belongs to that session, not to the one being opened.
+  final bool stale;
+
   @override
   String toString() =>
-      'TranscriptUpdate(${isFinal ? 'final' : 'partial'}: "$text")';
+      'TranscriptUpdate(${isFinal ? 'final' : (segmentEnd ? 'segment' : 'partial')}'
+      '${stale ? ' stale' : ''}: "$text")';
 }
 
 enum SpeechSessionStatus {

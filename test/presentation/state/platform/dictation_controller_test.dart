@@ -715,4 +715,232 @@ void main() {
       c.dispose();
     });
   });
+
+  // --- bug "yang diambil malah bagian akhirnya doang" (Ravel 1.18.0, Fold) ---
+  //
+  // Urutan event realistis: on-device recognizer Google/Samsung memecah
+  // ucapan panjang jadi segmen; setelah satu segmen partial mulai lagi dari
+  // kata baru, dan final bisa hanya berisi segmen terakhir.
+
+  group('ucapan panjang: tidak ada kata yang hilang', () {
+    const awal = 'aku udah ngomong panjang lebar soal kartu';
+    const tengah = 'terus tombolnya harus dipindah ke atas';
+    const akhir = 'jenisnya yang diklik tadi';
+
+    void say(String words) {
+      // partial kumulatif per segmen: kata demi kata
+      final w = words.split(' ');
+      for (var i = 1; i <= w.length; i++) {
+        speech.partial(w.take(i).join(' '));
+      }
+    }
+
+    test('partial mulai ulang per segmen, final hanya segmen terakhir', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        say(awal);
+        say(tengah); // partial mulai ulang tanpa tanda apa pun
+        say(akhir);
+        speech.finalResult(akhir);
+        expect(st(c).committed, '$awal $tengah $akhir');
+        c.dispose();
+      });
+    });
+
+    test('segmen bertanda final_result (intermediate), lalu stop', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        say(awal);
+        speech.segment(awal);
+        say(tengah);
+        speech.segment(tengah);
+        say(akhir);
+        String? out;
+        ctl(c).stop().then((t) => out = t);
+        speech.finalResult(akhir); // final sesudah stop: hanya segmen akhir
+        fa.flushMicrotasks();
+        fa.elapse(DictationController.finalizeTimeout);
+        expect(out, '$awal $tengah $akhir');
+        c.dispose();
+      });
+    });
+
+    test('segmen bertanda tapi partial tetap kumulatif → tidak dobel', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        say(awal);
+        speech.segment(awal);
+        speech.partial('$awal terus');
+        speech.partial('$awal $tengah');
+        speech.finalResult('$awal $tengah $akhir');
+        expect(st(c).committed, '$awal $tengah $akhir');
+        c.dispose();
+      });
+    });
+
+    test('partial kumulatif tapi final hanya segmen terakhir', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        say('$awal $tengah $akhir');
+        speech.finalResult(akhir);
+        expect(st(c).committed, '$awal $tengah $akhir');
+        c.dispose();
+      });
+    });
+
+    test('final memperbaiki kata partial (revisi biasa) tetap satu kali', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        speech.partial('di');
+        speech.partial('disana');
+        speech.partial('di sana ada');
+        speech.partial('Di sana ada kepasar');
+        speech.finalResult('Di sana ada ke pasar.');
+        expect(st(c).committed, 'Di sana ada ke pasar.');
+        c.dispose();
+      });
+    });
+
+    test('3+ sesi dengan event terlambat, final kosong, done ganda', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        // sesi 1: final normal
+        say(awal);
+        speech.finalResult(awal);
+        expect(st(c).phase, DictationPhase.restarting);
+        fa.elapse(DictationController.restartDelay); // cancel → listen baru
+        // final sesi 1 dikirim ulang saat sesi lama ditutup
+        speech.staleResult(awal, isFinal: true);
+        speech.staleResult(awal);
+        // sesi 2: partial mulai ulang di tengah sesi, final kosong
+        say(tengah);
+        say(akhir);
+        speech.finalResult('');
+        speech.endSession(); // done ganda sesi 2
+        speech.emitStatus(SpeechSessionStatus.done);
+        fa.elapse(DictationController.restartDelay);
+        // sesi 3: berakhir tanpa final, final terlambat datang sesudahnya
+        say('lalu kirim');
+        speech.endSession();
+        speech.finalResult('lalu kirim ya');
+        fa.elapse(DictationController.restartDelay);
+        // sesi 4: partial lama (sesi 3) terlambat lalu kata baru
+        speech.staleResult('lalu kirim ya');
+        say('oke');
+        String? out;
+        ctl(c).stop().then((t) => out = t);
+        fa.flushMicrotasks();
+        fa.elapse(DictationController.finalizeTimeout);
+        expect(out, '$awal $tengah $akhir lalu kirim ya oke');
+        expect(st(c).committed, out);
+        c.dispose();
+      });
+    });
+
+    test('committed tidak pernah menyusut selama dikte', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        var longest = 0;
+        c.listen(dictationControllerProvider, (_, n) {
+          expect(n.committed.length, greaterThanOrEqualTo(longest));
+          longest = n.committed.length;
+        });
+        ctl(c).start();
+        fa.flushMicrotasks();
+        for (var i = 0; i < 3; i++) {
+          say(awal);
+          say(akhir);
+          speech.finalResult(akhir);
+          speech.endSession();
+          fa.elapse(DictationController.restartDelay);
+          speech.staleResult('$awal $akhir', isFinal: true);
+        }
+        ctl(c).stop();
+        fa.flushMicrotasks();
+        fa.elapse(DictationController.finalizeTimeout);
+        expect(st(c).committed, '$awal $akhir $awal $akhir $awal $akhir');
+        expect(
+          RegExp('jenisnya').allMatches(st(c).committed).length,
+          3,
+          reason: st(c).committed,
+        );
+        c.dispose();
+      });
+    });
+
+    test('log dikte: panjang committed per sesi, segmen, event basi', () {
+      fakeAsync((fa) {
+        final c = makeContainer();
+        ctl(c).start();
+        fa.flushMicrotasks();
+        say(awal);
+        say(akhir);
+        speech.finalResult(akhir);
+        fa.elapse(DictationController.restartDelay);
+        speech.staleResult(akhir, isFinal: true);
+        ctl(c).stop();
+        fa.flushMicrotasks();
+        fa.elapse(DictationController.finalizeTimeout);
+        final text = log.toText();
+        expect(text, contains('segmen'));
+        expect(text, contains('total 0→11 kata'));
+        expect(text, contains('abaikan'));
+        // privasi: tidak ada kata ucapan di log
+        expect(text, isNot(contains('jenisnya')));
+        c.dispose();
+      });
+    });
+  });
+
+  group('transcript helpers', () {
+    test('transcriptContinues', () {
+      expect(transcriptContinues('', 'apa saja'), isTrue);
+      expect(transcriptContinues('beli susu', 'Beli susu dan roti'), isTrue);
+      expect(transcriptContinues('ke', 'kemarin aku'), isTrue);
+      expect(transcriptContinues('di sana ada', 'Disana ada banyak'), isTrue);
+      expect(
+        transcriptContinues('aku mau ke pasar', 'aku mau ke pasar dan beli'),
+        isTrue,
+      );
+      expect(
+        transcriptContinues('saya mau ke pasar', 'Aku mau ke pasar'),
+        isTrue,
+      );
+      expect(transcriptContinues('oke', 'jenisnya'), isFalse);
+      expect(
+        transcriptContinues('aku mau ke pasar beli sayur', 'aku juga'),
+        isFalse,
+      );
+      expect(
+        transcriptContinues(
+          'aku mau ke pasar beli sayur',
+          'aku juga mau beli ikan',
+        ),
+        isFalse,
+      );
+    });
+
+    test('transcriptTail', () {
+      expect(transcriptTail('', 'a b'), 'a b');
+      expect(transcriptTail('satu dua', 'Satu dua, tiga empat'), 'tiga empat');
+      expect(transcriptTail('satu dua tiga', 'dua tiga empat'), 'empat');
+      expect(transcriptTail('satu dua', 'tiga'), 'tiga');
+      expect(transcriptTail('halo', 'halo apa kabar'), 'apa kabar');
+      expect(transcriptTail('satu dua', 'satu dua'), '');
+      // satu kata kebetulan sama bukan tumpang tindih
+      expect(transcriptTail('aku pergi dan', 'dan pulang'), 'dan pulang');
+    });
+  });
 }

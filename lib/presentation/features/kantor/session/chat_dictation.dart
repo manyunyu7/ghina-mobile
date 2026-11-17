@@ -1,134 +1,137 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../domain/services/services.dart';
-import '../../../shared/widgets/widgets.dart';
+import '../../../design_system/design_system.dart';
 import '../../../state/platform/platform_state.dart';
 import '../../notes/markdown_edit.dart' show insertAtCursor;
-import '../../notes/widgets/dictation_bar.dart' show showDictationUnavailable;
-import '../../notes/widgets/mic_permission.dart';
+import 'chat_dictation_sheet.dart';
 
-/// Speech into the chat field ("Dikte", `id-ID`): words land in the field as
-/// they are recognised, editable before sending. Same flow as the Killa
-/// composer, driven by the shared `dictationControllerProvider`; the owner
-/// widget forwards `ref.listen(dictationControllerProvider, d.onChange)`.
+/// Speech into the chat field ("Dikte", `id-ID`) through a pop-up
+/// ([showChatDictationSheet]): the live transcript shows there (permission
+/// steps too); Selesai puts ALL of it into the field at the cursor, Kirim
+/// also sends, Batal drops it. The field is only ever added to, never
+/// replaced. Driven by the shared `dictationControllerProvider`.
 class ChatDictation {
-  ChatDictation({required this.ref, required this.context, required this.text});
+  ChatDictation({
+    required this.ref,
+    required this.context,
+    required this.text,
+    this.onSend,
+  });
 
   final WidgetRef ref;
   final BuildContext Function() context;
   final TextEditingController text;
 
-  /// Length of the transcript already put into [text].
-  int _inserted = 0;
-  bool _ownsDictation = false;
+  /// Kirim in the pop-up: sends what's in the field (words just inserted).
+  final Future<void> Function()? onSend;
+
+  bool _open = false;
   bool _disposed = false;
   void Function()? _cancelOwned;
 
   void dispose() {
     _disposed = true;
-    _ownsDictation = false;
     _cancelOwned?.call();
     _cancelOwned = null;
   }
 
-  bool get active => ref.read(dictationControllerProvider).isActive;
+  bool get active => _open || ref.read(dictationControllerProvider).isActive;
 
-  void onChange(DictationState? prev, DictationState next) {
-    if (_disposed || !_ownsDictation) return;
-    final committed = next.committed;
-    if (committed.length > _inserted) {
-      final delta = committed.substring(_inserted);
-      _inserted = committed.length;
-      final v = text.value;
-      final at = v.selection.isValid
-          ? v
-          : v.copyWith(
-              selection: TextSelection.collapsed(offset: v.text.length),
-            );
-      text.value = insertAtCursor(at, delta);
-    } else if (committed.length < _inserted) {
-      _inserted = committed.length;
-    }
-    if (prev?.phase != DictationPhase.error &&
-        next.phase == DictationPhase.error &&
-        next.error?.kind != SpeechErrorKind.permission) {
-      showErrorToast(context(), _error(next.error?.kind));
-    }
+  void _log(String event, String detail) {
+    try {
+      ref.read(dictationLogProvider).record(event, detail);
+    } catch (_) {}
   }
 
-  String _error(SpeechErrorKind? k) =>
-      k?.message ?? 'Dikte berhenti. Coba lagi, yuk';
+  static int _words(String s) {
+    final t = s.trim();
+    return t.isEmpty ? 0 : t.split(RegExp(r'\s+')).length;
+  }
 
-  Future<void> toggle() async => active ? stop() : start();
+  /// Adds [words] at the cursor (end when the field has no cursor).
+  void _insert(String words, String how) {
+    if (_disposed || words.trim().isEmpty) return;
+    final v = text.value;
+    final at = v.selection.isValid
+        ? v
+        : v.copyWith(selection: TextSelection.collapsed(offset: v.text.length));
+    text.value = insertAtCursor(at, words);
+    _log(
+      'kotak ketik',
+      '$how · ${_words(words)} kata masuk · kotak ${_words(text.text)} kata',
+    );
+  }
 
-  Future<void> start() async {
-    if (_disposed || active) return;
-    final c = ref.read(dictationControllerProvider.notifier);
-    final avail = await ref
-        .read(speechTranscriberProvider)
-        .availability(locale: ref.read(speechLocaleProvider));
-    if (_disposed) return;
+  Future<void> toggle() => open();
+
+  /// Opens the dictation pop-up and handles how it was closed.
+  Future<void> open() async {
+    if (_disposed || _open) return;
     final ctx = context();
-    if (_disposed || !ctx.mounted) return;
-    const fallback = 'Kamu tetap bisa mengetik pesannya, ya.';
-    if (!avail.canDictate(
-      allowNetwork: ref.read(dictationAllowsNetworkProvider),
-    )) {
-      // "Mulai dikte" (pack ready) / "Pakai online dulu" → go on.
-      final go = await showDictationUnavailable(
-        ctx,
-        ref,
-        avail,
-        fallback: fallback,
-      );
-      if (!go || _disposed || !ctx.mounted) return;
-    }
-    if (!await ensureMicReady(ctx, ref, MicPurpose.dictate)) return;
-    if (_disposed || !ctx.mounted) return;
-    c.clear();
-    _inserted = 0;
-    _ownsDictation = true;
+    if (!ctx.mounted) return;
+    final c = ref.read(dictationControllerProvider.notifier);
+    if (!ref.read(dictationControllerProvider).isActive) c.clear();
+    _open = true;
     _cancelOwned = () {
       c.cancel();
     };
-    final ok = await c.start();
-    if (_disposed || ok || !ctx.mounted) return;
-    final s = ref.read(dictationControllerProvider);
-    if (s.phase == DictationPhase.unavailable && s.availability != null) {
-      await showDictationUnavailable(
-        ctx,
-        ref,
-        s.availability!,
-        fallback: fallback,
+    DictationSheetResult? r;
+    try {
+      r = await showChatDictationSheet(ctx);
+    } finally {
+      _open = false;
+    }
+    if (_disposed) return;
+    if (r == null) {
+      // Swiped away: stop listening, and only drop the words when the owner
+      // says so.
+      final s = ref.read(dictationControllerProvider);
+      final words = s.isActive ? await c.stop() : s.text;
+      c.clear();
+      _cancelOwned = null;
+      final ctx2 = context();
+      if (_disposed || words.trim().isEmpty || !ctx2.mounted) return;
+      final drop = await showChunkyConfirm(
+        ctx2,
+        title: 'Buang teks dikte?',
+        message: '${_words(words)} kata belum masuk ke kotak ketik.',
+        confirmLabel: 'Buang',
+        cancelLabel: 'Masukkan ke kotak ketik',
+        destructive: true,
       );
-    } else if (s.error?.kind == SpeechErrorKind.permission) {
-      if (s.permission == MicPermissionStatus.permanentlyDenied) {
-        await showMicSettingsGuide(ctx, ref);
+      if (drop) {
+        _log('kotak ketik', 'buang · ${_words(words)} kata');
       } else {
-        showErrorToast(ctx, 'Izin mikrofon dibutuhkan untuk dikte');
+        _insert(words, 'tutup');
       }
-    } else if (s.phase == DictationPhase.error) {
-      showErrorToast(ctx, _error(s.error?.kind));
+      return;
+    }
+    _cancelOwned = null;
+    switch (r.action) {
+      case DictationSheetAction.cancel:
+        _log('kotak ketik', 'batal');
+      case DictationSheetAction.done:
+        _insert(r.text, 'selesai');
+      case DictationSheetAction.send:
+        _insert(r.text, 'kirim');
+        await onSend?.call();
     }
   }
 
-  /// Stops listening; the final words still land in the field.
+  /// Ends a dictation that is still running (sending mid-dictation): the
+  /// words still land in the field.
   Future<void> stop() async {
     final c = ref.read(dictationControllerProvider.notifier);
-    await c.stop();
+    if (!ref.read(dictationControllerProvider).isActive) return;
+    final words = await c.stop();
     c.clear();
-    _inserted = 0;
-    _ownsDictation = false;
-    _cancelOwned = null;
+    _insert(words, 'stop');
   }
 
   Future<void> cancel() async {
     final c = ref.read(dictationControllerProvider.notifier);
     await c.cancel();
     c.clear();
-    _inserted = 0;
-    _ownsDictation = false;
-    _cancelOwned = null;
   }
 }

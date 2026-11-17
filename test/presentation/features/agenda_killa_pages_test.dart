@@ -480,14 +480,20 @@ void main() {
       await t.pumpWidget(const SizedBox());
     });
 
-    testWidgets('refused microphone → toast, nothing listens', (t) async {
+    testWidgets('refused microphone → "Coba lagi", nothing listens', (t) async {
       await pumpChat(t, mic: MicPermissionStatus.denied);
       await t.tap(find.byKey(const ValueKey('killa-dictate')));
       await settle(t);
       await t.tap(find.byKey(const ValueKey('mic-allow')));
       await settle(t);
       expect(speech.starts, 0);
-      expect(find.text('Izin mikrofon dibutuhkan untuk dikte'), findsOneWidget);
+      // a clear message with a retry instead of a toast (one prompt per tap)
+      expect(find.text('Mikrofon belum diizinkan'), findsOneWidget);
+      expect(find.byKey(const ValueKey('mic-retry')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('mic-later')));
+      await settle(t);
+      expect(speech.starts, 0);
+      expect(find.text('Izin mikrofon dibutuhkan untuk dikte'), findsNothing);
       expect(find.byKey(const ValueKey('dictation-bar')), findsNothing);
       await t.pumpWidget(const SizedBox());
     });
