@@ -424,12 +424,20 @@ class KantorMessengerHeader extends StatelessWidget {
     required this.onTap,
     this.onLongPress,
     this.onLabel,
+    this.compact = false,
   });
   final KantorOfficeFeed feed;
   final Json sess;
   final ChatStyle style;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+
+  /// Layar sempit: foto profil lebih kecil, supaya nama muat di samping avatar
+  /// agen di header.
+  final bool compact;
+
+  /// Lebar foto profil + jarak sebelum nama (lihat [compact]).
+  static double leadOf({required bool compact}) => compact ? 32 + 8 : 40 + 10;
 
   /// Ketuk stiker label: buka form ubah label.
   final VoidCallback? onLabel;
@@ -449,13 +457,13 @@ class KantorMessengerHeader extends StatelessWidget {
           children: [
             CircleAvatar(
               backgroundColor: c.surface,
-              radius: 20,
+              radius: compact ? 16 : 20,
               child: KantorSprite(
                 look: role ?? KantorSprite.guestLook('${sess['sid']}'),
-                size: 36,
+                size: compact ? 29 : 36,
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: compact ? 8 : 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

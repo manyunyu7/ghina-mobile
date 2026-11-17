@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -18,8 +18,8 @@ import 'kantor_label.dart';
 import 'kantor_snapshot_store.dart';
 
 /// Peringkat semua agen hidup dari semua kantor dan semua koneksi server
-/// tersimpan, untuk pindah cepat (strip avatar di bawah header chat, pencari
-/// cepat, baris chip mode meja).
+/// tersimpan, untuk pindah cepat (avatar kecil di header chat, pencari cepat,
+/// kartu agen mode meja).
 ///
 /// Urutan: perlu tindakan (menunggu izin / bertanya / `blocker` dari server)
 /// → sedang bekerja → terakhir dibuka ([kantorRecentComplexChatsProvider]) →
@@ -284,7 +284,7 @@ Future<void> kantorOpenRankedAgent(
 }
 
 /// Ambil riwayat chat beberapa agen teratas lebih dulu (hanya mengisi ruang
-/// kosong cache), supaya pindah lewat strip langsung menampilkan riwayat.
+/// kosong cache), supaya pindah lewat avatar langsung menampilkan riwayat.
 void kantorPrefetchRanked(
   ProviderContainer c,
   Iterable<KantorRankedAgent> agents,
@@ -309,86 +309,78 @@ void kantorPrefetchRanked(
   }
 }
 
-/// Status tampil strip setelah [n] dari daftar chat/terminal di bawahnya:
-/// true = tampilkan, false = sembunyikan, null = biarkan.
-///
-/// Digulir menjauhi pesan terbaru (membaca riwayat) → sembunyi; digulir ke
-/// arah pesan terbaru atau berhenti di dasar → tampil. Daftar chat terbalik
-/// (`reverse: true`, pesan terbaru di offset 0); terminal biasa (terbaru di
-/// bawah). Scrollable kecil (kolom ketik) dan horizontal diabaikan.
-bool? kantorStripVisibility(ScrollNotification n) {
-  final m = n.metrics;
-  if (m.axis != Axis.vertical || m.viewportDimension < 160) return null;
-  final reversed = m.axisDirection == AxisDirection.up;
-  if (n is UserScrollNotification) {
-    if (n.direction == ScrollDirection.idle) return _atNewest(m) ? true : null;
-    // forward = offset mengecil. Di daftar terbalik offset membesar = ke riwayat
-    final away = reversed
-        ? n.direction == ScrollDirection.reverse
-        : n.direction == ScrollDirection.forward;
-    return !away;
-  }
-  if (n is ScrollEndNotification && _atNewest(m)) return true;
-  return null;
-}
+/// Diameter luar avatar header: wajah 22dp + garis pemisah 1.5dp di tiap sisi.
+const kKantorHeaderAvatar = 25.0;
 
-bool _atNewest(ScrollMetrics m) {
-  final reversed = m.axisDirection == AxisDirection.up;
-  final d = reversed
-      ? m.pixels - m.minScrollExtent
-      : m.maxScrollExtent - m.pixels;
-  return d <= 24;
-}
+/// Tumpang-tindih antar-avatar header.
+const kKantorHeaderAvatarOverlap = 6.0;
 
-/// Baris agen untuk pindah cepat. Dipakai:
-/// - di bawah header chat (layar sempit): avatar 38dp + nama kecil;
-/// - [dense]: avatar lebih kecil, untuk ruang sempit;
-/// - [chips]: pil avatar + nama sebaris (mode meja).
+/// Chip "+N" sedikit menumpang avatar terakhir (seperti tumpukan avatar).
+const _kHeaderChipOverlap = 2.0;
+
+/// Jumlah avatar header maksimum; 4 bila header selebar
+/// [kKantorHeaderAgentsWide] atau lebih.
+const kKantorHeaderAgentsMax = 3;
+const kKantorHeaderAgentsWide = 400.0;
+
+/// Deret avatar kecil agen penting di kanan judul chat (layar sempit, tab Chat
+/// dan Terminal), tanpa nama dan tanpa tinggi tambahan di bawah header.
 ///
-/// Cincin merah = perlu tindakan, biru = bekerja, garis aksen = [currentSid].
-/// Pojok kertas kuning di avatar = agen berlabel. Garis tipis memisahkan
-/// kelompok. Ketuk = [onOpen], atau bila null pindah lewat
-/// [kantorOpenRankedAgent]. Tahan = label lengkap + "Beri/Ubah label".
-/// Tidak tampil bila tidak ada agen lain.
-class KantorAgentStrip extends ConsumerStatefulWidget {
-  const KantorAgentStrip({
+/// Isi hanya agen lain (bukan [currentSid]) yang perlu tindakan (cincin merah:
+/// izin, tanya, blocker login) lalu yang sedang bekerja (cincin biru), urut
+/// dari [kantorAgentRankProvider], maks [kKantorHeaderAgentsMax] (4 bila layar
+/// ≥ [kKantorHeaderAgentsWide]). Avatar saling tumpang
+/// [kKantorHeaderAvatarOverlap]; pojok kuning kecil = agen berlabel.
+///
+/// Lebar dibatasi [maxWidth] (sisa judul setelah nama agen saat ini mendapat
+/// ruang minimumnya): bila tidak muat, jumlah avatar dikurangi dulu. Setelah
+/// avatar ada chip "+N" (N = agen lain yang tidak tampil) yang membuka pencari
+/// cepat lewat [onMore]. Tanpa agen penting hanya chip "+N"; tanpa agen lain
+/// sama sekali tidak tampil apa-apa.
+///
+/// Ketuk avatar = [onOpen] (atau [kantorOpenRankedAgent] bila null). Tahan =
+/// menu label ([showKantorLabelMenu]).
+class KantorHeaderAgents extends ConsumerStatefulWidget {
+  const KantorHeaderAgents({
     super.key,
+    required this.maxWidth,
     this.currentSid,
     this.onOpen,
-    this.dense = false,
-    this.chips = false,
+    this.onMore,
+    this.background,
   });
 
+  /// Lebar maksimum deret (avatar + chip).
+  final double maxWidth;
   final String? currentSid;
   final void Function(KantorRankedAgent agent)? onOpen;
-  final bool dense;
-  final bool chips;
+  final VoidCallback? onMore;
+
+  /// Warna latar header, untuk garis pemisah antar-avatar yang bertumpuk.
+  final Color? background;
 
   @override
-  ConsumerState<KantorAgentStrip> createState() => _KantorAgentStripState();
+  ConsumerState<KantorHeaderAgents> createState() => _KantorHeaderAgentsState();
 }
 
-class _KantorAgentStripState extends ConsumerState<KantorAgentStrip> {
-  final _currentKey = GlobalKey();
+class _KantorHeaderAgentsState extends ConsumerState<KantorHeaderAgents> {
   String _prefetched = '';
-  bool _scrolledToCurrent = false;
 
   bool _isCurrent(KantorRankedAgent a) =>
       a.active && widget.currentSid != null && a.sid == widget.currentSid;
 
   Future<void> _open(KantorRankedAgent a) async {
-    if (_isCurrent(a)) return;
     final cb = widget.onOpen;
     if (cb != null) return cb(a);
     try {
       await kantorOpenRankedAgent(context, a);
     } catch (_) {
       if (!mounted) return;
+      final where = a.connectionName.isEmpty ? a.officeName : a.connectionName;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(
           content: Text(
-            'Tidak bisa membuka ${a.connectionName.isEmpty ? a.officeName : a.connectionName}. '
-            'Periksa koneksi lalu coba lagi.',
+            'Tidak bisa membuka $where. Periksa koneksi lalu coba lagi.',
           ),
         ),
       );
@@ -404,101 +396,109 @@ class _KantorAgentStripState extends ConsumerState<KantorAgentStrip> {
     connection: a.active ? null : a.connection,
   );
 
-  /// Sekali per daftar: hangatkan chat beberapa agen teratas, dan geser strip
-  /// supaya agen saat ini terlihat.
-  void _afterBuild(List<KantorRankedAgent> agents) {
-    final top = agents.where((a) => !_isCurrent(a)).take(6).toList();
+  /// Hangatkan chat beberapa agen teratas (sekali per daftar), supaya pindah
+  /// lewat avatar langsung menampilkan riwayat dari cache.
+  void _prefetch(List<KantorRankedAgent> others) {
+    final top = others.take(6).toList();
     final sig = top.map((a) => a.identity).join('|');
-    final scroll = !_scrolledToCurrent;
-    if (sig == _prefetched && !scroll) return;
+    if (sig.isEmpty || sig == _prefetched) return;
+    _prefetched = sig;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (sig != _prefetched) {
-        _prefetched = sig;
-        kantorPrefetchRanked(
-          ProviderScope.containerOf(context, listen: false),
-          top,
-        );
-      }
-      final cur = _currentKey.currentContext;
-      if (scroll && cur != null) {
-        _scrolledToCurrent = true;
-        Scrollable.ensureVisible(cur, alignment: .5);
-      }
+      kantorPrefetchRanked(
+        ProviderScope.containerOf(context, listen: false),
+        top,
+      );
     });
+  }
+
+  TextStyle _chipStyle(GhinaTokens g) => GhinaType.caption.copyWith(
+    fontSize: 11.5,
+    height: 1,
+    fontWeight: FontWeight.w800,
+    color: g.textSecondary,
+  );
+
+  /// Lebar chip "+[n]" (sama dengan tata letak [_MoreChip]).
+  double _chipWidth(String text, TextStyle style) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final w = tp.width;
+    tp.dispose();
+    return math.max(_MoreChip.minWidth, w + 2 * _MoreChip.padding);
   }
 
   @override
   Widget build(BuildContext context) {
     final agents = ref.watch(kantorAgentRankProvider).agents;
-    if (!agents.any((a) => !_isCurrent(a))) return const SizedBox.shrink();
-    _afterBuild(agents);
+    final others = agents.where((a) => !_isCurrent(a)).toList();
+    if (others.isEmpty) return const SizedBox.shrink();
+    _prefetch(others);
     final g = context.ghina;
-    final items = <Widget>[];
-    KantorAgentGroup? last;
-    for (final a in agents) {
-      if (last != null && a.group != last) {
-        items.add(
-          Container(
-            width: 1,
-            margin: EdgeInsets.symmetric(
-              horizontal: 2,
-              vertical: widget.chips ? 8 : 10,
-            ),
-            color: g.border,
-          ),
-        );
-      }
-      last = a.group;
-      final cur = _isCurrent(a);
-      items.add(
-        KeyedSubtree(
-          key: cur ? _currentKey : null,
-          child: widget.chips
-              ? _Chip(
-                  agent: a,
-                  current: cur,
-                  onTap: () => _open(a),
-                  onLongPress: () => _label(a),
-                )
-              : _Avatar(
-                  agent: a,
-                  current: cur,
-                  dense: widget.dense,
-                  onTap: () => _open(a),
-                  onLongPress: () => _label(a),
-                ),
-        ),
-      );
+    final style = _chipStyle(g);
+    final limit = MediaQuery.sizeOf(context).width >= kKantorHeaderAgentsWide
+        ? kKantorHeaderAgentsMax + 1
+        : kKantorHeaderAgentsMax;
+    final hot = others
+        .where((a) => a.needsAction || a.working)
+        .take(limit)
+        .toList();
+    const step = kKantorHeaderAvatar - kKantorHeaderAvatarOverlap;
+    double faces(int k) => k == 0 ? 0 : kKantorHeaderAvatar + (k - 1) * step;
+    double width(int k) {
+      final n = others.length - k;
+      if (n == 0) return faces(k);
+      return faces(k) -
+          (k > 0 ? _kHeaderChipOverlap : 0) +
+          _chipWidth('+$n', style);
     }
-    final avatar = widget.dense ? 30.0 : 38.0;
-    final height = widget.chips
-        ? (widget.dense ? 40.0 : 48.0)
-        : avatar + 10 + 16 + (widget.dense ? 8 : 14);
-    return Material(
-      key: const ValueKey('kantor-agent-strip'),
-      color: widget.chips ? Colors.transparent : g.surface,
-      child: Container(
-        decoration: widget.chips
-            ? null
-            : BoxDecoration(
-                border: Border(bottom: BorderSide(color: g.border)),
+
+    // avatar mengalah lebih dulu: kurangi jumlah sampai muat
+    var k = hot.length;
+    while (k > 0 && width(k) > widget.maxWidth) {
+      k--;
+    }
+    final shown = hot.take(k).toList();
+    final more = others.length - k;
+    final bg = widget.background ?? Theme.of(context).colorScheme.surface;
+    final chipLeft = k == 0 ? 0.0 : faces(k) - _kHeaderChipOverlap;
+    return SizedBox(
+      key: const ValueKey('kantor-header-agents'),
+      width: width(k),
+      height: kKantorHeaderAvatar,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // yang paling penting (kiri) digambar paling atas
+          for (var i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: i * step,
+              top: 0,
+              child: _HeaderFace(
+                agent: shown[i],
+                background: bg,
+                onTap: () => _open(shown[i]),
+                onLongPress: () => _label(shown[i]),
               ),
-        height: height,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.symmetric(
-            horizontal: GhinaSpace.sm,
-            vertical: widget.chips ? 4 : (widget.dense ? 4 : 7),
-          ),
-          children: [
-            for (final w in items)
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: widget.chips ? 3 : 4),
-                child: w,
+            ),
+          if (more > 0)
+            Positioned(
+              left: chipLeft,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: _MoreChip(
+                  count: more,
+                  style: style,
+                  onTap: widget.onMore,
+                ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -511,15 +511,13 @@ Color? _ringColor(BuildContext context, KantorRankedAgent a) => a.needsAction
     ? GhinaColors.blue.base
     : null;
 
-/// Lingkaran avatar: sprite agen di atas latar lembut, cincin status, garis
-/// aksen di luar bila agen ini yang sedang dibuka, dan pojok kertas kuning
-/// bila agen berlabel (ikut berubah saat label disimpan).
+/// Lingkaran avatar: sprite agen di atas latar lembut, cincin status, dan
+/// pojok kertas kuning bila agen berlabel (ikut berubah saat label disimpan).
 class _Face extends StatelessWidget {
-  const _Face({required this.agent, required this.size, this.current = false});
+  const _Face({required this.agent, required this.size});
 
   final KantorRankedAgent agent;
   final double size;
-  final bool current;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -547,32 +545,21 @@ class _Face extends StatelessWidget {
   Widget _face(BuildContext context) {
     final g = context.ghina;
     final ring = _ringColor(context, agent);
-    final accent = Theme.of(context).colorScheme.primary;
     return Container(
-      padding: const EdgeInsets.all(2),
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: g.surfaceAlt,
         border: Border.all(
-          color: current ? accent : Colors.transparent,
-          width: 2,
+          color: ring ?? g.border,
+          width: ring == null ? 1 : 2,
         ),
       ),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: g.surfaceAlt,
-          border: Border.all(
-            color: ring ?? g.border,
-            width: ring == null ? 1 : 2.5,
-          ),
-        ),
-        child: ClipOval(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: KantorSprite(look: agent.look, size: size * .78),
-          ),
+      child: ClipOval(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: KantorSprite(look: agent.look, size: size * .78),
         ),
       ),
     );
@@ -587,120 +574,73 @@ String _semantic(KantorRankedAgent a) => [
   if (kantorLabelOf(a.session) case final l?) 'label: $l',
 ].join(', ');
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({
+/// Satu avatar header: wajah + garis pemisah warna header (supaya avatar yang
+/// bertumpuk tetap terbedakan).
+class _HeaderFace extends StatelessWidget {
+  const _HeaderFace({
     required this.agent,
-    required this.current,
-    required this.dense,
+    required this.background,
     required this.onTap,
-    this.onLongPress,
+    required this.onLongPress,
   });
 
   final KantorRankedAgent agent;
-  final bool current;
-  final bool dense;
+  final Color background;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  final VoidCallback onLongPress;
 
   @override
-  Widget build(BuildContext context) {
-    final g = context.ghina;
-    final size = dense ? 30.0 : 38.0;
-    return Semantics(
-      button: true,
-      selected: current,
-      label: _semantic(agent),
-      excludeSemantics: true,
-      child: InkWell(
-        key: ValueKey('strip-agent-${agent.identity}'),
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: SizedBox(
-          width: size + 14,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _Face(agent: agent, size: size, current: current),
-              const SizedBox(height: 2),
-              Text(
-                agent.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: GhinaType.caption.copyWith(
-                  fontSize: dense ? 9.5 : 10.5,
-                  height: 1.2,
-                  fontWeight: current ? FontWeight.w800 : FontWeight.w600,
-                  color: current ? g.textPrimary : g.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: _semantic(agent),
+    excludeSemantics: true,
+    child: InkResponse(
+      key: ValueKey('header-agent-${agent.identity}'),
+      radius: 18,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        width: kKantorHeaderAvatar,
+        height: kKantorHeaderAvatar,
+        padding: const EdgeInsets.all(1.5),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: background),
+        child: _Face(agent: agent, size: kKantorHeaderAvatar - 3),
       ),
-    );
-  }
+    ),
+  );
 }
 
-/// Pil avatar + nama sebaris (mode meja).
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.agent,
-    required this.current,
-    required this.onTap,
-    this.onLongPress,
-  });
+/// Chip "+N": agen lain yang tidak tampil; ketuk = pencari cepat.
+class _MoreChip extends StatelessWidget {
+  const _MoreChip({required this.count, required this.style, this.onTap});
 
-  final KantorRankedAgent agent;
-  final bool current;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  static const minWidth = 24.0;
+  static const padding = 5.0;
+
+  final int count;
+  final TextStyle style;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
-    final accent = Theme.of(context).colorScheme.primary;
     return Semantics(
       button: true,
-      selected: current,
-      label: _semantic(agent),
+      label: 'Pindah agen, $count agen lain',
       excludeSemantics: true,
-      child: Center(
-        child: Material(
-          color: current ? accent.withValues(alpha: .12) : g.surface,
-          shape: StadiumBorder(
-            side: BorderSide(
-              color: current ? accent : g.borderEdge,
-              width: 1.5,
-            ),
-          ),
-          child: InkWell(
-            key: ValueKey('strip-agent-${agent.identity}'),
-            customBorder: const StadiumBorder(),
-            onTap: onTap,
-            onLongPress: onLongPress,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 3, 10, 3),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _Face(agent: agent, size: 24),
-                  const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 120),
-                    child: Text(
-                      agent.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GhinaType.bodyS
-                          .w(700)
-                          .copyWith(color: g.textPrimary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      child: Material(
+        color: g.surfaceAlt,
+        shape: StadiumBorder(side: BorderSide(color: g.border)),
+        child: InkWell(
+          key: const ValueKey('header-agents-more'),
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Container(
+            height: 22,
+            constraints: const BoxConstraints(minWidth: minWidth),
+            padding: const EdgeInsets.symmetric(horizontal: padding),
+            alignment: Alignment.center,
+            child: Text('+$count', maxLines: 1, softWrap: false, style: style),
           ),
         ),
       ),

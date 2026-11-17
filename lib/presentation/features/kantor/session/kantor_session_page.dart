@@ -208,9 +208,6 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
 
   late int _shown = widget.initialTab;
 
-  /// Strip agen tampil (sembunyi saat chat/terminal digulir ke riwayat).
-  bool _stripShown = true;
-
   @override
   void initState() {
     super.initState();
@@ -240,7 +237,6 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     setState(() {
       _shown = i;
       _built.add(i);
-      _stripShown = true;
     });
   }
 
@@ -286,9 +282,9 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     final s = widget.feed.session(widget.sid)!;
     final view = ref.watch(chatViewPrefsProvider);
     // mode meja (Fold setengah terbuka, engsel mendatar): layar tetap menyala
-    // selama posisi ini; di tab Chat/Terminal AppBar, bar konteks, dan strip
-    // avatar diganti header mini (atas) dan grid kartu agen (bawah engsel),
-    // lihat kantor_tabletop.dart
+    // selama posisi ini; di tab Chat/Terminal AppBar (beserta avatar agen di
+    // header) dan bar konteks diganti header mini (atas) dan grid kartu agen
+    // (bawah engsel), lihat kantor_tabletop.dart
     final table = _table;
     return KantorKeepAwake(
       on: kantorTabletopHinge(context) != null,
@@ -321,6 +317,56 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
       (_shown == 0 || _shown == _terminalTab) &&
       kantorTabletopHinge(context) != null;
 
+  /// Layar sempit satu panel (di layar lebar daftar agen ada di panel kiri).
+  bool get _narrow =>
+      !widget.embedded && MediaQuery.sizeOf(context).width < kKantorTwoPaneMin;
+
+  /// Avatar agen penting di header: layar sempit, tab Chat dan Terminal,
+  /// bukan mode meja (kartu agen di bawah engsel menggantikannya).
+  bool get _headerAgentsOn =>
+      _narrow && !_table && (_shown == 0 || _shown == _terminalTab);
+
+  /// Lebar tombol aksi/kembali header di layar sempit (bawaan 48/56dp), supaya
+  /// nama agen dan avatar header muat di 360dp.
+  static const _narrowButton = 40.0;
+
+  /// Ikon ▾ di samping nama (lebih kecil di layar sempit).
+  double get _chevron => _narrow ? 18 : 20;
+
+  Widget _headerButton(Widget child) =>
+      _narrow ? SizedBox(width: _narrowButton, child: child) : child;
+
+  /// [title] + avatar agen penting di kanannya. [reserve] = lebar minimum
+  /// judul (avatar agen saat ini + nama ±90dp + ikon); avatar header hanya
+  /// memakai sisanya dan mengalah lebih dulu (jumlahnya dikurangi).
+  Widget _withHeaderAgents(
+    Widget title, {
+    required double reserve,
+    Color? background,
+  }) {
+    if (!_headerAgentsOn) return title;
+    return LayoutBuilder(
+      builder: (context, c) => Row(
+        children: [
+          Expanded(child: title),
+          const SizedBox(width: 4),
+          KantorHeaderAgents(
+            maxWidth: (c.maxWidth - reserve - 4).clamp(0.0, double.infinity),
+            currentSid: widget.sid,
+            onOpen: _openAgent,
+            background: background,
+            onMore: () => showKantorAgentSwitcher(
+              context,
+              officeId: widget.officeId,
+              currentSid: widget.sid,
+              tab: _tabNames[_shown],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _plainScaffold(Json s) {
     // Only the selected tab is visible and focusable: the others stay mounted
     // (state kept) but are offstage and out of the focus tree, so the terminal
@@ -336,64 +382,74 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
             : AppBar(
                 automaticallyImplyLeading: !widget.embedded,
                 titleSpacing: 0,
+                leadingWidth: _narrow ? _narrowButton : null,
                 // tap the agent to switch (this office or all); swipe the header to
                 // step to the previous/next active agent, staying on the same tab
-                title: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragEnd: (d) {
-                    if (widget.embedded) return;
-                    final v = d.primaryVelocity ?? 0;
-                    if (v.abs() < 400) return;
-                    kantorStepAgent(
-                      context,
-                      currentSid: widget.sid,
-                      dir: v < 0 ? 1 : -1,
-                      tab: _tabNames[_shown],
-                    );
-                  },
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    // hidden: how long the last load of this chat took
-                    onLongPress: _timings,
-                    onTap: widget.embedded
-                        ? null
-                        : () => showKantorAgentSwitcher(
-                            context,
-                            officeId: widget.officeId,
-                            currentSid: widget.sid,
-                            tab: _tabNames[_shown],
+                title: _withHeaderAgents(
+                  // sprite + jarak, nama minimum, ikon ▾
+                  reserve: _Header.compactLead + 90 + _chevron,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragEnd: (d) {
+                      if (widget.embedded) return;
+                      final v = d.primaryVelocity ?? 0;
+                      if (v.abs() < 400) return;
+                      kantorStepAgent(
+                        context,
+                        currentSid: widget.sid,
+                        dir: v < 0 ? 1 : -1,
+                        tab: _tabNames[_shown],
+                      );
+                    },
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      // hidden: how long the last load of this chat took
+                      onLongPress: _timings,
+                      onTap: widget.embedded
+                          ? null
+                          : () => showKantorAgentSwitcher(
+                              context,
+                              officeId: widget.officeId,
+                              currentSid: widget.sid,
+                              tab: _tabNames[_shown],
+                            ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: _Header(
+                              feed: widget.feed,
+                              sess: s,
+                              compact: _narrow,
+                              onLabel: widget.actions == null
+                                  ? null
+                                  : () => _editLabel(s),
+                            ),
                           ),
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: _Header(
-                            feed: widget.feed,
-                            sess: s,
-                            onLabel: widget.actions == null
-                                ? null
-                                : () => _editLabel(s),
-                          ),
-                        ),
-                        if (!widget.embedded)
-                          const Icon(Icons.expand_more_rounded, size: 20),
-                      ],
+                          if (!widget.embedded)
+                            Icon(Icons.expand_more_rounded, size: _chevron),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 actions: [
-                  KantorComplexSwitcherButton(
-                    officeId: widget.officeId,
-                    currentSid: widget.sid,
-                    tab: _tabNames[_shown],
+                  _headerButton(
+                    KantorComplexSwitcherButton(
+                      officeId: widget.officeId,
+                      currentSid: widget.sid,
+                      tab: _tabNames[_shown],
+                    ),
                   ),
-                  _Menu(
-                    feed: widget.feed,
-                    sess: s,
-                    actions: widget.actions,
-                    // the open tab decides which look settings the menu offers
-                    scope: _shown == _terminalTab
-                        ? ViewSheetScope.terminal
-                        : ViewSheetScope.chat,
+                  _headerButton(
+                    _Menu(
+                      feed: widget.feed,
+                      sess: s,
+                      actions: widget.actions,
+                      // the open tab decides which look settings the menu offers
+                      scope: _shown == _terminalTab
+                          ? ViewSheetScope.terminal
+                          : ViewSheetScope.chat,
+                    ),
                   ),
                 ],
                 bottom: TabBar(
@@ -417,7 +473,6 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
           top: false,
           child: Column(
             children: [
-              _strip(),
               // konteks hanya di Chat dan Terminal; hilang saat keyboard terbuka
               if (!_table && (_shown == 0 || _shown == 1))
                 KantorKonteksBar(
@@ -438,71 +493,23 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
     );
   }
 
-  Widget _tabStack(Json s) {
-    // gulir chat/terminal menyembunyikan/menampilkan strip agen
-    return NotificationListener<ScrollNotification>(
-      onNotification: (n) {
-        final v = kantorStripVisibility(n);
-        if (v != null && v != _stripShown) setState(() => _stripShown = v);
-        return false;
-      },
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          for (var i = 0; i < _tabNames.length; i++)
-            if (_built.contains(i))
-              Offstage(
-                key: ValueKey('tab$i'),
-                offstage: _shown != i,
-                child: TickerMode(
-                  enabled: _shown == i,
-                  child: ExcludeFocus(
-                    excluding: _shown != i,
-                    child: _page(i, s),
-                  ),
-                ),
-              ),
-        ],
-      ),
-    );
-  }
+  Widget _tabStack(Json s) => Stack(
+    fit: StackFit.expand,
+    children: [
+      for (var i = 0; i < _tabNames.length; i++)
+        if (_built.contains(i))
+          Offstage(
+            key: ValueKey('tab$i'),
+            offstage: _shown != i,
+            child: TickerMode(
+              enabled: _shown == i,
+              child: ExcludeFocus(excluding: _shown != i, child: _page(i, s)),
+            ),
+          ),
+    ],
+  );
 
-  /// Strip avatar agen di bawah header: hanya layar sempit (di layar lebar
-  /// daftar agen ada di panel kiri), di tab Chat dan Terminal, dan tidak saat
-  /// keyboard terbuka. Slotnya selalu ada (tinggi 0 saat sembunyi) supaya isi
-  /// tab di bawahnya tidak dibuat ulang. Mode meja: tidak tampil (kartu
-  /// agen di bawah engsel menggantikannya).
-  Widget _strip() {
-    final narrow =
-        !widget.embedded &&
-        MediaQuery.sizeOf(context).width < kKantorTwoPaneMin;
-    final on = narrow && !_table && (_shown == 0 || _shown == 1);
-    final show =
-        on && _stripShown && MediaQuery.viewInsetsOf(context).bottom == 0;
-    return ClipRect(
-      key: const ValueKey('agent-strip-slot'),
-      child: AnimatedAlign(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        alignment: Alignment.bottomCenter,
-        heightFactor: show ? 1 : 0,
-        child: on
-            ? IgnorePointer(
-                ignoring: !show,
-                child: ExcludeSemantics(
-                  excluding: !show,
-                  child: KantorAgentStrip(
-                    currentSid: widget.sid,
-                    onOpen: _openAgent,
-                  ),
-                ),
-              )
-            : const SizedBox(width: double.infinity),
-      ),
-    );
-  }
-
-  /// Ketuk avatar di strip: pindah ke chat agen itu di tab yang sama.
+  /// Ketuk avatar agen di header: pindah ke chat agen itu di tab yang sama.
   Future<void> _openAgent(KantorRankedAgent a) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
@@ -586,6 +593,7 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                 surfaceTintColor: Colors.transparent,
                 automaticallyImplyLeading: !widget.embedded,
                 titleSpacing: 0,
+                leadingWidth: _narrow ? _narrowButton : null,
                 leading: _shown == 0
                     ? null
                     : IconButton(
@@ -593,39 +601,53 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
                         onPressed: () => _tabs.animateTo(0),
                         icon: const Icon(Icons.arrow_back),
                       ),
-                title: KantorMessengerHeader(
-                  feed: widget.feed,
-                  sess: s,
-                  style: view.style,
-                  onTap: _profile,
-                  onLongPress: _timings,
-                  onLabel: widget.actions == null ? null : () => _editLabel(s),
+                title: _withHeaderAgents(
+                  // foto profil + jarak, nama minimum
+                  reserve: KantorMessengerHeader.leadOf(compact: _narrow) + 90,
+                  background: colors.header,
+                  KantorMessengerHeader(
+                    feed: widget.feed,
+                    sess: s,
+                    style: view.style,
+                    onTap: _profile,
+                    onLongPress: _timings,
+                    compact: _narrow,
+                    onLabel: widget.actions == null
+                        ? null
+                        : () => _editLabel(s),
+                  ),
                 ),
                 actions: [
                   // jalan cepat ke agen/kantor lain dari dalam chat (gaya WA dan
                   // Telegram tidak punya pemilih agen di judul seperti gaya bawaan)
-                  KantorComplexSwitcherButton(
-                    officeId: widget.officeId,
-                    currentSid: widget.sid,
-                    tab: _tabNames[_shown],
+                  _headerButton(
+                    KantorComplexSwitcherButton(
+                      officeId: widget.officeId,
+                      currentSid: widget.sid,
+                      tab: _tabNames[_shown],
+                    ),
                   ),
                   if (s['tmux'] != null && s['status'] != 'ended')
-                    IconButton(
-                      tooltip: _shown == 1 ? 'Chat' : 'Terminal',
-                      onPressed: () => _tabs.animateTo(_shown == 1 ? 0 : 1),
-                      icon: Icon(
-                        _shown == 1
-                            ? Icons.chat_bubble_outline
-                            : Icons.terminal,
+                    _headerButton(
+                      IconButton(
+                        tooltip: _shown == 1 ? 'Chat' : 'Terminal',
+                        onPressed: () => _tabs.animateTo(_shown == 1 ? 0 : 1),
+                        icon: Icon(
+                          _shown == 1
+                              ? Icons.chat_bubble_outline
+                              : Icons.terminal,
+                        ),
                       ),
                     ),
-                  _Menu(
-                    feed: widget.feed,
-                    sess: s,
-                    actions: widget.actions,
-                    scope: _shown == 1
-                        ? ViewSheetScope.terminal
-                        : ViewSheetScope.chat,
+                  _headerButton(
+                    _Menu(
+                      feed: widget.feed,
+                      sess: s,
+                      actions: widget.actions,
+                      scope: _shown == 1
+                          ? ViewSheetScope.terminal
+                          : ViewSheetScope.chat,
+                    ),
                   ),
                 ],
               ),
@@ -633,7 +655,6 @@ class _SessionScaffoldState extends ConsumerState<_SessionScaffold>
           top: false,
           child: Column(
             children: [
-              _strip(),
               if (!_table && (_shown == 0 || _shown == 1))
                 KantorKonteksBar(
                   session: s,
@@ -719,10 +740,23 @@ class _OutsideNote extends ConsumerWidget {
 }
 
 class _Header extends ConsumerWidget {
-  const _Header({required this.feed, required this.sess, this.onLabel});
+  const _Header({
+    required this.feed,
+    required this.sess,
+    this.onLabel,
+    this.compact = false,
+  });
 
   final KantorOfficeFeed feed;
   final Json sess;
+
+  /// Layar sempit: sprite lebih kecil dan status pindah ke baris kedua
+  /// ("Bekerja · kompleks · kantor"), supaya baris nama muat di samping avatar
+  /// agen di header.
+  final bool compact;
+
+  /// Lebar sprite + jarak sebelum nama dalam mode [compact].
+  static const compactLead = 26.0 + 6;
 
   /// Ketuk stiker label: buka form ubah label. Null = stiker tidak bisa diketuk.
   final VoidCallback? onLabel;
@@ -752,6 +786,101 @@ class _Header extends ConsumerWidget {
       _ => (GhinaColors.blue, kantorStatusLabel[status] ?? status),
     };
     final mode = sess['permMode'] as String?;
+    final name = Text(
+      sessionName(feed, sess),
+      key: const ValueKey('header-name'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GhinaType.h3.copyWith(color: g.textPrimary),
+    );
+    final subtitle = KantorSessionLabel(
+      key: const ValueKey('header-label'),
+      session: sess,
+      maxLines: 1,
+      size: 13,
+      padding: const EdgeInsets.only(top: 1, bottom: 1),
+      onTap: onLabel,
+      empty: Text(
+        [
+          if (complex != null) complex.name,
+          if (feed.office?['name'] != null) '${feed.office!['name']}',
+          sub,
+        ].join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GhinaType.caption.copyWith(color: g.textSecondary),
+      ),
+    );
+    final modeLine = mode != null && mode != 'default'
+        ? Text(
+            'Izin: ${codex ? kantorCodexModeLabel(mode) : kantorModeLabel[mode] ?? mode}',
+            style: GhinaType.caption.copyWith(
+              color: mode == 'bypassPermissions'
+                  ? GhinaColors.red.base
+                  : g.textMuted,
+            ),
+          )
+        : null;
+    if (compact) {
+      // status sebagai teks berwarna di depan baris kedua (tanpa pil)
+      Color tone(ChunkySwatch c) => g.isDark ? c.base : c.edge;
+      final words = <(String, Color)>[
+        (label, tone(color)),
+        if (codex) ('Codex', tone(GhinaColors.green)),
+        if (sess['compacting'] == true) ('Meringkas', tone(GhinaColors.blue)),
+        if (kantorBgAgents(sess) > 0)
+          ('${kantorBgAgents(sess)} sub', tone(GhinaColors.orange)),
+      ];
+      final dot = TextSpan(
+        text: ' · ',
+        style: TextStyle(color: g.textSecondary),
+      );
+      return Row(
+        children: [
+          KantorSprite(look: look, size: 26),
+          const SizedBox(width: compactLead - 26),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                name,
+                // status paling banyak 60% baris; sisanya subjudul/label
+                LayoutBuilder(
+                  builder: (context, c) => Row(
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: c.maxWidth * .6),
+                        child: Text.rich(
+                          key: const ValueKey('header-status'),
+                          TextSpan(
+                            children: [
+                              for (final (i, (t, c)) in words.indexed) ...[
+                                if (i > 0) dot,
+                                TextSpan(
+                                  text: t,
+                                  style: TextStyle(color: c),
+                                ),
+                              ],
+                              dot,
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GhinaType.caption.w(800),
+                        ),
+                      ),
+                      Flexible(child: subtitle),
+                    ],
+                  ),
+                ),
+                ?modeLine,
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         KantorSprite(look: look, size: 36),
@@ -762,14 +891,7 @@ class _Header extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Flexible(
-                    child: Text(
-                      sessionName(feed, sess),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GhinaType.h3.copyWith(color: g.textPrimary),
-                    ),
-                  ),
+                  Flexible(child: name),
                   const SizedBox(width: 6),
                   ChunkyPill(label: label, color: color, soft: true),
                   if (codex) ...[
@@ -795,33 +917,8 @@ class _Header extends ConsumerWidget {
                 ],
               ),
               // berlabel: subjudul jadi stiker kecil satu baris
-              KantorSessionLabel(
-                key: const ValueKey('header-label'),
-                session: sess,
-                maxLines: 1,
-                size: 13,
-                padding: const EdgeInsets.only(top: 1, bottom: 1),
-                onTap: onLabel,
-                empty: Text(
-                  [
-                    if (complex != null) complex.name,
-                    if (feed.office?['name'] != null) '${feed.office!['name']}',
-                    sub,
-                  ].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GhinaType.caption.copyWith(color: g.textSecondary),
-                ),
-              ),
-              if (mode != null && mode != 'default')
-                Text(
-                  'Izin: ${codex ? kantorCodexModeLabel(mode) : kantorModeLabel[mode] ?? mode}',
-                  style: GhinaType.caption.copyWith(
-                    color: mode == 'bypassPermissions'
-                        ? GhinaColors.red.base
-                        : g.textMuted,
-                  ),
-                ),
+              subtitle,
+              ?modeLine,
             ],
           ),
         ),

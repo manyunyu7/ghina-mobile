@@ -438,8 +438,11 @@ void main() {
         expect(bottom.bottom, _h);
         expect(grid, findsOneWidget);
         expect(t.getRect(grid).top, greaterThanOrEqualTo(380));
-        // strip avatar tidak tampil di mode meja
-        expect(find.byKey(const ValueKey('kantor-agent-strip')), findsNothing);
+        // avatar agen di header tidak tampil di mode meja
+        expect(
+          find.byKey(const ValueKey('kantor-header-agents')),
+          findsNothing,
+        );
 
         // 830dp: 4 kolom, tinggi kartu seragam
         final delegate =

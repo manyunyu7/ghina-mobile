@@ -429,7 +429,7 @@ const kantorTabletopCardHeight = 120.0;
 /// Lebar minimum kartu agen: 830dp (Fold terbuka) jadi 4 kolom, ±600dp 3.
 const kantorTabletopCardMin = 200.0;
 
-/// Daftar agen di bawah engsel (pengganti strip avatar dalam mode meja):
+/// Daftar agen di bawah engsel (pengganti avatar header dalam mode meja):
 /// grid kartu, bisa digulir vertikal, urut menurut [kantorAgentRankProvider]
 /// (perlu tindakan → bekerja → terakhir dibuka → idle; semua kantor dan
 /// koneksi). Agen yang sedang dibuka ([currentSid]) ditaruh pertama dan
@@ -471,7 +471,7 @@ class _KantorTabletopAgentsState extends ConsumerState<KantorTabletopAgents> {
     }
   }
 
-  /// Tahan kartu: label lengkap dan aksi ubah label (sama dengan strip).
+  /// Tahan kartu: label lengkap dan aksi ubah label (sama dengan avatar header).
   void _label(KantorRankedAgent a) => showKantorLabelMenu(
     context,
     a.session,
@@ -546,7 +546,7 @@ class _KantorTabletopAgentsState extends ConsumerState<KantorTabletopAgents> {
   }
 }
 
-/// Satu kartu agen mode meja: avatar (sprite yang sama dengan strip, cincin
+/// Satu kartu agen mode meja: avatar (sprite yang sama dengan header, cincin
 /// warna status), nama, kantor, pil status (merah perlu tindakan, biru
 /// bekerja, abu idle), stiker label bila ada, dan satu baris aktivitas.
 class KantorTabletopAgentCard extends StatelessWidget {

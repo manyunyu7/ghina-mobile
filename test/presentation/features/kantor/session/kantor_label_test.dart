@@ -315,18 +315,29 @@ void main() {
   });
 
   testWidgets(
-    'strip: pojok kuning untuk agen berlabel, tahan → label lengkap',
+    'avatar header: pojok kuning untuk agen berlabel, tahan → label lengkap',
     (t) async {
+      // agen berlabel harus penting (bekerja) agar tampil di header
+      final offices = _offices();
+      offices['demo']!['sessions'] = [
+        _s('s1', 'Ayu', 'working'),
+        _s('s2', 'Budi', 'working', l: 'Migrasi jadwal'),
+      ];
+      offices['lain']!['sessions'] = [_s('s3', 'Citra', 'working')];
       await t.pumpWidget(
         ProviderScope(
           overrides: [
             kantorStateProvider.overrideWith(
-              (ref) async => {'offices': _offices().values.toList()},
+              (ref) async => {'offices': offices.values.toList()},
             ),
           ],
           child: MaterialApp(
             theme: GhinaTheme.light(),
-            home: const Scaffold(body: KantorAgentStrip(currentSid: 's1')),
+            home: const Scaffold(
+              body: Center(
+                child: KantorHeaderAgents(maxWidth: 200, currentSid: 's1'),
+              ),
+            ),
           ),
         ),
       );
@@ -341,10 +352,10 @@ void main() {
         find.byKey(ValueKey('label-corner-${id('lain', 's3')}')),
         findsNothing,
       );
-      // nama tetap di bawah avatar
-      expect(find.text('Budi'), findsOneWidget);
+      // avatar header tanpa nama
+      expect(find.text('Budi'), findsNothing);
       await t.longPress(
-        find.byKey(ValueKey('strip-agent-${id('demo', 's2')}')),
+        find.byKey(ValueKey('header-agent-${id('demo', 's2')}')),
       );
       await t.pumpAndSettle();
       expect(
@@ -355,29 +366,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Ubah label'), findsOneWidget);
-
-      // mode chips (meja) juga memberi pojok kuning
-      await t.pumpWidget(
-        ProviderScope(
-          overrides: [
-            kantorStateProvider.overrideWith(
-              (ref) async => {'offices': _offices().values.toList()},
-            ),
-          ],
-          child: MaterialApp(
-            theme: GhinaTheme.light(),
-            home: const Scaffold(
-              body: KantorAgentStrip(currentSid: 's1', chips: true),
-            ),
-          ),
-        ),
-      );
-      await t.pump();
-      await t.pump();
-      expect(
-        find.byKey(ValueKey('label-corner-${id('demo', 's2')}')),
-        findsOneWidget,
-      );
     },
   );
 

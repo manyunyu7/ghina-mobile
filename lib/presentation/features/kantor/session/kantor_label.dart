@@ -11,7 +11,7 @@ import 'kantor_feed.dart';
 import 'kantor_konteks.dart';
 
 /// Label pemilik untuk sesi agen: simpan (optimistis), form ubah label, dan
-/// menu tahan-lama yang dipakai daftar agen, strip avatar, dan pencari cepat.
+/// menu tahan-lama yang dipakai daftar agen, avatar header, dan pencari cepat.
 ///
 /// Endpoint server: `POST /api/sessions/:sid/label` body `{text, carry, tell}`;
 /// teks kosong menghapus label.
@@ -77,7 +77,7 @@ Future<void> kantorSaveLabel(
 }
 
 /// Muat ulang sumber data yang menampilkan label: state koneksi (dipakai
-/// strip, pencari, Kompleks) dan feed kantor (daftar agen, judul chat).
+/// avatar header, pencari, Kompleks) dan feed kantor (daftar agen, judul chat).
 Future<void> _refresh(
   ProviderContainer c, {
   String? other,
