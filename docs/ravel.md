@@ -20,6 +20,9 @@ Ravel harus memakai entry point `main_ravel.dart`. Kunci release tetap memakai
 `apksigner verify --print-certs`; jangan membagikan kunci/password.
 APK: `build/app/outputs/flutter-apk/app-ravel-release.apk`.
 
+Versi 1.11.2 (47): unduhan pratinjau background, progres dan hasil tersimpan.
+Lihat [alur unduhan dan pengujiannya](ravel-downloads.md).
+
 ## Manifest
 
 Manifest hasil gabungan plugin berada di

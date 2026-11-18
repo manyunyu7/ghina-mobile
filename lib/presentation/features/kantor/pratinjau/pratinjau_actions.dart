@@ -6,6 +6,7 @@ import '../../../design_system/design_system.dart';
 import '../kantor_format.dart';
 import '../roles/kantor_ui.dart';
 import 'pratinjau_widgets.dart';
+import 'pratinjau_downloads.dart';
 
 /// Owner actions on a pratinjau item, shared by the feed card, the detail
 /// page and the session-chat bubble: buttons per `jenis`, reactions, the
@@ -239,6 +240,9 @@ class PratinjauMenuButton extends ConsumerWidget {
       onSelected: (v) async {
         PratinjauItem? next;
         switch (v) {
+          case 'download':
+            final api = ref.read(kantorApiProvider);
+            if (api != null) await showPratinjauDownloads(context, api, it);
           case 'pin':
             next = await pratinjauDo(
               context,
@@ -262,6 +266,8 @@ class PratinjauMenuButton extends ConsumerWidget {
         if (next != null) onItem?.call(next);
       },
       itemBuilder: (_) => [
+        if (!it.filesPurged && it.files.isNotEmpty)
+          const PopupMenuItem(value: 'download', child: Text('Unduh berkas…')),
         for (final (v, label) in extra)
           PopupMenuItem(value: v, child: Text(label)),
         PopupMenuItem(

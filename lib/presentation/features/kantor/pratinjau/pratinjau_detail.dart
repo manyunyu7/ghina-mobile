@@ -11,6 +11,7 @@ import 'pratinjau_compare.dart';
 import 'pratinjau_ig_frame.dart';
 import 'pratinjau_viewers.dart';
 import 'pratinjau_widgets.dart';
+import 'pratinjau_downloads.dart';
 
 /// `/kantor/o/:office/pratinjau/:id`: viewer + thumbnail strip, version
 /// switcher, per-file verdicts, approve / revise, and "Jadikan wiki".
@@ -162,6 +163,7 @@ class _DetailState extends ConsumerState<KantorPratinjauDetailPage> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          const KantorDownloadsButton(),
           if (item != null && pratinjauIgImages(item).isNotEmpty)
             IconButton(
               tooltip: _ig ? 'Tampilan biasa' : 'Bingkai Instagram',
@@ -350,7 +352,7 @@ class _DetailState extends ConsumerState<KantorPratinjauDetailPage> {
             ],
           );
 
-    final fileBar = file == null
+    final fileInfo = file == null
         ? const SizedBox.shrink()
         : Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -399,8 +401,9 @@ class _DetailState extends ConsumerState<KantorPratinjauDetailPage> {
                   selected: false,
                   onTap: _busy
                       ? null
-                      : () async =>
-                            _set(await pratinjauComment(context, ref, it, file: file)),
+                      : () async => _set(
+                          await pratinjauComment(context, ref, it, file: file),
+                        ),
                 ),
                 const SizedBox(width: GhinaSpace.xs),
                 if (it.isPilihan)
@@ -433,6 +436,15 @@ class _DetailState extends ConsumerState<KantorPratinjauDetailPage> {
               ],
             ),
           );
+
+    final fileBar = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        fileInfo,
+        if (file != null && !it.filesPurged)
+          PratinjauDownloadActions(api: api, item: it, file: file),
+      ],
+    );
 
     final strip = files.length < 2
         ? const SizedBox.shrink()
@@ -574,9 +586,7 @@ class _DetailState extends ConsumerState<KantorPratinjauDetailPage> {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
-                    child: Column(
-                      children: [header, fileBar, strip, comments],
-                    ),
+                    child: Column(children: [header, fileBar, strip, comments]),
                   ),
                 ),
                 actions,

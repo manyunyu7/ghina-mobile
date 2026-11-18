@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../pratinjau/pratinjau_downloads.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -129,7 +130,10 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
     }
     return Scaffold(
       backgroundColor: g.background,
-      appBar: AppBar(title: const Text('Pengaturan Kompleks')),
+      appBar: AppBar(
+        title: const Text('Pengaturan Kompleks'),
+        actions: const [KantorDownloadsButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(GhinaSpace.page),
         children: [

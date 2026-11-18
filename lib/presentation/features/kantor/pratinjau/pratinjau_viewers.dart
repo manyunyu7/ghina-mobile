@@ -8,6 +8,7 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../kantor_format.dart';
 import 'pratinjau_widgets.dart';
+import 'pratinjau_downloads.dart';
 
 /// Shows one pratinjau file at full size: image (pinch zoom), PDF (pdfrx),
 /// video, HTML / bundle (WebView locked to the item's own `/pv/` prefix), or
@@ -179,7 +180,9 @@ class _PratinjauWebState extends State<PratinjauWeb> {
       children: [
         WebViewWidget(controller: _c),
         if (_progress < 100)
-          LinearProgressIndicator(value: _progress == 0 ? null : _progress / 100),
+          LinearProgressIndicator(
+            value: _progress == 0 ? null : _progress / 100,
+          ),
       ],
     );
   }
@@ -209,9 +212,7 @@ class PratinjauVideo extends StatefulWidget {
 }
 
 class PratinjauVideoState extends State<PratinjauVideo> {
-  late VideoPlayerController _c = VideoPlayerController.networkUrl(
-    widget.uri,
-  );
+  late VideoPlayerController _c = VideoPlayerController.networkUrl(widget.uri);
   Object? _error;
   bool _usedFallback = false;
 
@@ -381,9 +382,7 @@ class PratinjauVideoState extends State<PratinjauVideo> {
                     label: Text('Komentar di ${_t(v.position)}'),
                     onPressed: () {
                       _c.pause();
-                      widget.onCommentAt!(
-                        v.position.inMilliseconds / 1000,
-                      );
+                      widget.onCommentAt!(v.position.inMilliseconds / 1000);
                     },
                   ),
               ],
@@ -413,6 +412,12 @@ class PratinjauFullscreen extends StatelessWidget {
     appBar: AppBar(
       title: Text(kantorShort(file.name, 40), overflow: TextOverflow.ellipsis),
       actions: [
+        IconButton(
+          tooltip: 'Unduh berkas',
+          icon: const Icon(Icons.download_rounded),
+          onPressed: () => showPratinjauDownloads(context, api, item),
+        ),
+        const KantorDownloadsButton(),
         IconButton(
           tooltip: 'Buka di browser',
           icon: const Icon(Icons.open_in_new_rounded),

@@ -7,6 +7,7 @@ import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
 import 'pratinjau_actions.dart';
 import 'pratinjau_widgets.dart';
+import 'pratinjau_downloads.dart';
 
 const _filters = <(String, String)>[
   ('baru', 'Baru'),
@@ -24,7 +25,10 @@ class KantorPratinjauPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: context.ghina.background,
-    appBar: AppBar(title: const Text('Pratinjau')),
+    appBar: AppBar(
+      title: const Text('Pratinjau'),
+      actions: const [KantorDownloadsButton()],
+    ),
     body: KantorPratinjauFeed(officeId: officeId),
   );
 }
@@ -75,6 +79,7 @@ class _FeedState extends ConsumerState<KantorPratinjauFeed> {
               GhinaSpace.xs,
             ),
             children: [
+              const KantorDownloadsButton(),
               for (final (k, label) in _filters) ...[
                 ChunkyChip(
                   label: _counts[k] == null ? label : '$label ${_counts[k]}',
@@ -131,8 +136,7 @@ class _FeedState extends ConsumerState<KantorPratinjauFeed> {
                     ),
               error: (e, _) => KantorErrorView(
                 error: e,
-                onRetry: () =>
-                    ref.invalidate(kantorPratinjauFeedProvider(key)),
+                onRetry: () => ref.invalidate(kantorPratinjauFeedProvider(key)),
               ),
               loading: () => const KantorLoading(count: 3),
             ),

@@ -128,6 +128,7 @@ class MainActivity : FlutterFragmentActivity() {
         super.configureFlutterEngine(flutterEngine)
         uiEngine = flutterEngine
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+        MethodChannel(messenger, "kantor/downloads").setMethodCallHandler(KantorDownloads(this))
 
         EventChannel(messenger, SHARE_EVENTS).setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
