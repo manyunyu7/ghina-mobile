@@ -40,7 +40,10 @@ final kantorUploaderProvider = Provider<KantorUploader?>((ref) {
         baseUrl: config.baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 30),
-        headers: {'Authorization': 'Bearer ${config.token}'},
+        headers: {
+          ...config.edgeHeaders,
+          'Authorization': 'Bearer ${config.token}',
+        },
       ),
     ),
   );

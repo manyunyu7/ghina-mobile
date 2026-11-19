@@ -22,6 +22,7 @@ export '../data/datasources/remote/kantor_api.dart'
         KantorComplexProfile,
         KantorException,
         KantorFailure,
+        kantorEdgeHeaders,
         KantorPratinjauApi;
 export '../data/models/kantor_pratinjau.dart';
 

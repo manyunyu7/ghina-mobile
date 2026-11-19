@@ -13,6 +13,7 @@ class KantorDownloads {
     required String mime,
     required String description,
     String? authorization,
+    Map<String, String> edge = const {},
   }) async {
     final attachment = RegExp(
       r'^/api/attachments/[^/]+/raw$',
@@ -25,7 +26,11 @@ class KantorDownloads {
         (preview && authorization != null) ||
         (attachment &&
             (authorization == null ||
-                !RegExp(r'^Bearer [^\r\n]+$').hasMatch(authorization)))) {
+                !RegExp(r'^Bearer [^\r\n]+$').hasMatch(authorization))) ||
+        edge.keys.any(
+          (k) => k != 'CF-Access-Client-Id' && k != 'CF-Access-Client-Secret',
+        ) ||
+        edge.values.any((v) => v.isEmpty || v.contains(RegExp(r'[\r\n]')))) {
       throw const FormatException(
         'Alamat atau akses berkas Kantor tidak valid.',
       );
@@ -36,6 +41,7 @@ class KantorDownloads {
       'mime': mime,
       'description': description,
       'authorization': ?authorization,
+      if (edge.isNotEmpty) 'edge': edge,
     }))!;
   }
 

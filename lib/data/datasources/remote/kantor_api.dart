@@ -15,14 +15,40 @@ import '../../models/kantor_pratinjau.dart';
 
 /// Where the office is and how to get in.
 final class KantorConfig {
-  const KantorConfig({required this.baseUrl, required this.token});
+  const KantorConfig({
+    required this.baseUrl,
+    required this.token,
+    this.edge = '',
+  });
 
   static const defaultUrl = 'https://office.tentrem.space';
 
   final String baseUrl;
   final String token;
 
+  /// Cloudflare Access service token (`CLIENT_ID:CLIENT_SECRET`) for a
+  /// public Kantor host. Typed in by the owner like [token] and kept in the
+  /// Keystore, never shipped in the APK. Empty for Tailscale-only hosts.
+  final String edge;
+
+  /// `CF-Access-Client-Id` / `CF-Access-Client-Secret`, or none.
+  Map<String, String> get edgeHeaders => kantorEdgeHeaders(edge);
+
   bool get ready => baseUrl.isNotEmpty && token.isNotEmpty;
+}
+
+/// Parses `CLIENT_ID:CLIENT_SECRET` into Cloudflare Access headers. Anything
+/// malformed yields no headers, so a typo fails at Cloudflare, not here.
+Map<String, String> kantorEdgeHeaders(String edge) {
+  final s = edge.trim();
+  final i = s.indexOf(':');
+  if (i <= 0 || i == s.length - 1 || s.contains(RegExp(r'\s'))) {
+    return const {};
+  }
+  return {
+    'CF-Access-Client-Id': s.substring(0, i),
+    'CF-Access-Client-Secret': s.substring(i + 1),
+  };
 }
 
 /// A named connection. Credentials stay in Keychain / Keystore.
@@ -32,18 +58,22 @@ final class KantorComplexProfile {
     required this.name,
     required this.baseUrl,
     required this.token,
+    this.edge = '',
   });
   final String id;
   final String name;
   final String baseUrl;
   final String token;
-  KantorConfig get config => KantorConfig(baseUrl: baseUrl, token: token);
+  final String edge;
+  KantorConfig get config =>
+      KantorConfig(baseUrl: baseUrl, token: token, edge: edge);
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'baseUrl': baseUrl,
     'token': token,
+    if (edge.isNotEmpty) 'edge': edge,
   };
   factory KantorComplexProfile.fromJson(Map<String, dynamic> json) =>
       KantorComplexProfile(
@@ -51,6 +81,7 @@ final class KantorComplexProfile {
         name: json['name'] as String,
         baseUrl: json['baseUrl'] as String,
         token: json['token'] as String,
+        edge: json['edge'] is String ? json['edge'] as String : '',
       );
 }
 
@@ -236,6 +267,9 @@ final class KantorConfigStore {
                 : previous?.name ?? _nameFor(config.baseUrl),
             baseUrl: config.baseUrl.trim(),
             token: config.token.trim(),
+            edge: config.edge.trim().isNotEmpty
+                ? config.edge.trim()
+                : previous?.edge ?? '',
           ),
           activate: true,
         );
@@ -274,7 +308,10 @@ final class KantorApi {
           // the screen was off, so reads are retried once (see [get])
           connectTimeout: const Duration(seconds: 6),
           receiveTimeout: const Duration(seconds: 30),
-          headers: {'Authorization': 'Bearer ${config.token}'},
+          headers: {
+            ...config.edgeHeaders,
+            'Authorization': 'Bearer ${config.token}',
+          },
         ),
       );
 
@@ -318,6 +355,7 @@ final class KantorApi {
 
   /// Headers for `Image.network` and friends.
   Map<String, String> get authHeaders => {
+    ...config.edgeHeaders,
     'Authorization': 'Bearer ${config.token}',
   };
 

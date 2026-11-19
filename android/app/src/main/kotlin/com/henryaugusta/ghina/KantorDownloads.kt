@@ -34,7 +34,8 @@ class KantorDownloads(private val context: Context) : MethodChannel.MethodCallHa
             when (call.method) {
                 "enqueue" -> result.success(enqueue(call.argument<String>("url") ?: "",
                     call.argument<String>("name") ?: "berkas", call.argument<String>("mime") ?: "",
-                    call.argument<String>("description") ?: "Berkas Kantor", call.argument<String>("authorization")))
+                    call.argument<String>("description") ?: "Berkas Kantor", call.argument<String>("authorization"),
+                    call.argument<Map<String, String>>("edge")))
                 "list" -> result.success(records().map { row(it.first, it.second) }.sortedByDescending { it["created"] as Long })
                 "cancel" -> {
                     val id = id(call)
@@ -50,7 +51,9 @@ class KantorDownloads(private val context: Context) : MethodChannel.MethodCallHa
                     val meta = metadata(id)
                     require(row(id, meta)["status"] in listOf("failed", "cancelled", "missing"))
                     val next = enqueue(meta.getString("url"), meta.getString("name"), meta.optString("mime"), meta.optString("description"),
-                        if (meta.has("access")) decrypt(meta.getString("access")) else null)
+                        if (meta.has("access")) decrypt(meta.getString("access")) else null,
+                        if (meta.has("edge")) JSONObject(decrypt(meta.getString("edge"))).let { o ->
+                            o.keys().asSequence().associateWith { o.getString(it) } } else null)
                     prefs.edit().remove(id.toString()).apply()
                     result.success(next)
                 }
@@ -112,17 +115,22 @@ class KantorDownloads(private val context: Context) : MethodChannel.MethodCallHa
         return String(cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), Charsets.UTF_8)
     }
 
-    private fun enqueue(url: String, original: String, mime: String, description: String, authorization: String? = null): Long {
+    private fun enqueue(url: String, original: String, mime: String, description: String, authorization: String? = null,
+                        edge: Map<String, String>? = null): Long {
         val uri = Uri.parse(url)
         require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.userInfo == null)
         val preview = uri.path?.startsWith("/pv/") == true
         val attachment = Regex("^/api/attachments/[^/]+/raw$").matches(uri.path ?: "")
         require(preview || attachment)
         require(if (preview) authorization == null else authorization != null && Regex("^Bearer [^\\r\\n]+$").matches(authorization))
+        // Cloudflare Access service token for a public Kantor host; nothing else.
+        require(edge.isNullOrEmpty() || (edge.keys.all { it == "CF-Access-Client-Id" || it == "CF-Access-Client-Secret" } &&
+            edge.values.all { it.isNotEmpty() && !it.contains('\r') && !it.contains('\n') }))
         records().forEach { (id, meta) ->
             if (meta.optString("url") == url && row(id, meta)["status"] in listOf("queued", "running", "waiting")) return id
         }
         val encryptedAccess = authorization?.let { encrypt(it) }
+        val encryptedEdge = edge?.takeIf { it.isNotEmpty() }?.let { encrypt(JSONObject(it as Map<*, *>).toString()) }
         val name = original.replace(Regex("[\\\\/\\p{Cntrl}]"), "_").trim().take(160).ifBlank { "berkas" }
         val saved = "${UUID.randomUUID().toString().take(8)}-$name"
         val request = DownloadManager.Request(uri).setTitle(name).setDescription(description.take(200))
@@ -130,6 +138,7 @@ class KantorDownloads(private val context: Context) : MethodChannel.MethodCallHa
             .setAllowedOverMetered(true).setAllowedOverRoaming(false)
         if (mime.isNotBlank()) request.setMimeType(mime)
         if (authorization != null) request.addRequestHeader("Authorization", authorization)
+        edge?.forEach { (k, v) -> request.addRequestHeader(k, v) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Ravel/$saved")
         } else request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, saved)
@@ -138,6 +147,7 @@ class KantorDownloads(private val context: Context) : MethodChannel.MethodCallHa
             .put("description", description.take(200)).put("created", System.currentTimeMillis())
             .put("location", if (Build.VERSION.SDK_INT >= 29) "Download/Ravel/$saved" else "Penyimpanan aplikasi/$saved")
         if (encryptedAccess != null) meta.put("access", encryptedAccess)
+        if (encryptedEdge != null) meta.put("edge", encryptedEdge)
         prefs.edit().putString(id.toString(), meta.toString()).apply()
         return id
     }

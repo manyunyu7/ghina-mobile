@@ -28,6 +28,7 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
   String? _profileId;
   final _url = TextEditingController();
   final _token = TextEditingController();
+  final _edge = TextEditingController();
   bool _loaded = false;
   bool _testing = false;
   String? _result;
@@ -38,6 +39,7 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
     _name.dispose();
     _url.dispose();
     _token.dispose();
+    _edge.dispose();
     super.dispose();
   }
 
@@ -52,11 +54,19 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
         'Isi alamat HTTP/HTTPS yang valid dan token kompleks.',
       );
     }
+    final edge = _edge.text.trim();
+    if (edge.isNotEmpty && kantorEdgeHeaders(edge).isEmpty) {
+      throw const KantorException(
+        KantorFailure.server,
+        'Kunci Cloudflare harus berformat CLIENT_ID:CLIENT_SECRET.',
+      );
+    }
     return KantorComplexProfile(
       id: _profileId ?? DateTime.now().microsecondsSinceEpoch.toString(),
       name: _name.text.trim().isEmpty ? uri.host : _name.text.trim(),
       baseUrl: _url.text.trim().replaceFirst(RegExp(r'/+$'), ''),
       token: _token.text.trim(),
+      edge: edge,
     );
   }
 
@@ -107,6 +117,7 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
       _name.text = profile?.name ?? '';
       _url.text = profile?.baseUrl ?? '';
       _token.text = profile?.token ?? '';
+      _edge.text = profile?.edge ?? '';
       _result = null;
     });
   }
@@ -125,6 +136,7 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
       _loaded = true;
       _url.text = config.value!.baseUrl;
       _token.text = config.value!.token;
+      _edge.text = config.value!.edge;
       _profileId = active?.id;
       _name.text = active?.name ?? '';
     }
@@ -193,6 +205,24 @@ class _KantorSettingsPageState extends ConsumerState<KantorSettingsPage> {
                 final d = await Clipboard.getData(Clipboard.kTextPlain);
                 if (d?.text != null) {
                   setState(() => _token.text = d!.text!.trim());
+                }
+              },
+            ),
+          ),
+          const SizedBox(height: GhinaSpace.lg),
+          ChunkyTextField(
+            label: 'Kunci Cloudflare (opsional)',
+            hint: 'CLIENT_ID:CLIENT_SECRET',
+            controller: _edge,
+            obscureText: true,
+            prefixIcon: Icons.shield_outlined,
+            suffix: IconButton(
+              tooltip: 'Tempel',
+              icon: const Icon(Icons.paste_rounded),
+              onPressed: () async {
+                final d = await Clipboard.getData(Clipboard.kTextPlain);
+                if (d?.text != null) {
+                  setState(() => _edge.text = d!.text!.trim());
                 }
               },
             ),

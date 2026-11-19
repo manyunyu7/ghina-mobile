@@ -22,6 +22,7 @@ Future<int> saveAttachmentToDownloads(
   description:
       'Chat · ${a.agent.isEmpty ? 'Kantor' : a.agent} · ${Uri.parse(api.config.baseUrl).host}',
   authorization: api.authHeaders['Authorization'],
+  edge: api.config.edgeHeaders,
 );
 
 /// Downloads an attachment's raw bytes to the cache (streamed, with the
