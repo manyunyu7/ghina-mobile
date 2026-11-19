@@ -1,5 +1,21 @@
 # Unduhan pratinjau Ravel
 
+## Koreksi pengemasan rilis: versi 1.11.5 (50)
+
+APK 47–49 ternyata masih memuat Dart AOT lama, walaupun kode sumber dan probe
+debug sudah benar. Kotlin native terbaru masuk, tetapi merge JNI incremental
+AGP mempertahankan `libapp.so` lama. Versi 50 merupakan APK pengganti yang
+terverifikasi memuat UI download baru. Gunakan versi 50 untuk mencoba fitur ini.
+
+Release kini memaksa merge JNI penuh. Task `verifyRavelReleaseAot` (dan Ghina)
+menjadi syarat assemble: GNU build ID setiap `libapp.so` di APK harus sama dengan
+output compiler `flutter/<variant>/<abi>/app.so`, yang tidak berubah saat strip.
+Verifikasi tidak bergantung pada nomor versi, tanggal APK, atau JNI salinan.
+Percobaan menyisipkan APK 49 ke output build ditolak dengan `Stale Flutter AOT`;
+APK 50 diterima. Build berulang, tanda tangan rilis, marker UI baru dalam APK,
+dan membuka halaman Unduhan pada APK rilis di emulator Android 15 sudah dicek.
+Pengujian transfer background/progres di bawah memakai probe debug terisolasi.
+
 ## Chat dan pratinjau: versi 1.11.4 (49)
 
 Tombol **Download** pada lampiran chat (file, audio, gambar, video) dan pratinjau
