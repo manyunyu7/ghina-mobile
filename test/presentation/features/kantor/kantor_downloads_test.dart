@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghina/di/kantor_providers.dart';
+import 'package:ghina/presentation/design_system/design_system.dart';
+import 'package:ghina/presentation/features/kantor/pratinjau/pratinjau_feed.dart';
+import 'package:ghina/presentation/features/kantor/session/session_pratinjau_tab.dart';
 import 'package:ghina/data/platform/kantor_downloads.dart';
-import 'package:ghina/data/datasources/remote/kantor_api.dart';
-import 'package:ghina/data/models/kantor_pratinjau.dart';
 import 'package:ghina/presentation/features/kantor/pratinjau/pratinjau_downloads.dart';
 
 void main() {
@@ -41,6 +44,121 @@ void main() {
         'total': total,
         'reason': reason,
       };
+
+  testWidgets(
+    'preview strip shows progress inline, refreshes after resume and remains usable when empty',
+    (t) async {
+      rows = [task('running')];
+      await t.pumpWidget(
+        const MaterialApp(home: Scaffold(body: KantorDownloadStrip())),
+      );
+      await t.pump();
+      expect(find.text('Unduhan · 1 berjalan'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('pratinjau-download-progress-42')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('50%'), findsOneWidget);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      rows = [task('complete')];
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await t.pump();
+      expect(find.text('Selesai'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      rows = [];
+      await t.pump(const Duration(seconds: 2));
+      await t.pump();
+      expect(
+        find.textContaining('Progres akan muncul di sini'),
+        findsOneWidget,
+      );
+      await t.tap(find.text('Lihat semua'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 350));
+      expect(find.byType(KantorDownloadsPage), findsOneWidget);
+      await t.pumpWidget(const SizedBox());
+    },
+  );
+
+  for (final session in [false, true]) {
+    testWidgets(
+      'actual ${session ? 'agent' : 'office'} preview tab exposes downloads and progress without opening detail',
+      (t) async {
+        rows = [task('running')];
+        await t.pumpWidget(
+          ProviderScope(
+            overrides: [
+              kantorApiProvider.overrideWith((ref) => null),
+              kantorPratinjauSessionProvider(('o', 's')).overrideWith(
+                (ref) async => const PratinjauFeed(items: [], counts: {}),
+              ),
+              kantorPratinjauFeedProvider(('o', 'perlu')).overrideWith(
+                (ref) async => const PratinjauFeed(items: [], counts: {}),
+              ),
+              kantorPratinjauUsageProvider(
+                'o',
+              ).overrideWith((ref) async => (bytes: 0, items: 0, files: 0)),
+            ],
+            child: MaterialApp(
+              theme: GhinaTheme.light(),
+              home: Scaffold(
+                body: session
+                    ? const KantorSessionPratinjauTab(
+                        officeId: 'o',
+                        sid: 's',
+                        role: null,
+                        actions: null,
+                      )
+                    : const KantorPratinjauFeed(officeId: 'o'),
+              ),
+            ),
+          ),
+        );
+        await t.pump();
+        await t.pump(const Duration(milliseconds: 100));
+        expect(find.text('Lihat semua'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('pratinjau-download-progress-42')),
+          findsOneWidget,
+        );
+        expect(t.takeException(), isNull);
+        await t.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  testWidgets(
+    'preview progress remains visible on narrow phone with large text',
+    (t) async {
+      t.view.physicalSize = const Size(360, 640);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      rows = [task('running', total: -1)];
+      await t.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 640),
+              textScaler: TextScaler.linear(1.5),
+            ),
+            child: const Scaffold(
+              body: Column(
+                children: [
+                  KantorDownloadStrip(),
+                  Expanded(child: SizedBox()),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await t.pump();
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await t.pumpWidget(const SizedBox());
+    },
+  );
 
   test(
     'validates signed preview URL and never sends bearer credentials',

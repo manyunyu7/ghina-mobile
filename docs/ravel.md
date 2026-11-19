@@ -21,6 +21,7 @@ Ravel harus memakai entry point `main_ravel.dart`. Kunci release tetap memakai
 APK: `build/app/outputs/flutter-apk/app-ravel-release.apk`.
 
 Versi 1.11.2 (47): unduhan pratinjau background, progres dan hasil tersimpan.
+Versi 1.11.3 (48): tombol unduh dan bar progres terlihat langsung di tab Pratinjau kantor/agen.
 Lihat [alur unduhan dan pengujiannya](ravel-downloads.md).
 
 ## Manifest

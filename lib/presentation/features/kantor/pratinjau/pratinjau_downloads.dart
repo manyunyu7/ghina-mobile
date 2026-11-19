@@ -6,6 +6,144 @@ import '../../../../data/platform/kantor_downloads.dart';
 import '../../../../di/kantor_providers.dart';
 import 'pratinjau_widgets.dart';
 
+final _downloadEvents = ValueNotifier<int>(0);
+
+/// Visible in both preview tabs, independently of the server/feed state.
+class KantorDownloadStrip extends StatefulWidget {
+  const KantorDownloadStrip({super.key});
+  @override
+  State<KantorDownloadStrip> createState() => _DownloadStripState();
+}
+
+class _DownloadStripState extends State<KantorDownloadStrip>
+    with WidgetsBindingObserver {
+  List<KantorDownload> _items = [];
+  Timer? _timer;
+  bool _loading = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _downloadEvents.addListener(_refresh);
+    _start();
+  }
+
+  void _start() {
+    _timer?.cancel();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    if (_loading) return;
+    _loading = true;
+    try {
+      final items = await KantorDownloads.instance.list();
+      if (mounted) setState(() => _items = items);
+    } catch (_) {
+      /* The entry remains available on an older platform bridge. */
+    } finally {
+      _loading = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _start();
+    } else {
+      _timer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _downloadEvents.removeListener(_refresh);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _items.where((r) => r.active).toList();
+    final visible = active.isEmpty
+        ? _items.take(1)
+        : active.take(MediaQuery.sizeOf(context).height < 480 ? 1 : 2);
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => openKantorDownloads(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.downloading_rounded, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      active.isEmpty
+                          ? 'Unduhan'
+                          : 'Unduhan · ${active.length} berjalan',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => openKantorDownloads(context),
+                    child: const Text('Lihat semua'),
+                  ),
+                ],
+              ),
+              if (_items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Pilih Unduh asli pada kartu pratinjau. Progres akan muncul di sini.',
+                  ),
+                ),
+              for (final item in visible)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${item.label}${item.active ? ' · ${downloadBytes(item.received)} / ${downloadBytes(item.total)}' : ''}'
+                        '${item.active && item.progress != null ? ' · ${(item.progress! * 100).round()}%' : ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (item.active)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: LinearProgressIndicator(
+                            key: ValueKey(
+                              'pratinjau-download-progress-${item.id}',
+                            ),
+                            value: item.progress,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 void openKantorDownloads(BuildContext context) => Navigator.of(
   context,
 ).push(MaterialPageRoute<void>(builder: (_) => const KantorDownloadsPage()));
@@ -55,6 +193,7 @@ class _PreviewDownloadsState extends State<PratinjauDownloadActions> {
         );
         count++;
       }
+      _downloadEvents.value++;
     } on MissingPluginException {
       error = 'Unduhan background tersedia di aplikasi Android terbaru.';
     } catch (_) {
@@ -228,6 +367,7 @@ class _DownloadsState extends State<KantorDownloadsPage>
     setState(() => _busy.add(item.id));
     try {
       await KantorDownloads.instance.action(action, item.id);
+      _downloadEvents.value++;
       await _refresh();
     } catch (_) {
       if (mounted) {

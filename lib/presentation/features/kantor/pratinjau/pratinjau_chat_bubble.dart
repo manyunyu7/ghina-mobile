@@ -6,6 +6,7 @@ import '../../../design_system/design_system.dart';
 import '../session/chat_model.dart';
 import 'pratinjau_actions.dart';
 import 'pratinjau_widgets.dart';
+import 'pratinjau_downloads.dart';
 
 /// Pratinjau this session sent, placed among the chat [entries] by
 /// `createdAt` (items without a time go last).
@@ -164,6 +165,12 @@ class _BubbleState extends State<PratinjauChatBubble> {
                   ),
                 ),
               ],
+              if (api != null && files.isNotEmpty && !it.filesPurged)
+                PratinjauDownloadActions(
+                  api: api,
+                  item: it,
+                  file: files[_page.clamp(0, files.length - 1)],
+                ),
               if (it.filesPurged) ...[
                 const SizedBox(height: GhinaSpace.xs),
                 const PratinjauPurgedHint(),

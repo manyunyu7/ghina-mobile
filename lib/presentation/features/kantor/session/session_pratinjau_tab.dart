@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../pratinjau/pratinjau_feed.dart';
+import '../pratinjau/pratinjau_downloads.dart';
 import '../widgets/kantor_states.dart';
 import 'kantor_actions.dart';
 
@@ -74,44 +75,57 @@ class _State extends ConsumerState<KantorSessionPratinjauTab> {
         onPressed: widget.actions == null ? null : _request,
       ),
     );
-    return RefreshIndicator(
-      onRefresh: () => ref.refresh(kantorPratinjauSessionProvider(key).future),
-      child: feed.when(
-        skipLoadingOnRefresh: true,
-        data: (f) {
-          final items = f.items;
-          return ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: GhinaSpace.xxl),
-            children: [
-              header,
-              if (items.isEmpty || api == null)
-                const EmptyState(
-                  title: 'Belum ada pratinjau dari agen ini',
-                  message:
-                      'Ketuk "Minta pratinjau" agar agen mengirim hasilnya (desain, carousel, halaman, PDF) ke sini.',
-                  compact: true,
-                )
-              else
-                for (final it in items)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      GhinaSpace.page,
-                      GhinaSpace.sm,
-                      GhinaSpace.page,
-                      GhinaSpace.sm,
-                    ),
-                    child: PratinjauCard(key: ValueKey(it.id), api: api, item: it),
-                  ),
-            ],
-          );
-        },
-        error: (e, _) => KantorErrorView(
-          error: e,
-          onRetry: () => ref.invalidate(kantorPratinjauSessionProvider(key)),
+    return Column(
+      children: [
+        const KantorDownloadStrip(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () =>
+                ref.refresh(kantorPratinjauSessionProvider(key).future),
+            child: feed.when(
+              skipLoadingOnRefresh: true,
+              data: (f) {
+                final items = f.items;
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: GhinaSpace.xxl),
+                  children: [
+                    header,
+                    if (items.isEmpty || api == null)
+                      const EmptyState(
+                        title: 'Belum ada pratinjau dari agen ini',
+                        message:
+                            'Ketuk "Minta pratinjau" agar agen mengirim hasilnya (desain, carousel, halaman, PDF) ke sini.',
+                        compact: true,
+                      )
+                    else
+                      for (final it in items)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            GhinaSpace.page,
+                            GhinaSpace.sm,
+                            GhinaSpace.page,
+                            GhinaSpace.sm,
+                          ),
+                          child: PratinjauCard(
+                            key: ValueKey(it.id),
+                            api: api,
+                            item: it,
+                          ),
+                        ),
+                  ],
+                );
+              },
+              error: (e, _) => KantorErrorView(
+                error: e,
+                onRetry: () =>
+                    ref.invalidate(kantorPratinjauSessionProvider(key)),
+              ),
+              loading: () => const KantorLoading(count: 2),
+            ),
+          ),
         ),
-        loading: () => const KantorLoading(count: 2),
-      ),
+      ],
     );
   }
 }

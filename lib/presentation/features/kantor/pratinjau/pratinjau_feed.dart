@@ -68,6 +68,7 @@ class _FeedState extends ConsumerState<KantorPratinjauFeed> {
 
     return Column(
       children: [
+        const KantorDownloadStrip(),
         SizedBox(
           height: 56,
           child: ListView(
@@ -305,6 +306,12 @@ class _PratinjauCardState extends State<PratinjauCard> {
             const SizedBox(height: GhinaSpace.xs),
             const PratinjauPurgedHint(),
           ],
+          if (files.isNotEmpty && !it.filesPurged)
+            PratinjauDownloadActions(
+              api: widget.api,
+              item: it,
+              file: files[_page.clamp(0, files.length - 1)],
+            ),
           if (it.comments.isNotEmpty) ...[
             const SizedBox(height: GhinaSpace.xs),
             Text(

@@ -6,6 +6,19 @@ kompleks. Halaman menampilkan progres byte/persen, antrean, menunggu koneksi,
 selesai/gagal, filter status, batal/coba lagi, serta buka dan bagikan berkas.
 Tombol Simpan yang lama tetap berarti bookmark pratinjau, bukan unduh.
 
+Versi 1.11.3 (48) membuat akses ini terlihat langsung: tombol unduh di kartu
+feed/tab agen dan bubble chat, panel **Unduhan** di atas tab Pratinjau kantor
+dan agen, serta bar progres/persen/byte saat transfer aktif. Panel tetap ada
+ketika feed kosong atau server gagal dimuat. Ketuk **Lihat semua** untuk riwayat,
+batal/coba lagi, buka dan bagikan. Progres diperbarui juga setelah app kembali
+dari background, dan timer tampilan dihentikan saat app tidak aktif.
+
+Tes tab kantor dan tab agen memeriksa bar progres tanpa membuka detail, termasuk
+layar sempit dengan teks diperbesar. Probe `tool/kantor_preview_download_probe.dart`
+memakai tab agen sebenarnya dan fixture lokal untuk verifikasi visual Android.
+Uji Android 15 menunjukkan progres 1% lalu 15% langsung di tab setelah tombol
+**Unduh asli** pada kartu ditekan. Seluruh 401 tes Ravel/Kantor lulus (1 skip).
+
 Transfer menggunakan Android DownloadManager, terpisah dari proses Flutter.
 Menutup halaman/aplikasi tidak membatalkan transfer. Daftar ID dan metadata
 bertahan ketika proses aplikasi mati dan tidak bergantung pada kompleks aktif.
