@@ -8,6 +8,9 @@ import 'package:ghina/presentation/features/kantor/pratinjau/pratinjau_feed.dart
 import 'package:ghina/presentation/features/kantor/session/session_pratinjau_tab.dart';
 import 'package:ghina/data/platform/kantor_downloads.dart';
 import 'package:ghina/presentation/features/kantor/pratinjau/pratinjau_downloads.dart';
+import 'package:ghina/presentation/features/kantor/session/attachment_model.dart';
+import 'package:ghina/presentation/features/kantor/session/attachment_views.dart';
+import 'package:ghina/presentation/features/kantor/session/attachment_files.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -191,6 +194,100 @@ void main() {
   );
 
   test(
+    'chat attachment queues authenticated raw file in permanent downloads',
+    () async {
+      final api = KantorApi(
+        const KantorConfig(
+          baseUrl: 'https://kantor.test',
+          token: 'fixture-token',
+        ),
+      );
+      const item = KantorAttachment(
+        id: 'chat-1',
+        name: 'laporan.pdf',
+        mime: 'application/pdf',
+        size: 2048,
+        mine: false,
+        agent: 'Cyrus',
+        caption: '',
+        at: '',
+      );
+      expect(await saveAttachmentToDownloads(api, item), 42);
+      final args = calls.single.arguments as Map;
+      expect(args['url'], 'https://kantor.test/api/attachments/chat-1/raw');
+      expect(args['authorization'], 'Bearer fixture-token');
+      expect(args['name'], 'laporan.pdf');
+      expect(args['description'], contains('Chat'));
+      for (final entry in [
+        ('https://kantor.test/pv/a', 'Bearer fixture-token'),
+        ('https://kantor.test/api/attachments/a/raw', null),
+        (
+          'https://kantor.test/api/attachments/a/raw',
+          'Bearer secret\r\nX-Bad: value',
+        ),
+        ('https://kantor.test/api/private', 'Bearer fixture-token'),
+      ]) {
+        await expectLater(
+          KantorDownloads.instance.enqueue(
+            url: Uri.parse(entry.$1),
+            name: 'x',
+            mime: '',
+            description: '',
+            authorization: entry.$2,
+          ),
+          throwsFormatException,
+        );
+      }
+      expect(calls.length, 1);
+    },
+  );
+
+  for (final kind in ['file', 'audio', 'image', 'video']) {
+    testWidgets(
+      'chat $kind has explicit Download button and does not launch share sheet',
+      (t) async {
+        final api = KantorApi(
+          const KantorConfig(
+            baseUrl: 'https://kantor.test',
+            token: 'fixture-token',
+          ),
+        );
+        final item = KantorAttachment(
+          id: 'chat-$kind',
+          name: 'contoh.$kind',
+          mime: 'application/octet-stream',
+          size: 2048,
+          mine: false,
+          agent: 'Cyrus',
+          caption: '',
+          at: '',
+          kindName: kind,
+        );
+        await t.pumpWidget(
+          MaterialApp(
+            theme: GhinaTheme.light(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AttachmentBubble(item: item, api: api),
+              ),
+            ),
+          ),
+        );
+        await t.pump();
+        await t.tap(find.byKey(ValueKey('attachment-download-chat-$kind')));
+        await t.pump();
+        expect(calls.where((c) => c.method == 'enqueue').length, 1);
+        expect(
+          find.text('Download dimulai. Hasil disimpan di Download/Ravel.'),
+          findsOneWidget,
+        );
+        expect(t.takeException(), isNull);
+        await t.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
+  test(
     'progress and actionable network/storage errors handle unknown size',
     () {
       expect(KantorDownload.fromMap(task('running')).progress, .5);
@@ -294,7 +391,7 @@ void main() {
           ),
         ),
       );
-      await t.tap(find.text('Unduh semua (2)'));
+      await t.tap(find.text('Download semua (2)'));
       await t.pump();
       expect(calls.where((c) => c.method == 'enqueue').length, 2);
       expect(find.textContaining('2 berkas masuk antrean'), findsOneWidget);
@@ -310,7 +407,7 @@ void main() {
           ),
         ),
       );
-      await t.tap(find.textContaining('Unduh asli'));
+      await t.tap(find.textContaining('Download ·'));
       await t.pump();
       expect(calls.where((c) => c.method == 'enqueue'), isEmpty);
       await t.pumpWidget(const SizedBox());

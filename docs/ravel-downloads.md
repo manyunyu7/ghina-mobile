@@ -1,5 +1,39 @@
 # Unduhan pratinjau Ravel
 
+## Chat dan pratinjau: versi 1.11.4 (49)
+
+Tombol **Download** pada lampiran chat (file, audio, gambar, video) dan pratinjau
+sekarang memakai antrean yang sama dan menyimpan berkas permanen ke
+**Download/Ravel** pada Android 10+. Download tidak lagi berakhir di cache lalu
+otomatis membuka share sheet. Tombol **Unduhan** membuka hasil dan riwayat.
+**Bagikan** dan **Simpan ke galeri** tetap aksi terpisah; cache sementara hanya
+dipakai untuk membuka/berbagi/menambahkan media ke galeri.
+
+Pada chat, panel progres tampil selama ada transfer aktif, termasuk mode meja.
+Pada tab Pratinjau kantor/agen panel tetap tersedia. Kartu pratinjau dan bubble
+chat memiliki tombol berlabel **Download**, dan **Download semua** untuk banyak
+file. Pemilihan berkas mengikuti halaman thumbnail yang sedang dilihat.
+
+Lampiran memakai endpoint asli `/api/attachments/<id>/raw` dan header bearer
+kompleks sumber. Bridge menolak endpoint lain, kredensial dengan CR/LF, dan
+bearer pada link pratinjau publik. Metadata untuk retry menyimpan bearer dalam
+ciphertext AES-GCM dengan kunci Android Keystore privat aplikasi; token tidak
+dikembalikan lewat `list`/UI atau ditulis ke pesan galat. Android DownloadManager
+menerima header permintaan agar transfer dapat berjalan tanpa proses Flutter.
+Jika akses dicabut/berubah, buka kembali berkas dari koneksi Kantor yang benar
+dan tekan Download lagi.
+
+Pola kunci mengikuti [Android KeyGenParameterSpec](https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec)
+dan header transfer mengikuti [DownloadManager.Request](https://developer.android.com/reference/android/app/DownloadManager.Request).
+
+Validasi v49: 14 tes Download dan total 406 tes Ravel/Kantor lulus (1 skip).
+`tool/kantor_chat_download_probe.dart` + `tool/kantor_chat_download_e2e.py`
+menguji fixture HTTP yang menolak permintaan tanpa bearer: 404 terautentikasi,
+download 8 MiB dengan proses mati dan layar padam, hash file cocok, metadata
+tanpa token plaintext, lalu retry dengan kredensial terenkripsi setelah app
+dibuka kembali. Semuanya lulus pada Android 15. Menekan tombol Download di
+AttachmentBubble asli juga teruji memulai antrean/progres tanpa share sheet.
+
 Versi 1.11.2 (47) menambahkan tombol **Unduh asli**, **Unduh semua**, dan
 halaman **Unduhan** di detail/feed/fullscreen, menu kartu chat, serta pengaturan
 kompleks. Halaman menampilkan progres byte/persen, antrean, menunggu koneksi,
@@ -33,7 +67,7 @@ Ini tidak menjanjikan transfer ketika perangkat mati atau Download Manager
 dinonaktifkan. Batal menghapus transfer parsial; hasil selesai tidak memiliki
 aksi hapus di dalam Ravel.
 
-URL berasal dari berkas asli pratinjau (`/pv/...`), bukan thumbnail atau rendition
+Untuk pratinjau, URL berasal dari berkas asli (`/pv/...`), bukan thumbnail atau rendition
 video. Host harus sama dengan kompleks aktif dan tidak boleh berisi user-info.
 Link bertanda tangan diteruskan tanpa header bearer atau token akun. Bridge tidak
 mengembalikan URL ke daftar UI dan tidak mencetaknya pada pesan galat. FileProvider

@@ -7,10 +7,12 @@ import '../../../../di/kantor_providers.dart';
 import 'pratinjau_widgets.dart';
 
 final _downloadEvents = ValueNotifier<int>(0);
+void notifyKantorDownloadsChanged() => _downloadEvents.value++;
 
 /// Visible in both preview tabs, independently of the server/feed state.
 class KantorDownloadStrip extends StatefulWidget {
-  const KantorDownloadStrip({super.key});
+  const KantorDownloadStrip({super.key, this.activeOnly = false});
+  final bool activeOnly;
   @override
   State<KantorDownloadStrip> createState() => _DownloadStripState();
 }
@@ -67,6 +69,7 @@ class _DownloadStripState extends State<KantorDownloadStrip>
   @override
   Widget build(BuildContext context) {
     final active = _items.where((r) => r.active).toList();
+    if (widget.activeOnly && active.isEmpty) return const SizedBox.shrink();
     final visible = active.isEmpty
         ? _items.take(1)
         : active.take(MediaQuery.sizeOf(context).height < 480 ? 1 : 2);
@@ -102,7 +105,7 @@ class _DownloadStripState extends State<KantorDownloadStrip>
                 const Padding(
                   padding: EdgeInsets.only(bottom: 4),
                   child: Text(
-                    'Pilih Unduh asli pada kartu pratinjau. Progres akan muncul di sini.',
+                    'Pilih Download pada berkas. Progres akan muncul di sini.',
                   ),
                 ),
               for (final item in visible)
@@ -242,13 +245,13 @@ class _PreviewDownloadsState extends State<PratinjauDownloadActions> {
             label: Text(
               _busy
                   ? 'Menyiapkan…'
-                  : 'Unduh asli · ${downloadBytes(selected.size)}',
+                  : 'Download · ${downloadBytes(selected.size)}',
             ),
           ),
           if (files.length > 1)
             OutlinedButton(
               onPressed: _busy ? null : () => _download(files),
-              child: Text('Unduh semua (${files.length})'),
+              child: Text('Download semua (${files.length})'),
             ),
           TextButton.icon(
             onPressed: () => openKantorDownloads(context),
@@ -277,7 +280,7 @@ Future<void> showPratinjauDownloads(
       controller: scroll,
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Unduh pratinjau', style: Theme.of(c).textTheme.titleLarge),
+        Text('Download pratinjau', style: Theme.of(c).textTheme.titleLarge),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Text(
@@ -444,7 +447,7 @@ class _DownloadsState extends State<KantorDownloadsPage>
                   Icon(Icons.download_for_offline_outlined, size: 56),
                   SizedBox(height: 12),
                   Text('Belum ada unduhan'),
-                  Text('Buka pratinjau lalu pilih Unduh asli.'),
+                  Text('Pilih Download pada lampiran chat atau pratinjau.'),
                 ],
               ),
             ),

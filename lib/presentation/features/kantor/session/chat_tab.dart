@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../pratinjau/pratinjau_downloads.dart';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -989,31 +990,40 @@ class _KantorChatTabState extends ConsumerState<KantorChatTab>
             final table = kantorTabletopActive(context) != null;
             final list = KeyedSubtree(
               key: _listKey,
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: _pinchDown,
-                onPointerMove: _pinchMove,
-                onPointerUp: _pinchEnd,
-                onPointerCancel: _pinchEnd,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _list(context, api, outbox, view)),
-                    if (_entries != null && _live != null && !_atBottom)
-                      Positioned(
-                        bottom: GhinaSpace.sm,
-                        left: GhinaSpace.md,
-                        right: GhinaSpace.md,
-                        child: Center(child: _liveJump(context)),
+              child: Column(
+                children: [
+                  const KantorDownloadStrip(activeOnly: true),
+                  Expanded(
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: _pinchDown,
+                      onPointerMove: _pinchMove,
+                      onPointerUp: _pinchEnd,
+                      onPointerCancel: _pinchEnd,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: _list(context, api, outbox, view),
+                          ),
+                          if (_entries != null && _live != null && !_atBottom)
+                            Positioned(
+                              bottom: GhinaSpace.sm,
+                              left: GhinaSpace.md,
+                              right: GhinaSpace.md,
+                              child: Center(child: _liveJump(context)),
+                            ),
+                          if (_entries != null && (!_synced || _syncFailed))
+                            Positioned(
+                              top: GhinaSpace.sm,
+                              left: GhinaSpace.md,
+                              right: GhinaSpace.md,
+                              child: Center(child: _syncBadge(context)),
+                            ),
+                        ],
                       ),
-                    if (_entries != null && (!_synced || _syncFailed))
-                      Positioned(
-                        top: GhinaSpace.sm,
-                        left: GhinaSpace.md,
-                        right: GhinaSpace.md,
-                        child: Center(child: _syncBadge(context)),
-                      ),
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               ),
             );
             final blocker = ConstrainedBox(

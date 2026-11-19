@@ -267,7 +267,10 @@ class PratinjauMenuButton extends ConsumerWidget {
       },
       itemBuilder: (_) => [
         if (!it.filesPurged && it.files.isNotEmpty)
-          const PopupMenuItem(value: 'download', child: Text('Unduh berkas…')),
+          const PopupMenuItem(
+            value: 'download',
+            child: Text('Download berkas…'),
+          ),
         for (final (v, label) in extra)
           PopupMenuItem(value: v, child: Text(label)),
         PopupMenuItem(

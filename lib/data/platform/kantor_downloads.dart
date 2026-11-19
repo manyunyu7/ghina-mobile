@@ -12,18 +12,30 @@ class KantorDownloads {
     required String name,
     required String mime,
     required String description,
+    String? authorization,
   }) async {
+    final attachment = RegExp(
+      r'^/api/attachments/[^/]+/raw$',
+    ).hasMatch(url.path);
+    final preview = url.path.startsWith('/pv/');
     if (!['http', 'https'].contains(url.scheme) ||
         url.host.isEmpty ||
         url.userInfo.isNotEmpty ||
-        !url.path.startsWith('/pv/')) {
-      throw const FormatException('Alamat berkas pratinjau tidak valid.');
+        (!preview && !attachment) ||
+        (preview && authorization != null) ||
+        (attachment &&
+            (authorization == null ||
+                !RegExp(r'^Bearer [^\r\n]+$').hasMatch(authorization)))) {
+      throw const FormatException(
+        'Alamat atau akses berkas Kantor tidak valid.',
+      );
     }
     return (await channel.invokeMethod<int>('enqueue', {
       'url': url.toString(),
       'name': name,
       'mime': mime,
       'description': description,
+      'authorization': ?authorization,
     }))!;
   }
 
@@ -78,7 +90,8 @@ class KantorDownload {
     'cancelled' => 'Dibatalkan',
     'missing' => 'Berkas tidak tersedia',
     _ => switch (reason) {
-      401 || 403 => 'Akses berakhir. Buka ulang pratinjau.',
+      401 ||
+      403 => 'Akses berakhir. Buka ulang berkas dari chat atau pratinjau.',
       404 || 410 => 'Berkas tidak lagi tersedia di server.',
       1006 => 'Ruang penyimpanan tidak cukup.',
       1007 => 'Penyimpanan tidak tersedia.',

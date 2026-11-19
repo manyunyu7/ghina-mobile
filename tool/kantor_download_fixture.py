@@ -8,26 +8,39 @@ SIZE = 8 * 1024 * 1024
 
 
 class Fixture(BaseHTTPRequestHandler):
+    retry_requests = 0
+
     def do_GET(self):
+        attachment = self.path.startswith('/api/attachments/fixture-') and self.path.endswith('/raw')
+        if attachment:
+            if self.headers.get('Authorization') != 'Bearer fixture-only':
+                self.send_error(401)
+                return
+            if self.path == '/api/attachments/fixture-retry/raw':
+                Fixture.retry_requests += 1
+                if Fixture.retry_requests == 1:
+                    self.send_error(404)
+                    return
         if self.path.endswith('/missing-test.bin'):
             self.send_error(404)
             return
-        if not self.path.startswith('/pv/fixture/key/'):
+        if not attachment and not self.path.startswith('/pv/fixture/key/'):
             self.send_error(404)
             return
+        size = 262144 if self.path == '/api/attachments/fixture-retry/raw' else SIZE
         start = 0
         if self.headers.get('Range'):
             start = int(self.headers['Range'].split('=')[1].split('-')[0])
         self.send_response(206 if start else 200)
         self.send_header('Content-Type', 'application/octet-stream')
-        self.send_header('Content-Length', str(SIZE - start))
+        self.send_header('Content-Length', str(size - start))
         self.send_header('Accept-Ranges', 'bytes')
         if start:
-            self.send_header('Content-Range', f'bytes {start}-{SIZE - 1}/{SIZE}')
+            self.send_header('Content-Range', f'bytes {start}-{size - 1}/{size}')
         self.end_headers()
         try:
-            for offset in range(start, SIZE, len(CHUNK)):
-                self.wfile.write(CHUNK[: min(len(CHUNK), SIZE - offset)])
+            for offset in range(start, size, len(CHUNK)):
+                self.wfile.write(CHUNK[: min(len(CHUNK), size - offset)])
                 self.wfile.flush()
                 time.sleep(.25)
         except (BrokenPipeError, ConnectionResetError):

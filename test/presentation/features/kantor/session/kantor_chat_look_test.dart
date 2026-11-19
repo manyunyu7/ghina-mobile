@@ -405,6 +405,18 @@ void main() {
         expect(find.text('Cek layar ini ya'), findsOneWidget);
         // hidden files from before /clear
         final btn = find.byKey(const ValueKey('chat-old-files'));
+        // Attachment Download controls make the timeline taller; older rows
+        // are built lazily, so reveal the older end as a person would.
+        await t.scrollUntilVisible(
+          btn,
+          200,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('chat-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         expect(btn, findsOneWidget);
         expect(
           find.text('Tampilkan 2 berkas dari sebelum /clear'),

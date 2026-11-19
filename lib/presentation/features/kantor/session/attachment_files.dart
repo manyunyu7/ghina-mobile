@@ -7,7 +7,22 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../di/kantor_providers.dart';
+import '../../../../data/platform/kantor_downloads.dart';
 import 'attachment_model.dart';
+
+/// Explicit Download: persistent system queue and public Download/Ravel folder.
+/// The cache helper below is only for viewing/sharing/gallery actions.
+Future<int> saveAttachmentToDownloads(
+  KantorApi api,
+  KantorAttachment a,
+) => KantorDownloads.instance.enqueue(
+  url: api.url(a.rawPath),
+  name: a.name,
+  mime: a.mime,
+  description:
+      'Chat · ${a.agent.isEmpty ? 'Kantor' : a.agent} · ${Uri.parse(api.config.baseUrl).host}',
+  authorization: api.authHeaders['Authorization'],
+);
 
 /// Downloads an attachment's raw bytes to the cache (streamed, with the
 /// bearer header) and returns the file. A finished earlier download of the

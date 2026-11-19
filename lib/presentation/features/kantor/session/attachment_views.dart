@@ -10,6 +10,39 @@ import 'attachment_files.dart';
 import 'attachment_model.dart';
 import 'attachment_uploader.dart';
 import 'chat_model.dart' show hhmm;
+import '../pratinjau/pratinjau_downloads.dart';
+
+Future<void> _queueDownload(
+  BuildContext context,
+  KantorApi api,
+  KantorAttachment item,
+) async {
+  try {
+    await saveAttachmentToDownloads(api, item);
+    notifyKantorDownloadsChanged();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Download dimulai. Hasil disimpan di Download/Ravel.',
+          ),
+          action: SnackBarAction(
+            label: 'Unduhan',
+            onPressed: () => openKantorDownloads(context),
+          ),
+        ),
+      );
+    }
+  } catch (_) {
+    if (context.mounted) {
+      _toast(
+        context,
+        'Download gagal dimulai. Periksa koneksi Kantor lalu coba lagi.',
+        ok: false,
+      );
+    }
+  }
+}
 
 const _mediaWidth = 232.0;
 
@@ -57,15 +90,8 @@ class _AttachmentBubbleState extends State<AttachmentBubble> {
     if (api == null || _progress != null) return;
     setState(() => _progress = 0);
     try {
-      final f = await downloadAttachment(
-        api,
-        a,
-        onProgress: (got, total) {
-          if (mounted && total > 0) setState(() => _progress = got / total);
-        },
-      );
+      await _queueDownload(context, api, a);
       if (mounted) setState(() => _progress = null);
-      await shareAttachmentFile(f, a);
     } catch (e) {
       if (mounted) {
         setState(() => _progress = null);
@@ -108,6 +134,32 @@ class _AttachmentBubbleState extends State<AttachmentBubble> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 body,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _mediaWidth + 40),
+                  child: Wrap(
+                    spacing: 4,
+                    children: [
+                      TextButton.icon(
+                        key: ValueKey('attachment-download-${a.id}'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: mine ? GhinaColors.blue.on : null,
+                        ),
+                        onPressed: widget.api == null || _progress != null
+                            ? null
+                            : _download,
+                        icon: const Icon(Icons.download_rounded),
+                        label: const Text('Download'),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: mine ? GhinaColors.blue.on : null,
+                        ),
+                        onPressed: () => openKantorDownloads(context),
+                        child: const Text('Unduhan'),
+                      ),
+                    ],
+                  ),
+                ),
                 if (a.mine && !a.delivered)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(6, 4, 6, 0),
@@ -262,7 +314,7 @@ class _AttachmentBubbleState extends State<AttachmentBubble> {
                 ),
               ),
               const SizedBox(width: GhinaSpace.sm),
-              Icon(Icons.ios_share_rounded, color: fg, size: 20),
+              Icon(Icons.download_rounded, color: fg, size: 20),
             ],
           ),
         ),
@@ -410,6 +462,13 @@ class _ViewerActions extends StatefulWidget {
 class _ViewerActionsState extends State<_ViewerActions> {
   bool _busy = false;
 
+  Future<void> _download() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    await _queueDownload(context, widget.api, widget.item);
+    if (mounted) setState(() => _busy = false);
+  }
+
   Future<void> _run(Future<void> Function(File f) go) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -439,9 +498,14 @@ class _ViewerActionsState extends State<_ViewerActions> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        TextButton.icon(
+          onPressed: _download,
+          icon: const Icon(Icons.download_rounded),
+          label: const Text('Download'),
+        ),
         IconButton(
           tooltip: 'Simpan ke galeri',
-          icon: const Icon(Icons.download_rounded),
+          icon: const Icon(Icons.photo_library_outlined),
           onPressed: () => _run((f) async {
             final ok = await saveToGallery(f, widget.item);
             if (mounted && context.mounted) {
