@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../di/kantor_providers.dart';
 import 'input/remote_input.dart';
+import 'remote_hubs.dart';
 import 'remote_protocol.dart';
 import 'remote_session.dart';
 import 'remote_widgets.dart';
@@ -19,23 +20,23 @@ import 'remote_widgets.dart';
 /// this page owns the session, the video, zoom state, the toolbar,
 /// clipboard, reconnects and the device-sized virtual display (`vd`).
 class RemoteSessionPage extends ConsumerStatefulWidget {
-  const RemoteSessionPage({super.key, required this.host, this.api});
+  const RemoteSessionPage({super.key, required this.host, this.hubs});
 
   final RemoteHost host;
 
-  /// Viewer client (device token from pairing). Falls back to the active
-  /// Kantor connection, which kantor-claude only accepts if it is a viewer
-  /// token.
-  final KantorApi? api;
+  /// Viewer client over the hub addresses (device token from pairing).
+  /// Falls back to the active Kantor connection, which kantor-claude only
+  /// accepts if it is a viewer token.
+  final RemoteHubClient? hubs;
 
   static Future<void> open(
     BuildContext context,
     RemoteHost host, {
-    KantorApi? api,
+    RemoteHubClient? hubs,
   }) => Navigator.of(context).push(
     MaterialPageRoute<void>(
       fullscreenDialog: true,
-      builder: (_) => RemoteSessionPage(host: host, api: api),
+      builder: (_) => RemoteSessionPage(host: host, hubs: hubs),
     ),
   );
 
@@ -83,15 +84,18 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _zoom.addListener(_onZoom);
-    final api = widget.api ?? ref.read(kantorApiProvider);
-    if (api != null) {
+    final owner = ref.read(kantorApiProvider);
+    final hubs =
+        widget.hubs ?? (owner == null ? null : RemoteHubClient.single(owner));
+    if (hubs != null) {
       final s = RemoteSession(
-        api: api,
+        hubs: hubs,
         host: widget.host,
         viewer: _viewerInfo(),
       );
       _s = s;
       s.addListener(_onSession);
+      _kb.beforePaste = () => s.pushClipboard(force: true);
       _clipSub = s.clipFromHost.listen(_onHostClip);
       s.setMaxStream(_physicalSize());
       s.start();
@@ -476,11 +480,12 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
             RemoteInputLayer(
               send: s.send,
               hostMessages: s.hostMessages,
-              remoteSize: Size(s.logicalWidth, s.logicalHeight),
+              // §5: exactly hello/display w,h; input waits until it is known
+              remoteSize: s.streamSize ?? s.pictureSize,
               mode: _mode,
               transformationController: _zoom,
               keyboardController: _kb,
-              enabled: s.live,
+              enabled: s.live && s.streamSize != null,
               settings: RemoteInputSettings(
                 showLocalCursor: _mode == InputMode.trackpad,
               ),

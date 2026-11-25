@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/data/datasources/remote/kantor_api.dart';
+import 'package:ghina/presentation/features/remote/remote_hubs.dart';
 import 'package:ghina/presentation/features/remote/remote_session.dart';
 import 'package:ghina/presentation/features/remote/remote_protocol.dart';
 
@@ -211,7 +212,9 @@ void main() {
 
     test('stream cap follows the screen, ≤2560×1440', () {
       final s = RemoteSession(
-        api: KantorApi(const KantorConfig(baseUrl: 'http://k:1', token: 't')),
+        hubs: RemoteHubClient.single(
+          KantorApi(const KantorConfig(baseUrl: 'http://k:1', token: 't')),
+        ),
         host: const RemoteHost(machine: 'm', name: 'Mac', online: true),
         viewer: const {},
       );

@@ -8,6 +8,7 @@ import '../../../data/datasources/remote/kantor_api.dart';
 import '../../design_system/design_system.dart';
 import '../kantor/widgets/kantor_wide.dart';
 import 'remote_auth.dart';
+import 'remote_hubs.dart';
 
 /// Default name this phone/tablet asks to be paired as.
 String remoteDefaultDeviceName() {
@@ -274,7 +275,7 @@ class _RemotePairingViewState extends State<RemotePairingView> {
 /// Bottom sheet: paired devices (revoke) and requests waiting for approval.
 Future<void> showRemoteDevicesSheet(
   BuildContext context, {
-  required KantorApi viewer,
+  required RemoteHubClient viewer,
   required VoidCallback onRevokedSelf,
 }) => showModalBottomSheet<void>(
   context: context,
@@ -286,7 +287,7 @@ Future<void> showRemoteDevicesSheet(
 class _DevicesSheet extends StatefulWidget {
   const _DevicesSheet({required this.viewer, required this.onRevokedSelf});
 
-  final KantorApi viewer;
+  final RemoteHubClient viewer;
   final VoidCallback onRevokedSelf;
 
   @override
@@ -306,8 +307,8 @@ class _DevicesSheetState extends State<_DevicesSheet> {
 
   Future<void> _load() async {
     try {
-      final d = await RemoteAuth.devices(widget.viewer);
-      final p = await RemoteAuth.pending(widget.viewer);
+      final d = await widget.viewer.run(RemoteAuth.devices);
+      final p = await widget.viewer.run(RemoteAuth.pending);
       if (mounted) {
         setState(() {
           _devices = d;
@@ -344,7 +345,7 @@ class _DevicesSheetState extends State<_DevicesSheet> {
     );
     if (ok != true) return;
     try {
-      await RemoteAuth.revoke(widget.viewer, d.id);
+      await widget.viewer.run((a) => RemoteAuth.revoke(a, d.id));
       if (d.current) {
         if (mounted) Navigator.pop(context);
         widget.onRevokedSelf();
@@ -358,7 +359,7 @@ class _DevicesSheetState extends State<_DevicesSheet> {
 
   Future<void> _approve(RemotePendingPair p) async {
     try {
-      await RemoteAuth.approveOther(widget.viewer, p.id);
+      await widget.viewer.run((a) => RemoteAuth.approveOther(a, p.id));
       await _load();
     } catch (e) {
       if (mounted) setState(() => _error = '$e');

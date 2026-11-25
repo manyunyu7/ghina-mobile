@@ -194,7 +194,10 @@ void main() {
     await tester.tap(find.text('→'));
     await tester.pump();
     expect(h.keyboard.stateOf(RemoteModifier.meta), StickyState.off);
+    // ⌘V pushes the phone clipboard first (session hook; none here)
+    h.keyboard.beforePaste = () async {};
     await tester.tap(find.text('⌘V'));
+    await tester.pump();
     await tester.dragUntilVisible(
       find.text('F5'),
       find.text('⌘V'),

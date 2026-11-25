@@ -114,7 +114,14 @@ class RemoteKeyboardBar extends StatelessWidget {
         const meta = [RemoteModifier.meta];
         final row2 = <Widget>[
           shortcut('⌘C', 'KeyC', meta),
-          shortcut('⌘V', 'KeyV', meta),
+          // clipboard HP → Mac dulu, lalu ⌘V
+          _BarKey(
+            label: '⌘V',
+            onPressed: () {
+              tap();
+              kb.paste();
+            },
+          ),
           shortcut('⌘Z', 'KeyZ', meta),
           shortcut('⇧⌘Z', 'KeyZ', const [
             RemoteModifier.meta,

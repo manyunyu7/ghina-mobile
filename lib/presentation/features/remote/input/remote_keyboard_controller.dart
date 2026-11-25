@@ -105,6 +105,27 @@ class RemoteKeyboardController extends ChangeNotifier {
     });
   }
 
+  /// Dipanggil sebelum ⌘V dari baris tombol: kirim clipboard HP ke Mac
+  /// (`clip`) supaya yang ditempel isi HP. Inti memasang ini agar lewat
+  /// sesi (dedupe dengan clipboard Mac); null → baca clipboard di sini.
+  Future<void> Function()? beforePaste;
+
+  /// ⌘V yang menempel clipboard HP: `clip` dulu, baru `key KeyV [meta]`.
+  Future<void> paste() async {
+    try {
+      final hook = beforePaste;
+      if (hook != null) {
+        await hook();
+      } else {
+        final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+        if (text != null && text.isNotEmpty) _emit({'t': 'clip', 's': text});
+      }
+    } catch (_) {
+      // clipboard tidak terbaca: tetap tempel isi clipboard Mac
+    }
+    sendShortcut('KeyV', const [RemoteModifier.meta]);
+  }
+
   /// Pintasan tetap (⌘C dll): modifier sticky TIDAK ikut dikonsumsi.
   void sendShortcut(String code, List<RemoteModifier> mods) {
     _emit({

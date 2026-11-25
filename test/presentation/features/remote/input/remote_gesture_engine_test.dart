@@ -223,6 +223,59 @@ void main() {
       });
     });
 
+    test('jari ke-3 saat scroll 2 jari: tetap scroll, bukan geser', () {
+      fakeAsync((async) {
+        final r = _Rig(InputMode.trackpad);
+        r.down(1, const Offset(100, 300));
+        r.down(2, const Offset(160, 300));
+        r.tick(async, 16);
+        for (var i = 1; i <= 3; i++) {
+          r.move(1, Offset(100, 300 - i * 10.0));
+          r.move(2, Offset(160, 300 - i * 10.0));
+          r.tick(async, 16);
+        }
+        final before = r.sent.length;
+        expect(r.types.toSet(), {'wh'});
+        r.down(3, const Offset(220, 270));
+        for (var i = 1; i <= 3; i++) {
+          r.move(1, Offset(100, 270 - i * 10.0));
+          r.move(2, Offset(160, 270 - i * 10.0));
+          r.move(3, Offset(220, 270 - i * 10.0));
+          r.tick(async, 16);
+        }
+        expect(r.sent.length, greaterThan(before));
+        expect(r.types.toSet(), {'wh'});
+        expect(r.viewport.zooms, isEmpty);
+        r.up(1, const Offset(100, 240));
+        r.up(2, const Offset(160, 240));
+        r.up(3, const Offset(220, 240));
+        async.flushTimers();
+      });
+    });
+
+    test('jari ke-3 saat pinch: tetap zoom, bukan geser', () {
+      fakeAsync((async) {
+        final r = _Rig(InputMode.trackpad);
+        r.down(1, const Offset(400, 300));
+        r.down(2, const Offset(500, 300));
+        r.tick(async, 16);
+        r.move(2, const Offset(600, 300));
+        r.tick(async, 16);
+        expect(r.viewport.zooms.last.scaleRatio, greaterThan(1));
+        r.down(3, const Offset(450, 400));
+        r.move(2, const Offset(650, 300));
+        r.move(1, const Offset(350, 300));
+        r.tick(async, 16);
+        expect(r.sent, isEmpty);
+        // spread grew → still zooming (ratio ≠ 1), not a pure pan
+        expect(r.viewport.zooms.last.scaleRatio, isNot(1.0));
+        r.up(1, const Offset(350, 300));
+        r.up(2, const Offset(650, 300));
+        r.up(3, const Offset(450, 400));
+        async.flushTimers();
+      });
+    });
+
     test('geser 3 jari = geser tampilan, tidak dikirim ke Mac', () {
       fakeAsync((async) {
         final r = _Rig(InputMode.trackpad);

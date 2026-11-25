@@ -9,6 +9,7 @@ import '../kantor/widgets/kantor_states.dart';
 import '../kantor/widgets/kantor_wide.dart';
 import 'remote_auth.dart';
 import 'remote_pairing.dart';
+import 'remote_hubs.dart';
 import 'remote_protocol.dart';
 import 'remote_security.dart';
 import 'remote_session_page.dart';
@@ -41,7 +42,8 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
   bool _loading = false;
 
   /// This device's viewer client (`kcview_` token), null until paired.
-  KantorApi? _viewer;
+  RemoteHubClient? _viewer;
+  final _hubList = RemoteHubList();
   bool _tokenChecked = false;
   String? _pairNotice;
 
@@ -78,9 +80,88 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     if (widget.load == null && owner != null) {
       final token = await _store.read(owner.config.baseUrl);
       if (!mounted) return;
-      _viewer = token == null ? null : RemoteAuth.viewerApi(owner, token);
+      _viewer = token == null ? null : await _hubsFor(owner, token);
+      if (!mounted) return;
     }
     setState(() => _tokenChecked = true);
+    _load();
+  }
+
+  /// Viewer client over every hub address of this Kantor.
+  Future<RemoteHubClient> _hubsFor(KantorApi owner, String token) async {
+    final primary = owner.config.baseUrl;
+    return RemoteHubClient(
+      id: RemoteHubList.originOf(primary),
+      urls: await _hubList.ordered(primary),
+      token: token,
+      onWorking: (u) => _hubList.remember(primary, u),
+    );
+  }
+
+  Future<void> _editHubs() async {
+    final owner = ref.read(kantorApiProvider);
+    final viewer = _viewer;
+    if (owner == null || viewer == null) return;
+    final primary = owner.config.baseUrl;
+    final ctl = TextEditingController(
+      text: (await _hubList.extras(primary)).join('\n'),
+    );
+    if (!mounted) return;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Alamat hub tambahan'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Utama: ${RemoteHubList.originOf(primary)}\n'
+              'Alamat lain ke Kantor yang sama (satu per baris), dicoba '
+              'bergantian kalau yang dipakai tidak terjangkau.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctl,
+              minLines: 2,
+              maxLines: 6,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                hintText: 'https://hub.example.com',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+    final lines = ctl.text.split(RegExp(r'[\s,]+'));
+    ctl.dispose();
+    if (save != true) return;
+    final bad = lines.where(
+      (l) => l.trim().isNotEmpty && RemoteHubList.parse(l) == null,
+    );
+    await _hubList.setExtras(primary, lines);
+    final hubs = await _hubsFor(owner, viewer.token);
+    if (!mounted) return;
+    setState(() => _viewer = hubs);
+    if (bad.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text('Diabaikan (bukan http/https): ${bad.join(', ')}'),
+        ),
+      );
+    }
     _load();
   }
 
@@ -88,9 +169,10 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     final owner = ref.read(kantorApiProvider);
     if (owner == null) return;
     await _store.write(owner.config.baseUrl, token);
+    final hubs = await _hubsFor(owner, token);
     if (!mounted) return;
     setState(() {
-      _viewer = RemoteAuth.viewerApi(owner, token);
+      _viewer = hubs;
       _pairNotice = null;
       _hosts = null;
       _error = null;
@@ -126,16 +208,18 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     try {
       final hosts = load != null
           ? await load()
-          : RemoteHost.listFromJson(await viewer!.get('/api/remote/hosts'));
+          : RemoteHost.listFromJson(
+              await viewer!.run((a) => a.get('/api/remote/hosts')),
+            );
       if (!mounted) return;
       setState(() {
         _hosts = hosts;
         _error = null;
       });
       if (viewer != null) {
-        final pending = await RemoteAuth.pending(
-          viewer,
-        ).catchError((_) => const <RemotePendingPair>[]);
+        final pending = await viewer
+            .run(RemoteAuth.pending)
+            .catchError((_) => const <RemotePendingPair>[]);
         if (mounted) setState(() => _pending = pending);
       }
     } on KantorException catch (e) {
@@ -182,7 +266,7 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
       );
       return;
     }
-    await RemoteSessionPage.open(context, h, api: _viewer);
+    await RemoteSessionPage.open(context, h, hubs: _viewer);
     if (mounted) _load();
   }
 
@@ -316,6 +400,16 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
                   ),
               ],
             ),
+            if (_viewer != null)
+              IconButton(
+                tooltip: 'Alamat hub',
+                icon: Badge(
+                  isLabelVisible: _viewer!.apis.length > 1,
+                  label: Text('${_viewer!.apis.length}'),
+                  child: const Icon(Icons.hub_rounded),
+                ),
+                onPressed: _editHubs,
+              ),
           ],
         ],
       ),

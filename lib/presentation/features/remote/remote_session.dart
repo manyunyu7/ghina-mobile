@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import '../../../data/datasources/remote/kantor_api.dart';
+import 'remote_hubs.dart';
 import 'remote_protocol.dart';
 import 'remote_security.dart';
 
@@ -65,7 +65,7 @@ class RemoteStats {
 /// DataChannel for input, clipboard and stream settings.
 class RemoteSession extends ChangeNotifier {
   RemoteSession({
-    required this.api,
+    required this.hubs,
     required this.host,
     required this.viewer,
     this.backgroundGrace = const Duration(minutes: 2),
@@ -80,7 +80,8 @@ class RemoteSession extends ChangeNotifier {
   bool pinChanged = false;
   String? _announcedFp;
 
-  final KantorApi api;
+  /// Signaling hubs (several addresses of the same Kantor, failover).
+  final RemoteHubClient hubs;
   final RemoteHost host;
 
   /// Sent as query params so kantor-claude can fill `join.viewer`.
@@ -177,23 +178,12 @@ class RemoteSession extends ChangeNotifier {
     return const Size(16, 10);
   }
 
-  /// Width of the display in logical points (the unit of `mr`/`wh`).
-  double get logicalWidth {
-    final d = activeDisplay;
-    final scale = d != null && d.scale > 0 ? d.scale : 1.0;
-    final w = remoteW > 0 ? remoteW : (d?.w ?? 0);
-    if (w <= 0) return pictureSize.width;
-    // `w` from the Mac is in pixels (Built-in 3024 @2x) → points
-    return w / scale;
-  }
-
-  double get logicalHeight {
-    final d = activeDisplay;
-    final scale = d != null && d.scale > 0 ? d.scale : 1.0;
-    final h = remoteH > 0 ? remoteH : (d?.h ?? 0);
-    if (h <= 0) return pictureSize.height;
-    return h / scale;
-  }
+  /// Coordinate space of the stream: exactly `w`,`h` of the latest
+  /// `hello`/`display` (PROTOCOL.md §5). The Mac converts `mr` with the same
+  /// numbers, so never derive it from anything else. Null until known.
+  Size? get streamSize => remoteW > 0 && remoteH > 0
+      ? Size(remoteW.toDouble(), remoteH.toDouble())
+      : null;
 
   static Future<void>? _rtcInit;
 
@@ -231,12 +221,10 @@ class RemoteSession extends ChangeNotifier {
     _notify();
     final WebSocket ws;
     try {
-      ws = await api
-          .connectWs(
-            '/api/remote/ws',
-            query: {'machine': host.machine, ...viewer},
-          )
-          .timeout(const Duration(seconds: 12));
+      ws = await hubs.connectWs(
+        '/api/remote/ws',
+        query: {'machine': host.machine, ...viewer},
+      );
     } catch (e) {
       if (gen != _gen || _closing) return;
       _fail(_connectError(e), retry: _retryable(e));
@@ -358,7 +346,7 @@ class RemoteSession extends ChangeNotifier {
   /// DTLS pinning: the offer must carry the fingerprint kantor-claude
   /// announced in `ready`, and the one pinned for this Mac (TOFU).
   Future<bool> _verifyFingerprint(String sdp, int gen) async {
-    final base = api.config.baseUrl;
+    final base = hubs.id;
     String? pinned;
     try {
       pinned = await pins.read(base, host.machine);
@@ -404,7 +392,7 @@ class RemoteSession extends ChangeNotifier {
   /// After the owner confirms: forget the old pin and connect again.
   Future<void> trustNewIdentity() async {
     try {
-      await pins.clear(api.config.baseUrl, host.machine);
+      await pins.clear(hubs.id, host.machine);
     } catch (_) {}
     pinChanged = false;
     reconnectNow();
