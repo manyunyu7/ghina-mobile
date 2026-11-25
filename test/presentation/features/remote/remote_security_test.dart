@@ -115,7 +115,9 @@ void main() {
       auth.result = HabitAuthOutcome.lockedOut;
       expect(await lock.unlock('Mac'), RemoteUnlock.lockedOut);
       auth.supported = false;
-      expect(await lock.unlock('Mac'), RemoteUnlock.ok);
+      expect(await lock.unlock('Mac'), RemoteUnlock.okWithoutLock);
+      expect(await lock.shouldWarnNoLock(), isTrue);
+      expect(await lock.shouldWarnNoLock(), isFalse); // only once
       auth.supported = true;
       await lock.setPolicy(RemoteLockPolicy.off);
       final before = auth.calls;

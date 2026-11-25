@@ -252,7 +252,31 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     }
     final unlocked = await _lock.unlock(h.name);
     if (!mounted) return;
-    if (unlocked != RemoteUnlock.ok) {
+    if (unlocked == RemoteUnlock.okWithoutLock &&
+        await _lock.shouldWarnNoLock()) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (c) => AlertDialog(
+          icon: const Icon(Icons.no_encryption_gmailerrorred_rounded),
+          title: const Text('HP ini tanpa kunci layar'),
+          content: const Text(
+            'Remote Mac tidak bisa meminta sidik jari atau PIN karena HP ini '
+            'belum punya kunci layar. Siapa pun yang memegang HP ini bisa '
+            'membuka Mac-mu. Pasang kunci layar di Pengaturan Android supaya '
+            'sesi remote terlindungi. Peringatan ini hanya muncul sekali.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Mengerti'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (!mounted) return;
+    if (unlocked != RemoteUnlock.ok && unlocked != RemoteUnlock.okWithoutLock) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,

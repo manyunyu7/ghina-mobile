@@ -17,7 +17,15 @@ enum RemoteLockPolicy {
   final String label;
 }
 
-enum RemoteUnlock { ok, cancelled, lockedOut, failed }
+enum RemoteUnlock {
+  ok,
+
+  /// Allowed, but the phone has no screen lock / biometrics to check.
+  okWithoutLock,
+  cancelled,
+  lockedOut,
+  failed,
+}
 
 /// Asks for biometrics (falls back to the device PIN/pattern, as local_auth
 /// does by default) before a remote session. Policy lives in prefs; the
@@ -44,6 +52,16 @@ class RemoteLock {
   /// Forget the last success (tests, or "lock now").
   static void reset() => _lastOk = null;
 
+  static const warnedKey = 'ravel.remote.nolock.warned';
+
+  /// True the first time only: show the "no screen lock" warning once.
+  Future<bool> shouldWarnNoLock() async {
+    final p = await _prefs;
+    if (p.getBool(warnedKey) ?? false) return false;
+    await p.setBool(warnedKey, true);
+    return true;
+  }
+
   Future<RemoteLockPolicy> policy() async {
     final v = (await _prefs).getString(prefKey);
     return RemoteLockPolicy.values.firstWhere(
@@ -66,14 +84,14 @@ class RemoteLock {
     if (!needsAuth(await policy())) return RemoteUnlock.ok;
     // A phone without any screen lock cannot prove anything; do not lock the
     // owner out of their own Mac because of it.
-    if (!await _auth.canAuthenticate()) return RemoteUnlock.ok;
+    if (!await _auth.canAuthenticate()) return RemoteUnlock.okWithoutLock;
     final r = await _auth.authenticate('Buka remote $machineName');
     switch (r) {
       case HabitAuthOutcome.success:
         _lastOk = _now();
         return RemoteUnlock.ok;
       case HabitAuthOutcome.unavailable:
-        return RemoteUnlock.ok;
+        return RemoteUnlock.okWithoutLock;
       case HabitAuthOutcome.cancelled:
         return RemoteUnlock.cancelled;
       case HabitAuthOutcome.lockedOut:
