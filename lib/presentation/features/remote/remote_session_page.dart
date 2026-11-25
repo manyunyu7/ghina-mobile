@@ -8,7 +8,6 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../../di/kantor_providers.dart';
 import 'input/remote_input.dart';
 import 'remote_hubs.dart';
 import 'remote_protocol.dart';
@@ -84,9 +83,7 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _zoom.addListener(_onZoom);
-    final owner = ref.read(kantorApiProvider);
-    final hubs =
-        widget.hubs ?? (owner == null ? null : RemoteHubClient.single(owner));
+    final hubs = widget.hubs;
     if (hubs != null) {
       final s = RemoteSession(
         hubs: hubs,

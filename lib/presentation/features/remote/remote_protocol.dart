@@ -111,7 +111,17 @@ sealed class SignalMessage {
     final session = json['session']?.toString();
     switch (json['type']) {
       case 'ready':
-        return SignalReady(session, json['fingerprint']?.toString());
+        final ice = json['iceServers'];
+        return SignalReady(
+          session,
+          json['fingerprint']?.toString(),
+          ice is List
+              ? [
+                  for (final s in ice)
+                    if (s is Map) Map<String, dynamic>.from(s),
+                ]
+              : const [],
+        );
       case 'error':
         return SignalError(json['message']?.toString() ?? 'Kesalahan sesi.');
       case 'offer':
@@ -135,8 +145,15 @@ sealed class SignalMessage {
 }
 
 class SignalReady extends SignalMessage {
-  const SignalReady(this.session, [this.fingerprint]);
+  const SignalReady(
+    this.session, [
+    this.fingerprint,
+    this.iceServers = const [],
+  ]);
   final String? session;
+
+  /// TURN/STUN from a relay hub (kantor-claude over Tailscale sends none).
+  final List<Map<String, dynamic>> iceServers;
 
   /// DTLS fingerprint the Mac registered with (`sha-256 AB:CD:…`).
   final String? fingerprint;

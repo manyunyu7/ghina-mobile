@@ -69,6 +69,25 @@ void main() {
       );
     });
 
+    test('pins are per machine, whatever the hub', () async {
+      final pins = MemoryRemotePinStore();
+      await pins.write('mini', _fpA);
+      expect(await pins.read('mini'), _fpA);
+      expect(await pins.read('mbp'), isNull);
+      expect(SecureRemotePinStore.keyFor('mini'), 'ravel.remote.pin.m.mini');
+    });
+
+    test('ready from a relay carries iceServers', () {
+      final r =
+          SignalMessage.decode(
+                '{"type":"ready","session":"s","fingerprint":"$_fpA",'
+                '"iceServers":[{"urls":["turn:turn.example:3478"],'
+                '"username":"1:m-viewer","credential":"c"}]}',
+              )
+              as SignalReady;
+      expect(r.iceServers.single['username'], '1:m-viewer');
+    });
+
     test('ready carries the fingerprint', () {
       final r =
           SignalMessage.decode(

@@ -79,6 +79,10 @@ class RemoteSession extends ChangeNotifier {
   /// it was first trusted (the UI offers "trust again").
   bool pinChanged = false;
   String? _announcedFp;
+  List<Map<String, dynamic>> _iceServers = const [];
+
+  /// Every hub refused this device: the UI sends the owner to pairing.
+  bool needsPairing = false;
 
   /// Signaling hubs (several addresses of the same Kantor, failover).
   final RemoteHubClient hubs;
@@ -225,6 +229,11 @@ class RemoteSession extends ChangeNotifier {
         '/api/remote/ws',
         query: {'machine': host.machine, ...viewer},
       );
+    } on RemoteHubsFailed catch (e) {
+      if (gen != _gen || _closing) return;
+      needsPairing = e.needPairing.isNotEmpty;
+      _fail(e.message, retry: false);
+      return;
     } catch (e) {
       if (gen != _gen || _closing) return;
       _fail(_connectError(e), retry: _retryable(e));
@@ -263,9 +272,10 @@ class RemoteSession extends ChangeNotifier {
 
   void _onSignal(SignalMessage msg, int gen) {
     switch (msg) {
-      case SignalReady(:final session, :final fingerprint):
+      case SignalReady(:final session, :final fingerprint, :final iceServers):
         _sid = session ?? _sid;
         _announcedFp = fingerprint;
+        _iceServers = iceServers;
         if (status != RemoteStatus.connected) {
           status = RemoteStatus.waiting;
           _notify();
@@ -313,7 +323,7 @@ class RemoteSession extends ChangeNotifier {
       var pc = _pc;
       if (pc == null) {
         pc = await createPeerConnection({
-          'iceServers': <Map<String, dynamic>>[],
+          'iceServers': _iceServers,
           'sdpSemantics': 'unified-plan',
         });
         if (gen != _gen) {
@@ -346,10 +356,9 @@ class RemoteSession extends ChangeNotifier {
   /// DTLS pinning: the offer must carry the fingerprint kantor-claude
   /// announced in `ready`, and the one pinned for this Mac (TOFU).
   Future<bool> _verifyFingerprint(String sdp, int gen) async {
-    final base = hubs.id;
     String? pinned;
     try {
-      pinned = await pins.read(base, host.machine);
+      pinned = await pins.read(host.machine);
     } catch (_) {}
     if (gen != _gen) return false;
     final r = checkFingerprint(
@@ -363,7 +372,7 @@ class RemoteSession extends ChangeNotifier {
         if (pinned == null) {
           final fp = sdpFingerprints(sdp).single;
           try {
-            await pins.write(base, host.machine, fp);
+            await pins.write(host.machine, fp);
           } catch (_) {}
         }
         return gen == _gen;
@@ -392,7 +401,7 @@ class RemoteSession extends ChangeNotifier {
   /// After the owner confirms: forget the old pin and connect again.
   Future<void> trustNewIdentity() async {
     try {
-      await pins.clear(hubs.id, host.machine);
+      await pins.clear(host.machine);
     } catch (_) {}
     pinChanged = false;
     reconnectNow();

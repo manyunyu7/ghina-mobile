@@ -1,5 +1,3 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../../../data/datasources/remote/kantor_api.dart';
 
 /// Ravel Remote needs a per-device viewer token (`kcview_…`): the owner token
@@ -92,27 +90,6 @@ class RemotePendingPair {
       ip: raw['ip']?.toString(),
     );
   }
-}
-
-/// Viewer token storage, one per Kantor address.
-class RemoteDeviceStore {
-  RemoteDeviceStore([FlutterSecureStorage? storage])
-    : _storage = storage ?? const FlutterSecureStorage();
-
-  final FlutterSecureStorage _storage;
-
-  static String keyFor(String baseUrl) =>
-      'ravel.remote.viewer.${Uri.tryParse(baseUrl.trim())?.origin ?? baseUrl.trim()}';
-
-  Future<String?> read(String baseUrl) async {
-    final v = await _storage.read(key: keyFor(baseUrl));
-    return v != null && v.startsWith('kcview_') ? v : null;
-  }
-
-  Future<void> write(String baseUrl, String token) =>
-      _storage.write(key: keyFor(baseUrl), value: token);
-
-  Future<void> clear(String baseUrl) => _storage.delete(key: keyFor(baseUrl));
 }
 
 /// Calls for pairing and device management.

@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/di/kantor_providers.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/remote/remote_hosts_page.dart';
+import 'package:ghina/presentation/features/remote/remote_hub_pages.dart';
+import 'package:ghina/presentation/features/remote/remote_hubs.dart';
 import 'package:ghina/presentation/features/remote/remote_pairing.dart';
 import 'package:ghina/presentation/features/habits/lock/habit_lock.dart';
 import 'package:ghina/presentation/features/remote/remote_protocol.dart';
@@ -111,6 +113,44 @@ void main() {
     expect(find.text('Pasangkan perangkat ini'), findsOneWidget);
     expect(find.text('Minta pairing'), findsOneWidget);
     expect(find.textContaining('dicabut'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('relay hub asks for the owner token once, then pairing', (
+    t,
+  ) async {
+    final secrets = MemoryRemoteSecrets();
+    final store = RemoteHubStore(secrets: secrets);
+    const relay = RemoteHub(
+      id: 'r1',
+      name: 'VPS',
+      url: 'https://relay.example',
+      kind: RemoteHubKind.relay,
+    );
+    await _pump(
+      t,
+      const Size(320, 640),
+      Scaffold(
+        body: RemoteHubPairing(
+          hub: relay,
+          store: store,
+          kantorToken: 'kantor-token',
+          onPaired: (_) {},
+        ),
+      ),
+    );
+    await t.pump();
+    expect(find.text('Token owner relay VPS'), findsOneWidget);
+    await t.enterText(find.byType(TextField), 'salah');
+    await t.tap(find.text('Lanjut'));
+    await t.pump();
+    expect(find.textContaining('kcowner_'), findsWidgets);
+    await t.enterText(find.byType(TextField), 'kcowner_0123456789abcdef');
+    await t.tap(find.text('Lanjut'));
+    await t.pump();
+    await t.pump();
+    expect(find.text('Pasangkan perangkat ini di VPS'), findsOneWidget);
+    expect(await store.ownerToken('r1'), 'kcowner_0123456789abcdef');
     expect(t.takeException(), isNull);
   });
 }

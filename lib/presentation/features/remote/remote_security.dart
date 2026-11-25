@@ -158,11 +158,12 @@ PinResult checkFingerprint({
   return PinResult.ok;
 }
 
-/// Pinned fingerprints, one per Kantor address + machine.
+/// Pinned fingerprints, one per MACHINE (not per hub): the same Mac reached
+/// through any hub must present the same identity.
 abstract interface class RemotePinStore {
-  Future<String?> read(String baseUrl, String machine);
-  Future<void> write(String baseUrl, String machine, String fingerprint);
-  Future<void> clear(String baseUrl, String machine);
+  Future<String?> read(String machine);
+  Future<void> write(String machine, String fingerprint);
+  Future<void> clear(String machine);
 }
 
 class SecureRemotePinStore implements RemotePinStore {
@@ -171,20 +172,17 @@ class SecureRemotePinStore implements RemotePinStore {
 
   final FlutterSecureStorage _s;
 
-  static String keyFor(String baseUrl, String machine) =>
-      'ravel.remote.pin.${Uri.tryParse(baseUrl.trim())?.origin ?? baseUrl}.$machine';
+  static String keyFor(String machine) => 'ravel.remote.pin.m.$machine';
 
   @override
-  Future<String?> read(String baseUrl, String machine) =>
-      _s.read(key: keyFor(baseUrl, machine));
+  Future<String?> read(String machine) => _s.read(key: keyFor(machine));
 
   @override
-  Future<void> write(String baseUrl, String machine, String fingerprint) =>
-      _s.write(key: keyFor(baseUrl, machine), value: fingerprint);
+  Future<void> write(String machine, String fingerprint) =>
+      _s.write(key: keyFor(machine), value: fingerprint);
 
   @override
-  Future<void> clear(String baseUrl, String machine) =>
-      _s.delete(key: keyFor(baseUrl, machine));
+  Future<void> clear(String machine) => _s.delete(key: keyFor(machine));
 }
 
 /// In-memory store for tests.
@@ -192,17 +190,12 @@ class MemoryRemotePinStore implements RemotePinStore {
   final Map<String, String> data = {};
 
   @override
-  Future<String?> read(String baseUrl, String machine) async =>
-      data['$baseUrl|$machine'];
+  Future<String?> read(String machine) async => data[machine];
 
   @override
-  Future<void> write(
-    String baseUrl,
-    String machine,
-    String fingerprint,
-  ) async => data['$baseUrl|$machine'] = fingerprint;
+  Future<void> write(String machine, String fingerprint) async =>
+      data[machine] = fingerprint;
 
   @override
-  Future<void> clear(String baseUrl, String machine) async =>
-      data.remove('$baseUrl|$machine');
+  Future<void> clear(String machine) async => data.remove(machine);
 }

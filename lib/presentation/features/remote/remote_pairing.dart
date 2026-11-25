@@ -28,9 +28,19 @@ class RemotePairingView extends StatefulWidget {
     required this.owner,
     required this.onPaired,
     this.notice,
+    this.hubName,
+    this.onOwnerRejected,
   });
 
+  /// Client with the token allowed to ask for pairing on this hub (Kantor
+  /// token, or a relay owner token `kcowner_`).
   final KantorApi owner;
+
+  /// Hub being paired, shown in the title when there are several.
+  final String? hubName;
+
+  /// The hub refused the owner token (wrong/revoked relay owner token).
+  final VoidCallback? onOwnerRejected;
   final ValueChanged<String> onPaired;
 
   /// Why pairing is shown again (e.g. the old token was revoked).
@@ -90,6 +100,9 @@ class _RemotePairingViewState extends State<RemotePairingView> {
         }
       });
     } catch (e) {
+      if (e is KantorException && e.kind == KantorFailure.unauthorized) {
+        widget.onOwnerRejected?.call();
+      }
       if (mounted) setState(() => _error = _message(e));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -175,7 +188,9 @@ class _RemotePairingViewState extends State<RemotePairingView> {
               Icon(Icons.phonelink_lock_rounded, size: 56, color: g.textMuted),
               const SizedBox(height: GhinaSpace.lg),
               Text(
-                'Pasangkan perangkat ini',
+                widget.hubName == null
+                    ? 'Pasangkan perangkat ini'
+                    : 'Pasangkan perangkat ini di ${widget.hubName}',
                 textAlign: TextAlign.center,
                 style: GhinaType.h3.copyWith(color: g.textPrimary),
               ),

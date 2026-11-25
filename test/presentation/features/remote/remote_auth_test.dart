@@ -36,17 +36,6 @@ void main() {
     );
   });
 
-  test('viewer token is stored per Kantor address', () {
-    expect(
-      RemoteDeviceStore.keyFor('http://kantor.example:8787/'),
-      RemoteDeviceStore.keyFor('http://kantor.example:8787'),
-    );
-    expect(
-      RemoteDeviceStore.keyFor('http://a:1'),
-      isNot(RemoteDeviceStore.keyFor('http://b:1')),
-    );
-  });
-
   test('viewer client keeps the address, swaps the token', () {
     final owner = KantorApi(
       const KantorConfig(baseUrl: 'http://k:8787', token: 'owner'),
