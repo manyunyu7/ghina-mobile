@@ -276,6 +276,8 @@ class RemoteSession extends ChangeNotifier {
         _sid = session ?? _sid;
         _announcedFp = fingerprint;
         _iceServers = iceServers;
+        // TODO(ravel-remote): relay TURN credentials expire after ~1 h; a
+        // session that needs an ICE restart later should fetch fresh ones.
         if (status != RemoteStatus.connected) {
           status = RemoteStatus.waiting;
           _notify();

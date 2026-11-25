@@ -170,25 +170,34 @@ abstract final class RemoteAuth {
   static Future<void> approveOther(KantorApi viewer, String id) =>
       viewer.post('/api/remote/pair/$id/approve');
 
-  /// Planned kantor-claude endpoint `GET /api/remote/relay-owner?url=<relay>`
-  /// (Kantor token) → `{token: "kcowner_…", url?}`: lets a phone that is
-  /// already connected to Kantor get the relay owner token without typing.
-  /// Returns null when Kantor does not have it (404 / older daemon).
+  /// kantor-claude `GET /api/remote/relay-owner` (Kantor owner token) →
+  /// `{url, token: "kcowner_…"}`: a phone already connected to Kantor gets
+  /// the relay owner token without typing. Null when Kantor has none (404),
+  /// its relay config is wrong (409), or it is for another relay than
+  /// [relayUrl] — the caller then falls back to manual entry.
   static Future<String?> relayOwnerFromKantor(
     KantorApi kantor,
     String relayUrl,
   ) async {
+    final Object? r;
     try {
-      final r = await kantor.get(
-        '/api/remote/relay-owner',
-        query: {'url': relayUrl},
-      );
-      final t = r is Map ? r['token'] : null;
-      return t is String && t.startsWith('kcowner_') ? t : null;
+      r = await kantor.get('/api/remote/relay-owner');
     } on KantorException catch (e) {
-      if (e.kind == KantorFailure.notFound) return null;
+      // 404 → notFound; 409 → server (kantor misconfigured)
+      if (e.kind == KantorFailure.notFound || e.kind == KantorFailure.server) {
+        return null;
+      }
       rethrow;
     }
+    if (r is! Map) return null;
+    final t = r['token'];
+    if (t is! String || !t.startsWith('kcowner_')) return null;
+    final url = r['url'];
+    if (url is String && url.isNotEmpty) {
+      String? origin(String u) => Uri.tryParse(u.trim())?.origin;
+      if (origin(url) != origin(relayUrl)) return null;
+    }
+    return t;
   }
 }
 
