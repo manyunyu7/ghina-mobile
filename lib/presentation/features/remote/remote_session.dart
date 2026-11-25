@@ -571,14 +571,27 @@ class RemoteSession extends ChangeNotifier {
     send(Ctl.cfg(cursor: mode));
   }
 
-  /// Caps the stream to this screen (long side ≤ 2560, short ≤ 1440 keeps
-  /// 60 fps). Sent again when the screen changes (Fold, rotation).
-  void setMaxStream(Size physical) {
+  /// Pixel budget that keeps 60 fps (2560×1440).
+  static const maxStreamPixels = 2560 * 1440;
+
+  /// Caps the stream to this screen by AREA, not by its short side: the
+  /// device's physical size, scaled down only when w×h exceeds
+  /// [maxStreamPixels], sent landscape (long, short) so a landscape Mac
+  /// stream is not squeezed by a portrait phone's short side. The host fits
+  /// its own aspect inside. Sent again when the screen changes (Fold,
+  /// rotation).
+  static Size streamCapFor(Size physical) {
     final long = math.max(physical.width, physical.height);
     final short = math.min(physical.width, physical.height);
-    final k = math.min(1.0, math.min(2560 / long, 1440 / short));
-    final next = Size((long * k).roundToDouble(), (short * k).roundToDouble());
-    if (next == maxStream) return;
+    if (long <= 0 || short <= 0) return Size.zero;
+    final area = long * short;
+    final k = area > maxStreamPixels ? math.sqrt(maxStreamPixels / area) : 1.0;
+    return Size((long * k).floorToDouble(), (short * k).floorToDouble());
+  }
+
+  void setMaxStream(Size physical) {
+    final next = streamCapFor(physical);
+    if (next.isEmpty || next == maxStream) return;
     maxStream = next;
     send(Ctl.cfg(maxW: next.width.round(), maxH: next.height.round()));
   }

@@ -209,7 +209,7 @@ void main() {
       expect(Ctl.virtualDisplay(on: false), {'t': 'vd', 'on': false});
     });
 
-    test('stream cap follows the screen, ≤2560×1440', () {
+    test('stream cap by area (≤2560×1440 px), landscape', () {
       final s = RemoteSession(
         hubs: RemoteHubClient([
           RemoteHubConn(
@@ -226,11 +226,22 @@ void main() {
         viewer: const {},
       );
       s.setMaxStream(const Size(1080, 2400)); // phone portrait
-      expect(s.maxStream, const Size(2400, 1080));
-      s.setMaxStream(const Size(2176, 1812)); // Fold open
-      expect(s.maxStream, const Size(1729, 1440));
+      expect(s.maxStream, const Size(2400, 1080)); // under budget, landscape
+      // Fold 8 Ultra inner 2184×1968: over budget by area → scaled evenly,
+      // and a 1920×1080 Mac stream still fits uncut
+      s.setMaxStream(const Size(2184, 1968));
+      final fold = s.maxStream!;
+      expect(fold.width * fold.height, lessThanOrEqualTo(2560 * 1440));
+      expect(fold.width / fold.height, closeTo(2184 / 1968, 0.01));
+      expect(fold.width, greaterThanOrEqualTo(1920));
+      expect(fold.height, greaterThanOrEqualTo(1080));
+      expect(fold, const Size(2022, 1822));
+      s.setMaxStream(const Size(1968, 2184)); // same Fold, portrait
+      expect(s.maxStream, fold);
       s.setMaxStream(const Size(3200, 2000)); // big tablet
-      expect(s.maxStream, const Size(2304, 1440));
+      final tab = s.maxStream!;
+      expect(tab.width * tab.height, lessThanOrEqualTo(2560 * 1440));
+      expect(tab.width, greaterThanOrEqualTo(1920));
       // nothing to send to yet: the request is remembered for the channel
       s.setVirtualDisplay(on: true, points: const Size(905.4, 1001), scale: 2);
       expect(s.virtualDisplayOn, isTrue);
