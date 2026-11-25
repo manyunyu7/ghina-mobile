@@ -9,6 +9,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../../data/datasources/remote/kantor_api.dart';
 import 'remote_protocol.dart';
+import 'remote_security.dart';
 
 enum RemoteStatus {
   /// Opening the signaling socket / waiting for the Mac.
@@ -68,7 +69,16 @@ class RemoteSession extends ChangeNotifier {
     required this.host,
     required this.viewer,
     this.backgroundGrace = const Duration(minutes: 2),
-  });
+    RemotePinStore? pins,
+  }) : pins = pins ?? SecureRemotePinStore();
+
+  /// Pinned DTLS fingerprints (trust on first use, per Mac).
+  final RemotePinStore pins;
+
+  /// The last offer was refused because the Mac's fingerprint changed since
+  /// it was first trusted (the UI offers "trust again").
+  bool pinChanged = false;
+  String? _announcedFp;
 
   final KantorApi api;
   final RemoteHost host;
@@ -265,8 +275,9 @@ class RemoteSession extends ChangeNotifier {
 
   void _onSignal(SignalMessage msg, int gen) {
     switch (msg) {
-      case SignalReady(:final session):
+      case SignalReady(:final session, :final fingerprint):
         _sid = session ?? _sid;
+        _announcedFp = fingerprint;
         if (status != RemoteStatus.connected) {
           status = RemoteStatus.waiting;
           _notify();
@@ -309,6 +320,7 @@ class RemoteSession extends ChangeNotifier {
   }
 
   Future<void> _onOffer(String sdp, int gen) async {
+    if (!await _verifyFingerprint(sdp, gen)) return;
     try {
       var pc = _pc;
       if (pc == null) {
@@ -341,6 +353,61 @@ class RemoteSession extends ChangeNotifier {
     } catch (e) {
       if (gen == _gen) _fail('Gagal menyiapkan video: $e');
     }
+  }
+
+  /// DTLS pinning: the offer must carry the fingerprint kantor-claude
+  /// announced in `ready`, and the one pinned for this Mac (TOFU).
+  Future<bool> _verifyFingerprint(String sdp, int gen) async {
+    final base = api.config.baseUrl;
+    String? pinned;
+    try {
+      pinned = await pins.read(base, host.machine);
+    } catch (_) {}
+    if (gen != _gen) return false;
+    final r = checkFingerprint(
+      sdp: sdp,
+      announced: _announcedFp,
+      pinned: pinned,
+    );
+    switch (r) {
+      case PinResult.ok:
+        pinChanged = false;
+        if (pinned == null) {
+          final fp = sdpFingerprints(sdp).single;
+          try {
+            await pins.write(base, host.machine, fp);
+          } catch (_) {}
+        }
+        return gen == _gen;
+      case PinResult.missing:
+        _fail(
+          'Mac tidak mengirim sidik jari DTLS. Sesi ditolak.',
+          retry: false,
+        );
+      case PinResult.mismatchAnnounced:
+        _fail(
+          'Sidik jari video tidak sama dengan yang didaftarkan Mac ke kantor. '
+          'Sesi ditolak demi keamanan.',
+          retry: false,
+        );
+      case PinResult.mismatchPinned:
+        pinChanged = true;
+        _fail(
+          'Identitas ${host.name} berubah sejak pertama dipercaya. Kalau kamu '
+          'baru memasang ulang ravel-host, percayai lagi; kalau tidak, jangan.',
+          retry: false,
+        );
+    }
+    return false;
+  }
+
+  /// After the owner confirms: forget the old pin and connect again.
+  Future<void> trustNewIdentity() async {
+    try {
+      await pins.clear(api.config.baseUrl, host.machine);
+    } catch (_) {}
+    pinChanged = false;
+    reconnectNow();
   }
 
   void _wirePeer(RTCPeerConnection pc, int gen) {

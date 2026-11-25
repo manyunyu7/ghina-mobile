@@ -43,7 +43,17 @@ class RemoteSessionPage extends ConsumerStatefulWidget {
   ConsumerState<RemoteSessionPage> createState() => _RemoteSessionPageState();
 }
 
-const _prefMode = 'ravel.remote.mode';
+/// Input mode is remembered per form factor: phone / Fold closed vs
+/// tablet / Fold open (RESEARCH.md: trackpad vs touch by default).
+String _prefModeFor(bool wide) =>
+    wide ? 'ravel.remote.mode.wide' : 'ravel.remote.mode.narrow';
+
+/// Shortest side ≥ 600dp: tablet or an open Fold.
+bool remoteIsWideDevice(Size logical) =>
+    math.min(logical.width, logical.height) >= 600;
+
+InputMode remoteDefaultMode(bool wide) =>
+    wide ? InputMode.touch : InputMode.trackpad;
 const _prefQuality = 'ravel.remote.quality';
 const _prefVd = 'ravel.remote.vd';
 
@@ -128,7 +138,10 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
   /// Fold opened/closed or rotated: new stream cap (and new virtual display
   /// size, handled by the stage layout).
   @override
-  void didChangeMetrics() => _s?.setMaxStream(_physicalSize());
+  void didChangeMetrics() {
+    _s?.setMaxStream(_physicalSize());
+    _onFormChange();
+  }
 
   static Size _physicalSize() =>
       WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
@@ -155,13 +168,34 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     final quality = RemoteQuality.values.where((v) => v.wire == q);
     if (quality.isNotEmpty) _s?.quality = quality.first;
     setState(() {
-      _mode = p.getString(_prefMode) == 'touch'
-          ? InputMode.touch
-          : InputMode.trackpad;
+      _mode = _storedMode(p, _wide);
       _wantVd = p.getBool(_prefVd) ?? false;
     });
     _s?.setCursorMode(_cursorFor(_mode));
     _syncVirtualDisplay();
+  }
+
+  static bool get _wideNow => remoteIsWideDevice(_physicalSize() / _dpr());
+  bool _wide = _wideNow;
+
+  static InputMode _storedMode(SharedPreferences p, bool wide) =>
+      switch (p.getString(_prefModeFor(wide))) {
+        'touch' => InputMode.touch,
+        'trackpad' => InputMode.trackpad,
+        _ => remoteDefaultMode(wide),
+      };
+
+  /// Fold opened/closed: switch to that posture's mode.
+  Future<void> _onFormChange() async {
+    final wide = _wideNow;
+    if (wide == _wide) return;
+    _wide = wide;
+    final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final m = _storedMode(p, wide);
+    if (m == _mode) return;
+    setState(() => _mode = m);
+    _s?.setCursorMode(_cursorFor(m));
   }
 
   static RemoteCursorMode _cursorFor(InputMode m) =>
@@ -282,7 +316,10 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
           : 'Mode sentuh langsung: ketuk tepat di titik yang mau diklik',
     );
     final p = await SharedPreferences.getInstance();
-    await p.setString(_prefMode, m == InputMode.touch ? 'touch' : 'trackpad');
+    await p.setString(
+      _prefModeFor(_wide),
+      m == InputMode.touch ? 'touch' : 'trackpad',
+    );
   }
 
   Future<void> _setQuality(RemoteQuality q) async {
@@ -313,6 +350,31 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     final nav = Navigator.of(context);
     await _s?.close();
     if (mounted) nav.pop();
+  }
+
+  Future<void> _confirmTrust() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Percayai identitas baru?'),
+        content: Text(
+          'Sidik jari ${widget.host.name} berbeda dari yang tersimpan. Ini wajar '
+          'hanya kalau ravel-host baru dipasang ulang atau sertifikatnya diganti. '
+          'Kalau tidak yakin, batalkan dan periksa Mac-nya dulu.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Percayai'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _s?.trustNewIdentity();
   }
 
   Future<void> _confirmLeave() async {
@@ -532,7 +594,16 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: [
-                if (!spinner)
+                if (s.pinChanged)
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFB3261E),
+                    ),
+                    onPressed: _confirmTrust,
+                    icon: const Icon(Icons.gpp_maybe_rounded),
+                    label: const Text('Percayai lagi'),
+                  )
+                else if (!spinner)
                   FilledButton.icon(
                     onPressed: s.reconnectNow,
                     icon: const Icon(Icons.refresh_rounded),

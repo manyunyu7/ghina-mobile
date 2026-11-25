@@ -10,16 +10,20 @@ import '../kantor/widgets/kantor_wide.dart';
 import 'remote_auth.dart';
 import 'remote_pairing.dart';
 import 'remote_protocol.dart';
+import 'remote_security.dart';
 import 'remote_session_page.dart';
 
 /// "Remote Mac": the Macs that run ravel-host (`GET /api/remote/hosts`).
 /// Tap an online Mac to open a remote-desktop session. Live via the
 /// `remote-hosts` event on `/ws`, plus a poll every 15 s while visible.
 class RemoteHostsPage extends ConsumerStatefulWidget {
-  const RemoteHostsPage({super.key, this.load});
+  const RemoteHostsPage({super.key, this.load, this.lock});
 
   /// Override for tests; defaults to `GET /api/remote/hosts`.
   final Future<List<RemoteHost>> Function()? load;
+
+  /// Biometric gate before a session (override for tests).
+  final RemoteLock? lock;
 
   @override
   ConsumerState<RemoteHostsPage> createState() => _RemoteHostsPageState();
@@ -28,6 +32,8 @@ class RemoteHostsPage extends ConsumerStatefulWidget {
 class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     with WidgetsBindingObserver {
   final _store = RemoteDeviceStore();
+  late final RemoteLock _lock = widget.lock ?? RemoteLock();
+  RemoteLockPolicy _policy = RemoteLockPolicy.everySession;
   List<RemoteHost>? _hosts;
   List<RemotePendingPair> _pending = const [];
   Object? _error;
@@ -45,6 +51,9 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     WidgetsBinding.instance.addObserver(this);
     _initAuth();
     _start();
+    _lock.policy().then((p) {
+      if (mounted) setState(() => _policy = p);
+    });
   }
 
   @override
@@ -153,6 +162,22 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
             '${h.name} offline. Nyalakan Mac dan pastikan ravel-host berjalan.',
           ),
           behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final unlocked = await _lock.unlock(h.name);
+    if (!mounted) return;
+    if (unlocked != RemoteUnlock.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(switch (unlocked) {
+            RemoteUnlock.lockedOut =>
+              'Terlalu banyak percobaan. Coba lagi sebentar lagi.',
+            RemoteUnlock.failed => 'Verifikasi gagal.',
+            _ => 'Verifikasi dibatalkan.',
+          }),
         ),
       );
       return;
@@ -270,6 +295,26 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
               tooltip: 'Muat ulang',
               icon: const Icon(Icons.refresh_rounded),
               onPressed: _load,
+            ),
+            PopupMenuButton<RemoteLockPolicy>(
+              tooltip: 'Kunci biometrik',
+              icon: const Icon(Icons.fingerprint_rounded),
+              onSelected: (p) {
+                setState(() => _policy = p);
+                _lock.setPolicy(p);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem<RemoteLockPolicy>(
+                  enabled: false,
+                  child: Text('Sidik jari / PIN sebelum sesi'),
+                ),
+                for (final p in RemoteLockPolicy.values)
+                  CheckedPopupMenuItem(
+                    value: p,
+                    checked: p == _policy,
+                    child: Text(p.label),
+                  ),
+              ],
             ),
           ],
         ],

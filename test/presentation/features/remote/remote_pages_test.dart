@@ -7,7 +7,10 @@ import 'package:ghina/di/kantor_providers.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/remote/remote_hosts_page.dart';
 import 'package:ghina/presentation/features/remote/remote_pairing.dart';
+import 'package:ghina/presentation/features/habits/lock/habit_lock.dart';
 import 'package:ghina/presentation/features/remote/remote_protocol.dart';
+import 'package:ghina/presentation/features/remote/remote_security.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final _hosts = RemoteHost.listFromJson([
   {
@@ -36,7 +39,40 @@ Future<void> _pump(WidgetTester t, Size size, Widget child) async {
   await t.pump();
 }
 
+class _NoAuth implements HabitAuthenticator {
+  int calls = 0;
+  @override
+  Future<bool> canAuthenticate() async => true;
+  @override
+  Future<HabitAuthOutcome> authenticate(String reason) async {
+    calls++;
+    return HabitAuthOutcome.cancelled;
+  }
+}
+
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    RemoteLock.reset();
+  });
+
+  testWidgets('cancelled biometrics keep the session closed', (t) async {
+    final auth = _NoAuth();
+    await _pump(
+      t,
+      const Size(400, 800),
+      RemoteHostsPage(
+        load: () async => _hosts,
+        lock: RemoteLock(auth: auth),
+      ),
+    );
+    await t.tap(find.textContaining('Mac mini kantor'));
+    await t.pumpAndSettle();
+    expect(auth.calls, 1);
+    expect(find.text('Verifikasi dibatalkan.'), findsOneWidget);
+    expect(find.text('Remote Mac'), findsOneWidget); // still on the list
+  });
+
   for (final size in const [Size(320, 700), Size(900, 800)]) {
     testWidgets('hosts list at ${size.width.toInt()}dp', (t) async {
       await _pump(t, size, RemoteHostsPage(load: () async => _hosts));

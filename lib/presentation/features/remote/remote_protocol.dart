@@ -111,7 +111,7 @@ sealed class SignalMessage {
     final session = json['session']?.toString();
     switch (json['type']) {
       case 'ready':
-        return SignalReady(session);
+        return SignalReady(session, json['fingerprint']?.toString());
       case 'error':
         return SignalError(json['message']?.toString() ?? 'Kesalahan sesi.');
       case 'offer':
@@ -135,8 +135,11 @@ sealed class SignalMessage {
 }
 
 class SignalReady extends SignalMessage {
-  const SignalReady(this.session);
+  const SignalReady(this.session, [this.fingerprint]);
   final String? session;
+
+  /// DTLS fingerprint the Mac registered with (`sha-256 AB:CD:…`).
+  final String? fingerprint;
 }
 
 class SignalError extends SignalMessage {

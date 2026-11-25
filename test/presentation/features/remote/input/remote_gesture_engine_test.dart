@@ -223,6 +223,31 @@ void main() {
       });
     });
 
+    test('geser 3 jari = geser tampilan, tidak dikirim ke Mac', () {
+      fakeAsync((async) {
+        final r = _Rig(InputMode.trackpad);
+        r.down(1, const Offset(100, 100));
+        r.down(2, const Offset(150, 100));
+        r.down(3, const Offset(200, 100));
+        r.tick(async, 20);
+        for (var i = 1; i <= 4; i++) {
+          r.move(1, Offset(100, 100 + i * 10.0));
+          r.move(2, Offset(150, 100 + i * 10.0));
+          r.move(3, Offset(200, 100 + i * 10.0));
+          r.tick(async, 16);
+        }
+        r.up(1, const Offset(100, 140));
+        r.up(2, const Offset(150, 140));
+        r.up(3, const Offset(200, 140));
+        r.tick(async, 400);
+        expect(r.sent, isEmpty);
+        expect(r.viewport.zooms, isNotEmpty);
+        expect(r.viewport.zooms.every((z) => z.scaleRatio == 1.0), isTrue);
+        final total = r.viewport.zooms.fold(0.0, (a, z) => a + z.pan.dy);
+        expect(total, closeTo(40, 0.01));
+      });
+    });
+
     test('ketuk 2 jari = klik kanan, 3 jari = klik tengah', () {
       fakeAsync((async) {
         final r = _Rig(InputMode.trackpad);

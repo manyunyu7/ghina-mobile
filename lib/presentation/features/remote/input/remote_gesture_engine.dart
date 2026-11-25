@@ -47,6 +47,9 @@ enum _Phase {
   scrolling,
   zooming,
 
+  /// 3+ jari: geser tampilan yang diperbesar (tidak dikirim ke Mac).
+  panning,
+
   /// Gestur multi-jari selesai sebagian; tunggu semua jari terangkat.
   trailing,
 }
@@ -206,6 +209,7 @@ class RemoteGestureEngine {
         _resetMultiBaseline();
       case _Phase.scrolling:
       case _Phase.zooming:
+      case _Phase.panning:
         _resetMultiBaseline(keepOrigin: true);
       default:
         // dragging / consumed / trailing: jari tambahan diabaikan.
@@ -255,6 +259,8 @@ class RemoteGestureEngine {
         _scroll(e.timeStamp);
       case _Phase.zooming:
         _zoom();
+      case _Phase.panning:
+        _pan();
       default:
         break;
     }
@@ -320,7 +326,10 @@ class RemoteGestureEngine {
     }
     if ((c - _c0).distance > _settings.scrollSlop) {
       if (_ptrs.length != 2) {
-        _phase = _Phase.trailing; // 3+ jari menggeser: belum dipakai.
+        // 3+ jari menggeser: geser tampilan (berguna saat diperbesar).
+        _phase = _settings.allowZoom ? _Phase.panning : _Phase.trailing;
+        _lastCentroid = _c0;
+        if (_phase == _Phase.panning) _pan();
         return;
       }
       _phase = _Phase.scrolling;
@@ -363,6 +372,13 @@ class RemoteGestureEngine {
     _lastSpread = s;
   }
 
+  void _pan() {
+    if (_ptrs.length < 2) return;
+    final c = _centroid();
+    viewport.zoomView(focal: c, scaleRatio: 1.0, pan: c - _lastCentroid);
+    _lastCentroid = c;
+  }
+
   void _startInertia(Duration liftTs) {
     if (!_settings.scrollInertia) return;
     final last = _lastScrollTs;
@@ -399,6 +415,7 @@ class RemoteGestureEngine {
           if (!cancelled) _startInertia(e.timeStamp);
           _phase = _Phase.trailing;
         case _Phase.zooming:
+        case _Phase.panning:
           _phase = _Phase.trailing;
         case _Phase.multiPending:
           _resetMultiBaseline(keepOrigin: true);
