@@ -105,6 +105,15 @@ class RemoteHubStore {
   final RemoteSecrets _secrets;
 
   static const _listKey = 'ravel.remote.hubs.v2';
+  static const _seededKey = 'ravel.remote.hubs.seeded';
+
+  /// Built-in relay (VPS), first in the list. Override at build time with
+  /// `--dart-define=RAVEL_RELAY_URL=…` (empty = no built-in relay).
+  static const defaultRelayUrl = String.fromEnvironment(
+    'RAVEL_RELAY_URL',
+    defaultValue: 'https://remote.tentrem.space',
+  );
+  static const defaultRelayId = 'relay-default';
   static const _lastKey = 'ravel.remote.hub.last';
   static String _viewerKey(String id) => 'ravel.remote.hub.$id.viewer';
   static String _ownerKey(String id) => 'ravel.remote.hub.$id.owner';
@@ -139,6 +148,24 @@ class RemoteHubStore {
         }
       } catch (_) {}
     }
+    // Seed the built-in relay once (in front); if the owner deletes it, it
+    // stays deleted.
+    if (!(p.getBool(_seededKey) ?? false)) {
+      final relay = parseUrl(defaultRelayUrl);
+      if (relay != null && !list.any((h) => h.url == relay)) {
+        list = [
+          RemoteHub(
+            id: defaultRelayId,
+            name: 'Relay VPS',
+            url: relay,
+            kind: RemoteHubKind.relay,
+          ),
+          ...list,
+        ];
+      }
+      await p.setBool(_seededKey, true);
+      await save(list);
+    }
     final k = kantorUrl == null ? null : parseUrl(kantorUrl);
     if (k != null &&
         !list.any((h) => h.kind == RemoteHubKind.kantor && h.url == k)) {
@@ -148,7 +175,9 @@ class RemoteHubStore {
         url: k,
         kind: RemoteHubKind.kantor,
       );
-      list = [hub, ...list];
+      // after the relays (VPS first, then Kantor/Tailscale)
+      final at = list.lastIndexWhere((h) => h.kind == RemoteHubKind.relay) + 1;
+      list = [...list.sublist(0, at), hub, ...list.sublist(at)];
       await save(list);
       // single-hub build stored the viewer token by Kantor origin
       final legacy = await _secrets.read(legacyViewerKey(k));

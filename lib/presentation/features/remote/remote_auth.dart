@@ -169,4 +169,32 @@ abstract final class RemoteAuth {
 
   static Future<void> approveOther(KantorApi viewer, String id) =>
       viewer.post('/api/remote/pair/$id/approve');
+
+  /// Planned kantor-claude endpoint `GET /api/remote/relay-owner?url=<relay>`
+  /// (Kantor token) → `{token: "kcowner_…", url?}`: lets a phone that is
+  /// already connected to Kantor get the relay owner token without typing.
+  /// Returns null when Kantor does not have it (404 / older daemon).
+  static Future<String?> relayOwnerFromKantor(
+    KantorApi kantor,
+    String relayUrl,
+  ) async {
+    try {
+      final r = await kantor.get(
+        '/api/remote/relay-owner',
+        query: {'url': relayUrl},
+      );
+      final t = r is Map ? r['token'] : null;
+      return t is String && t.startsWith('kcowner_') ? t : null;
+    } on KantorException catch (e) {
+      if (e.kind == KantorFailure.notFound) return null;
+      rethrow;
+    }
+  }
 }
+
+final _ownerToken = RegExp(r'kcowner_[A-Za-z0-9_\-]{8,}');
+
+/// Relay owner token inside whatever a QR code / paste holds: the bare
+/// token, a JSON like `{"owner":"kcowner_…","url":…}`, or a link.
+String? extractRelayOwnerToken(String raw) =>
+    _ownerToken.firstMatch(raw)?.group(0);

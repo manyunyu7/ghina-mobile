@@ -388,6 +388,7 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
         hub: pairing,
         store: _hubStore,
         kantorToken: owner?.config.token,
+        kantor: owner,
         notice: _pairNotice,
         onPaired: (t) => _onPaired(pairing, t),
       );

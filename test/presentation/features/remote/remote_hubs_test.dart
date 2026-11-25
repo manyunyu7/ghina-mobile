@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/data/datasources/remote/kantor_api.dart';
 import 'package:ghina/presentation/features/remote/input/remote_input.dart';
+import 'package:ghina/presentation/features/remote/remote_auth.dart';
 import 'package:ghina/presentation/features/remote/remote_hubs.dart';
 import 'package:ghina/presentation/features/remote/remote_protocol.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,20 +23,28 @@ void main() {
       store = RemoteHubStore(secrets: secrets);
     });
 
-    test('adds the Kantor as first hub and migrates its old token', () async {
+    test('built-in relay first, then the Kantor; old token migrated', () async {
       await secrets.write(
         RemoteHubStore.legacyViewerKey('http://kantor.example:8787'),
         'kcview_old',
       );
       final hubs = await store.hubs(kantorUrl: 'http://kantor.example:8787/');
-      expect(hubs.single.kind, RemoteHubKind.kantor);
-      expect(hubs.single.url, 'http://kantor.example:8787');
-      expect(await store.viewerToken(hubs.single.id), 'kcview_old');
+      expect(hubs.map((h) => (h.kind, h.url)), [
+        (RemoteHubKind.relay, RemoteHubStore.defaultRelayUrl),
+        (RemoteHubKind.kantor, 'http://kantor.example:8787'),
+      ]);
+      expect(await store.viewerToken(hubs.last.id), 'kcview_old');
       // idempotent
       expect(
         await store.hubs(kantorUrl: 'http://kantor.example:8787'),
-        hasLength(1),
+        hasLength(2),
       );
+    });
+
+    test('a deleted built-in relay stays deleted', () async {
+      await store.hubs();
+      await store.remove(RemoteHubStore.defaultRelayId);
+      expect(await store.hubs(), isEmpty);
     });
 
     test('tokens are per hub; relay owner token kept per hub', () async {
@@ -51,6 +60,7 @@ void main() {
         url: 'http://kantor.example:8787',
         kind: RemoteHubKind.kantor,
       );
+      await store.hubs(); // built-in relay seeded once
       await store.save([kantor, relay]);
       await store.setViewerToken('k1', 'kcview_k');
       await store.setOwnerToken('r1', ' kcowner_r ');
@@ -86,6 +96,17 @@ void main() {
         'https://x.example',
       );
     });
+  });
+
+  test('relay owner token from QR / paste text', () {
+    const t = 'kcowner_AbC-12_xyz9876';
+    expect(extractRelayOwnerToken(t), t);
+    expect(
+      extractRelayOwnerToken('{"url":"https://r.example","owner":"$t"}'),
+      t,
+    );
+    expect(extractRelayOwnerToken('ravel://pair?owner=$t&x=1'), t);
+    expect(extractRelayOwnerToken('kcview_nope'), isNull);
   });
 
   group('hub client', () {

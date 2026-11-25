@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import '../../../data/datasources/remote/kantor_api.dart';
 import '../../design_system/design_system.dart';
 import '../kantor/widgets/kantor_wide.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+import 'remote_auth.dart';
 import 'remote_hubs.dart';
 import 'remote_pairing.dart';
 
@@ -18,7 +21,12 @@ class RemoteHubPairing extends StatefulWidget {
     required this.kantorToken,
     required this.onPaired,
     this.notice,
+    this.kantor,
   });
+
+  /// The app's Kantor connection, to fetch the relay owner token from
+  /// `GET /api/remote/relay-owner` when Kantor offers it.
+  final KantorApi? kantor;
 
   final RemoteHub hub;
   final RemoteHubStore store;
@@ -61,9 +69,21 @@ class _RemoteHubPairingState extends State<RemoteHubPairing> {
   }
 
   Future<void> _init() async {
-    final owner = widget.hub.kind == RemoteHubKind.kantor
+    var owner = widget.hub.kind == RemoteHubKind.kantor
         ? widget.kantorToken
         : await widget.store.ownerToken(widget.hub.id);
+    final kantor = widget.kantor;
+    if (owner == null &&
+        widget.hub.kind == RemoteHubKind.relay &&
+        kantor != null) {
+      // Kantor may hand out the relay owner token (planned endpoint)
+      try {
+        owner = await RemoteAuth.relayOwnerFromKantor(kantor, widget.hub.url);
+        if (owner != null) {
+          await widget.store.setOwnerToken(widget.hub.id, owner);
+        }
+      } catch (_) {}
+    }
     if (!mounted) return;
     setState(() {
       _owner = owner;
@@ -73,12 +93,26 @@ class _RemoteHubPairingState extends State<RemoteHubPairing> {
 
   Future<void> _paste() async {
     final t = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim();
-    if (t != null) _ownerCtl.text = t;
+    if (t != null) _ownerCtl.text = extractRelayOwnerToken(t) ?? t;
+  }
+
+  Future<void> _scan() async {
+    final raw = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const RemoteQrScanPage()));
+    if (raw == null || !mounted) return;
+    final t = extractRelayOwnerToken(raw);
+    if (t == null) {
+      setState(() => _ownerError = 'QR itu tidak berisi token owner relay.');
+      return;
+    }
+    _ownerCtl.text = t;
+    await _saveOwner();
   }
 
   Future<void> _saveOwner() async {
-    final t = _ownerCtl.text.trim();
-    if (!t.startsWith('kcowner_') || t.length < 16) {
+    final t = extractRelayOwnerToken(_ownerCtl.text.trim()) ?? '';
+    if (t.isEmpty) {
       setState(() => _ownerError = 'Token owner relay diawali "kcowner_".');
       return;
     }
@@ -136,9 +170,9 @@ class _RemoteHubPairingState extends State<RemoteHubPairing> {
               const SizedBox(height: GhinaSpace.sm),
               Text(
                 widget.hub.kind == RemoteHubKind.relay
-                    ? 'Sekali saja: tempel token owner dari relay '
-                          '(`ravel-relay owner add`). Token ini hanya dipakai '
-                          'untuk meminta pairing dan disimpan aman di HP.'
+                    ? 'Sekali per HP: tempel atau pindai QR token owner dari '
+                          'relay (`ravel-relay owner add`). Token ini hanya '
+                          'dipakai untuk meminta pairing dan disimpan aman di HP.'
                     : 'Isi token Kantor di Pengaturan Kantor dulu.',
                 textAlign: TextAlign.center,
                 style: GhinaType.body.copyWith(color: g.textSecondary),
@@ -165,6 +199,12 @@ class _RemoteHubPairingState extends State<RemoteHubPairing> {
                 FilledButton(
                   onPressed: _saveOwner,
                   child: const Text('Lanjut'),
+                ),
+                const SizedBox(height: GhinaSpace.sm),
+                OutlinedButton.icon(
+                  onPressed: _scan,
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  label: const Text('Pindai QR'),
                 ),
               ],
             ],
@@ -440,5 +480,71 @@ class _HubDialogState extends State<_HubDialog> {
       ),
       FilledButton(onPressed: _save, child: const Text('Simpan')),
     ],
+  );
+}
+
+/// Full-screen QR scanner; pops with the first code's text.
+class RemoteQrScanPage extends StatefulWidget {
+  const RemoteQrScanPage({super.key});
+
+  @override
+  State<RemoteQrScanPage> createState() => _RemoteQrScanPageState();
+}
+
+class _RemoteQrScanPageState extends State<RemoteQrScanPage> {
+  final _ctl = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
+  bool _done = false;
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      title: const Text('Pindai QR token owner'),
+    ),
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        MobileScanner(
+          controller: _ctl,
+          onDetect: (capture) {
+            if (_done) return;
+            for (final b in capture.barcodes) {
+              final v = b.rawValue;
+              if (v != null && v.isNotEmpty) {
+                _done = true;
+                Navigator.of(context).pop(v);
+                return;
+              }
+            }
+          },
+          errorBuilder: (context, error) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Kamera tidak bisa dipakai (${error.errorCode.name}). '
+                'Beri izin kamera untuk Ravel, atau tempel tokennya.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+        const Align(
+          alignment: Alignment(0, 0.8),
+          child: Text(
+            'Arahkan ke QR dari `ravel-relay owner add`',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      ],
+    ),
   );
 }
