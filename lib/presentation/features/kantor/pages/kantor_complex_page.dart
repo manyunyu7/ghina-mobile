@@ -134,6 +134,7 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
               if (v == 'baru') context.push('/kantor/new');
               if (v == 'dibuka') showKantorShows(context);
               if (v == 'pc') context.push('/kantor/pc');
+              if (v == 'remote') context.push('/kantor/remote');
               if (v == 'set') context.push('/kantor/settings');
             },
             itemBuilder: (_) => const [
@@ -162,6 +163,15 @@ class _KantorComplexPageState extends ConsumerState<KantorComplexPage> {
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.monitor_heart_rounded),
                   title: Text('Performa PC'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'remote',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.desktop_mac_rounded),
+                  title: Text('Remote Mac'),
                 ),
               ),
               PopupMenuItem(
