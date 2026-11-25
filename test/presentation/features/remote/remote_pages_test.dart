@@ -1,15 +1,13 @@
-// Daftar Mac dan baris tombol keyboard di layar sempit (cover Fold ±320dp)
+// Daftar Mac dan layar pairing di layar sempit (cover Fold ±320dp)
 // dan lebar (Fold terbuka / tablet).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/di/kantor_providers.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_hosts_page.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_keys.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_pairing.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_protocol.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_widgets.dart';
+import 'package:ghina/presentation/features/remote/remote_hosts_page.dart';
+import 'package:ghina/presentation/features/remote/remote_pairing.dart';
+import 'package:ghina/presentation/features/remote/remote_protocol.dart';
 
 final _hosts = RemoteHost.listFromJson([
   {
@@ -58,45 +56,6 @@ void main() {
   testWidgets('empty list explains how to add a Mac', (t) async {
     await _pump(t, const Size(400, 800), RemoteHostsPage(load: () async => []));
     expect(find.text('Belum ada Mac terdaftar'), findsOneWidget);
-  });
-
-  testWidgets('key bar fits a narrow screen and reports taps', (t) async {
-    final sticky = StickyModifiers();
-    final keys = <String>[];
-    final mods = <RemoteMod>[];
-    final shortcuts = <String>[];
-    var pasted = 0;
-    await _pump(
-      t,
-      const Size(320, 600),
-      Scaffold(
-        body: const SizedBox.expand(),
-        bottomNavigationBar: RemoteKeyBar(
-          sticky: sticky,
-          onKey: keys.add,
-          onMod: mods.add,
-          onShortcut: (code, m) =>
-              shortcuts.add('$code${m.map((e) => e.wire)}'),
-          onPaste: () => pasted++,
-          onClose: () {},
-        ),
-      ),
-    );
-    expect(t.takeException(), isNull);
-    await t.tap(find.text('esc'));
-    await t.tap(find.text('⌘'));
-    // the row scrolls sideways on a narrow screen
-    await t.scrollUntilVisible(
-      find.text('⌘V'),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await t.tap(find.text('⌘C'));
-    await t.tap(find.text('⌘V'));
-    expect(keys, ['Escape']);
-    expect(mods, [RemoteMod.meta]);
-    expect(shortcuts, ['KeyC(meta)']);
-    expect(pasted, 1);
   });
 
   testWidgets('pairing screen fits the Fold cover screen', (t) async {

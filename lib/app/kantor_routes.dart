@@ -7,7 +7,7 @@ import '../presentation/features/kantor/pages/kantor_shell_page.dart';
 import '../presentation/features/kantor/session/kantor_session_page.dart';
 import '../presentation/features/kantor/pratinjau/pratinjau_detail.dart';
 import '../presentation/features/kantor/pratinjau/pratinjau_feed.dart';
-import '../presentation/features/kantor/remote/remote_hosts_page.dart';
+import '../presentation/features/remote/remote_hosts_page.dart';
 import '../presentation/features/kantor/sysmon/kantor_sysmon_page.dart';
 
 /// Shared by Ghina and the standalone Ravel app.

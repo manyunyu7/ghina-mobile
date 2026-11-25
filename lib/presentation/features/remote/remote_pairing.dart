@@ -4,9 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../data/datasources/remote/kantor_api.dart';
-import '../../../design_system/design_system.dart';
-import '../widgets/kantor_wide.dart';
+import '../../../data/datasources/remote/kantor_api.dart';
+import '../../design_system/design_system.dart';
+import '../kantor/widgets/kantor_wide.dart';
 import 'remote_auth.dart';
 
 /// Default name this phone/tablet asks to be paired as.

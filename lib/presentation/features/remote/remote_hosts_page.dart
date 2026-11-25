@@ -3,18 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../di/kantor_providers.dart';
-import '../../../design_system/design_system.dart';
-import '../widgets/kantor_states.dart';
-import '../widgets/kantor_wide.dart';
+import '../../../di/kantor_providers.dart';
+import '../../design_system/design_system.dart';
+import '../kantor/widgets/kantor_states.dart';
+import '../kantor/widgets/kantor_wide.dart';
 import 'remote_auth.dart';
 import 'remote_pairing.dart';
 import 'remote_protocol.dart';
 import 'remote_session_page.dart';
 
 /// "Remote Mac": the Macs that run ravel-host (`GET /api/remote/hosts`).
-/// Tap an online Mac to open a remote-desktop session. Refreshes every 8 s
-/// while visible.
+/// Tap an online Mac to open a remote-desktop session. Live via the
+/// `remote-hosts` event on `/ws`, plus a poll every 15 s while visible.
 class RemoteHostsPage extends ConsumerStatefulWidget {
   const RemoteHostsPage({super.key, this.load});
 
@@ -103,7 +103,7 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
 
   void _start() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
       // a session page on top owns the screen; skip polling meanwhile
       if (ModalRoute.of(context)?.isCurrent ?? true) _load();
     });
@@ -175,6 +175,13 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
   Widget build(BuildContext context) {
     final g = context.ghina;
     final owner = ref.watch(kantorApiProvider);
+    // live updates: kantor-claude pushes {t:'remote-hosts', hosts:[…]} on /ws
+    ref.listen(kantorEventsProvider, (_, next) {
+      final e = next.value;
+      if (e == null || e['t'] != 'remote-hosts' || e['hosts'] is! List) return;
+      if (widget.load != null || _viewer == null) return;
+      setState(() => _hosts = RemoteHost.listFromJson(e['hosts']));
+    });
     final hosts = _hosts;
     final paired = widget.load != null || _viewer != null;
     Widget body;

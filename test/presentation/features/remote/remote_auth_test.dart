@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghina/data/datasources/remote/kantor_api.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_auth.dart';
+import 'package:ghina/presentation/features/remote/remote_auth.dart';
 
 void main() {
   test('pair request from POST /api/remote/pair', () {
@@ -38,8 +38,8 @@ void main() {
 
   test('viewer token is stored per Kantor address', () {
     expect(
-      RemoteDeviceStore.keyFor('http://100.64.0.1:8787/'),
-      RemoteDeviceStore.keyFor('http://100.64.0.1:8787'),
+      RemoteDeviceStore.keyFor('http://kantor.example:8787/'),
+      RemoteDeviceStore.keyFor('http://kantor.example:8787'),
     );
     expect(
       RemoteDeviceStore.keyFor('http://a:1'),

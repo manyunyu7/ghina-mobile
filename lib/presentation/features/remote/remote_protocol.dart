@@ -272,6 +272,7 @@ abstract final class Ctl {
     int? maxH,
     int? bitrate,
     RemoteQuality? quality,
+    RemoteCursorMode? cursor,
   }) => {
     't': 'cfg',
     'display': ?display,
@@ -280,6 +281,24 @@ abstract final class Ctl {
     'maxH': ?maxH,
     'bitrate': ?bitrate,
     'quality': ?quality?.wire,
+    'cursor': ?cursor?.name,
+  };
+
+  /// Virtual display sized like this device (CGVirtualDisplay on the Mac).
+  /// [w]/[h] in points, [scale] 1..3. `on:false` removes it.
+  static Map<String, Object?> virtualDisplay({
+    required bool on,
+    int? w,
+    int? h,
+    int? scale,
+    String? name,
+  }) => {
+    't': 'vd',
+    'on': on,
+    'w': ?w,
+    'h': ?h,
+    'scale': ?scale?.clamp(1, 3),
+    'name': ?name,
   };
 
   static Map<String, Object?> ping(int ts) => {'t': 'ping', 'ts': ts};
@@ -300,6 +319,10 @@ String clampText(String s) {
       .decode(bytes.sublist(0, kRemoteTextLimit), allowMalformed: true)
       .replaceAll('�', '');
 }
+
+/// Who draws the pointer: `local` = the app (from `cursor` messages, the Mac
+/// stops burning it into the video), `video` = it is part of the picture.
+enum RemoteCursorMode { local, video }
 
 enum RemoteQuality {
   auto('auto', 'Otomatis'),

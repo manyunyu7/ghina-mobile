@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -6,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import '../../../../data/datasources/remote/kantor_api.dart';
+import '../../../data/datasources/remote/kantor_api.dart';
 import 'remote_protocol.dart';
 
 enum RemoteStatus {
@@ -43,6 +44,7 @@ class RemoteStats {
     this.height,
     this.encMs,
     this.codec,
+    this.decoder,
   });
 
   final double? fps;
@@ -52,6 +54,9 @@ class RemoteStats {
   final int? height;
   final double? encMs;
   final String? codec;
+
+  /// `decoderImplementation` (c2.qti…/c2.exynos… = hardware).
+  final String? decoder;
 }
 
 /// One remote-desktop session with a Mac: signaling WS to kantor-claude,
@@ -92,6 +97,20 @@ class RemoteSession extends ChangeNotifier {
   RemoteStats stats = const RemoteStats();
   bool statsEnabled = false;
   int attempt = 0;
+
+  /// Raw host → viewer ctl messages, for `RemoteInputLayer.hostMessages`.
+  Stream<Map<String, dynamic>> get hostMessages => _hostRaw.stream;
+  final _hostRaw = StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Pointer drawn by the app (trackpad) or burnt into the video (touch).
+  RemoteCursorMode cursorMode = RemoteCursorMode.video;
+
+  /// Largest stream size worth decoding on this screen (pixels).
+  Size? maxStream;
+
+  /// Virtual display request currently wanted (null = off).
+  Map<String, Object?>? _vd;
+  bool get virtualDisplayOn => _vd != null;
 
   /// Text the Mac put on its clipboard (already copied to the phone).
   Stream<String> get clipFromHost => _clipOut.stream;
@@ -166,7 +185,16 @@ class RemoteSession extends ChangeNotifier {
     return h / scale;
   }
 
+  static Future<void>? _rtcInit;
+
+  /// Low-latency playout and WARP; must run before any other flutter_webrtc
+  /// call (its first method call would otherwise init without options).
+  static Future<void> ensureWebRtc() => _rtcInit ??= WebRTC.initialize(
+    options: {'zeroPlayoutDelay': true, 'enableWARP': true},
+  ).catchError((Object _) {});
+
   Future<void> start() async {
+    await ensureWebRtc();
     await renderer.initialize();
     renderer.onResize = _notify;
     if (_disposed) return;
@@ -370,13 +398,19 @@ class RemoteSession extends ChangeNotifier {
     _ctl = ch;
     ch.onMessage = (m) {
       if (gen != _gen || m.isBinary) return;
+      try {
+        final raw = jsonDecode(m.text);
+        if (raw is Map) _hostRaw.add(Map<String, dynamic>.from(raw));
+      } catch (_) {}
       final msg = HostMessage.decode(m.text);
       if (msg != null) _onHost(msg);
     };
     ch.onDataChannelState = (s) {
       if (gen != _gen) return;
       if (s == RTCDataChannelState.RTCDataChannelOpen) {
-        if (quality != RemoteQuality.auto) send(Ctl.cfg(quality: quality));
+        _sendStreamConfig();
+        final vd = _vd;
+        if (vd != null) send(vd);
         send(Ctl.ping(_nowMs()));
       }
       _notify();
@@ -409,6 +443,7 @@ class RemoteSession extends ChangeNotifier {
         cursor = Offset(msg.x.clamp(0.0, 1.0), msg.y.clamp(0.0, 1.0));
         cursorVisible = msg.visible;
         cursorShape = msg.shape ?? 'arrow';
+        return; // ≤30/s; the input layer draws it, no page rebuild
       case HostClip(:final text):
         if (text.isEmpty || text == _lastClip) return;
         _lastClip = text;
@@ -430,6 +465,7 @@ class RemoteSession extends ChangeNotifier {
           height: stats.height,
           encMs: encMs ?? stats.encMs,
           codec: stats.codec,
+          decoder: stats.decoder,
         );
         if (!statsEnabled) return;
       case HostWarn(:final message):
@@ -448,26 +484,68 @@ class RemoteSession extends ChangeNotifier {
       return false;
     }
     ch.send(RTCDataChannelMessage(encodeCtl(msg))).catchError((_) {});
-    // predict the pointer so the local cursor does not wait for the Mac
-    switch (msg['t']) {
-      case 'mr':
-        final lw = logicalWidth;
-        final lh = logicalHeight;
-        if (lw > 0 && lh > 0) {
-          cursor = Offset(
-            (cursor.dx + (msg['dx'] as num) / lw).clamp(0.0, 1.0),
-            (cursor.dy + (msg['dy'] as num) / lh).clamp(0.0, 1.0),
-          );
-          cursorVisible = true;
-        }
-      case 'mm':
-        cursor = Offset(
-          (msg['x'] as num).toDouble(),
-          (msg['y'] as num).toDouble(),
-        );
-        cursorVisible = true;
-    }
     return true;
+  }
+
+  void _sendStreamConfig() {
+    final m = maxStream;
+    send(
+      Ctl.cfg(
+        quality: quality == RemoteQuality.auto ? null : quality,
+        cursor: cursorMode,
+        maxW: m?.width.round(),
+        maxH: m?.height.round(),
+      ),
+    );
+  }
+
+  void setCursorMode(RemoteCursorMode mode) {
+    if (mode == cursorMode) return;
+    cursorMode = mode;
+    send(Ctl.cfg(cursor: mode));
+  }
+
+  /// Caps the stream to this screen (long side ≤ 2560, short ≤ 1440 keeps
+  /// 60 fps). Sent again when the screen changes (Fold, rotation).
+  void setMaxStream(Size physical) {
+    final long = math.max(physical.width, physical.height);
+    final short = math.min(physical.width, physical.height);
+    final k = math.min(1.0, math.min(2560 / long, 1440 / short));
+    final next = Size((long * k).roundToDouble(), (short * k).roundToDouble());
+    if (next == maxStream) return;
+    maxStream = next;
+    send(Ctl.cfg(maxW: next.width.round(), maxH: next.height.round()));
+  }
+
+  /// Turns the device-sized virtual display on (or resizes it) / off.
+  void setVirtualDisplay({
+    required bool on,
+    Size? points,
+    int scale = 2,
+    String? name,
+  }) {
+    if (!on) {
+      if (_vd == null) return;
+      _vd = null;
+      send(Ctl.virtualDisplay(on: false));
+      _notify();
+      return;
+    }
+    final p = points;
+    if (p == null || p.isEmpty) return;
+    // even sizes keep H.264 happy
+    int even(double v) => (v.round() ~/ 2) * 2;
+    final msg = Ctl.virtualDisplay(
+      on: true,
+      w: even(p.width),
+      h: even(p.height),
+      scale: scale,
+      name: name,
+    );
+    if (_vd != null && mapEquals(_vd, msg)) return;
+    _vd = msg;
+    send(msg);
+    _notify();
   }
 
   void setQuality(RemoteQuality q) {
@@ -548,6 +626,7 @@ class RemoteSession extends ChangeNotifier {
       }),
     );
     _clipOut.close();
+    _hostRaw.close();
     super.dispose();
   }
 
@@ -637,6 +716,7 @@ class RemoteSession extends ChangeNotifier {
       int? w;
       int? h;
       String? codecId;
+      String? decoder;
       final codecs = <String, String>{};
       for (final r in reports) {
         final v = r.values;
@@ -649,6 +729,7 @@ class RemoteSession extends ChangeNotifier {
           w = _toD(v['frameWidth'])?.toInt();
           h = _toD(v['frameHeight'])?.toInt();
           codecId = v['codecId']?.toString();
+          decoder = v['decoderImplementation']?.toString();
           final bytes = _toD(v['bytesReceived'])?.toInt();
           final at = r.timestamp;
           if (bytes != null) {
@@ -676,6 +757,7 @@ class RemoteSession extends ChangeNotifier {
         height: h,
         encMs: stats.encMs,
         codec: codecId == null ? stats.codec : codecs[codecId],
+        decoder: decoder ?? stats.decoder,
       );
       _notify();
     } catch (_) {}

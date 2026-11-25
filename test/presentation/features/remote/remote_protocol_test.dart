@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_keys.dart';
-import 'package:ghina/presentation/features/kantor/remote/remote_protocol.dart';
+import 'package:ghina/data/datasources/remote/kantor_api.dart';
+import 'package:ghina/presentation/features/remote/remote_session.dart';
+import 'package:ghina/presentation/features/remote/remote_protocol.dart';
 
 void main() {
   group('hosts list', () {
@@ -181,53 +184,48 @@ void main() {
     });
   });
 
-  group('keyboard helpers', () {
-    test('textToCtl: plain text, newline and tab', () {
-      expect(textToCtl('ab\ncd\t', {}), [
-        {'t': 'txt', 's': 'ab'},
-        {'t': 'key', 'code': 'Enter', 'mods': <String>[]},
-        {'t': 'txt', 's': 'cd'},
-        {'t': 'key', 'code': 'Tab', 'mods': <String>[]},
-      ]);
-    });
-
-    test('textToCtl: sticky Cmd turns characters into shortcuts', () {
-      expect(textToCtl('c', {RemoteMod.meta}), [
+  group('stream config and virtual display', () {
+    test('cfg cursor and vd messages', () {
+      expect(Ctl.cfg(cursor: RemoteCursorMode.local), {
+        't': 'cfg',
+        'cursor': 'local',
+      });
+      expect(Ctl.cfg(maxW: 2560, maxH: 1440), {
+        't': 'cfg',
+        'maxW': 2560,
+        'maxH': 1440,
+      });
+      expect(
+        Ctl.virtualDisplay(on: true, w: 904, h: 1000, scale: 5, name: 'Fold'),
         {
-          't': 'key',
-          'code': 'KeyC',
-          'mods': ['meta'],
+          't': 'vd',
+          'on': true,
+          'w': 904,
+          'h': 1000,
+          'scale': 3,
+          'name': 'Fold',
         },
-      ]);
-      expect(textToCtl('?', {RemoteMod.ctrl}), [
-        {
-          't': 'key',
-          'code': 'Slash',
-          'mods': ['ctrl', 'shift'],
-        },
-      ]);
+      );
+      expect(Ctl.virtualDisplay(on: false), {'t': 'vd', 'on': false});
     });
 
-    test('textDiff handles autocorrect and emoji', () {
-      expect(textDiff('ab teh', 'ab the '), (deleted: 2, inserted: 'he '));
-      expect(textDiff('x👋', 'x'), (deleted: 1, inserted: ''));
-      expect(textDiff('', 'hi'), (deleted: 0, inserted: 'hi'));
-    });
-
-    test('sticky modifiers: once, locked, off', () {
-      final s = StickyModifiers();
-      s.tap(RemoteMod.meta);
-      expect(s.of(RemoteMod.meta), StickyState.once);
-      s.consume();
-      expect(s.any, isFalse);
-      s
-        ..tap(RemoteMod.shift)
-        ..tap(RemoteMod.shift);
-      expect(s.of(RemoteMod.shift), StickyState.locked);
-      s.consume();
-      expect(s.active, {RemoteMod.shift});
-      s.tap(RemoteMod.shift);
-      expect(s.any, isFalse);
+    test('stream cap follows the screen, ≤2560×1440', () {
+      final s = RemoteSession(
+        api: KantorApi(const KantorConfig(baseUrl: 'http://k:1', token: 't')),
+        host: const RemoteHost(machine: 'm', name: 'Mac', online: true),
+        viewer: const {},
+      );
+      s.setMaxStream(const Size(1080, 2400)); // phone portrait
+      expect(s.maxStream, const Size(2400, 1080));
+      s.setMaxStream(const Size(2176, 1812)); // Fold open
+      expect(s.maxStream, const Size(1729, 1440));
+      s.setMaxStream(const Size(3200, 2000)); // big tablet
+      expect(s.maxStream, const Size(2304, 1440));
+      // nothing to send to yet: the request is remembered for the channel
+      s.setVirtualDisplay(on: true, points: const Size(905.4, 1001), scale: 2);
+      expect(s.virtualDisplayOn, isTrue);
+      s.setVirtualDisplay(on: false);
+      expect(s.virtualDisplayOn, isFalse);
     });
   });
 }

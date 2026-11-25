@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,14 +8,16 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import '../../../../di/kantor_providers.dart';
-import 'remote_gestures.dart';
-import 'remote_keys.dart';
+import '../../../di/kantor_providers.dart';
+import 'input/remote_input.dart';
 import 'remote_protocol.dart';
 import 'remote_session.dart';
 import 'remote_widgets.dart';
 
-/// Full-screen remote desktop of one Mac.
+/// Full-screen remote desktop of one Mac. Touch, keyboard and the local
+/// pointer come from `input/` ([RemoteInputLayer], [RemoteKeyboardBar]);
+/// this page owns the session, the video, zoom state, the toolbar,
+/// clipboard, reconnects and the device-sized virtual display (`vd`).
 class RemoteSessionPage extends ConsumerStatefulWidget {
   const RemoteSessionPage({super.key, required this.host, this.api});
 
@@ -44,49 +45,34 @@ class RemoteSessionPage extends ConsumerStatefulWidget {
 
 const _prefMode = 'ravel.remote.mode';
 const _prefQuality = 'ravel.remote.quality';
-
-/// Zero-width text kept in the hidden field so Backspace always has
-/// something to delete (and so shows up as an edit we can forward).
-const _sentinel = '​​​​';
+const _prefVd = 'ravel.remote.vd';
 
 enum _Rotation { auto, landscape, portrait }
 
 class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     with WidgetsBindingObserver {
   RemoteSession? _s;
-  final _vp = RemoteViewport();
-  late final RemoteGestureEngine _g;
-  RemoteInputMode _mode = RemoteInputMode.trackpad;
+  final _zoom = TransformationController();
+  final _kb = RemoteKeyboardController();
+  InputMode _mode = InputMode.trackpad;
 
   bool _toolbar = true;
   bool _fullscreen = true;
-  bool _kbd = false;
+  bool _keyBar = false;
   bool _warnDismissed = false;
+  bool _wantVd = false;
   _Rotation _rotation = _Rotation.auto;
 
-  final _input = TextEditingController(text: _sentinel);
-  String _prevText = _sentinel;
-  final _inputFocus = FocusNode(debugLabel: 'remote-ime');
-  final _pageFocus = FocusNode(debugLabel: 'remote-page');
-  final _sticky = StickyModifiers();
-  final Set<String> _swallowUp = {};
-
-  final _clock = Stopwatch()..start();
-  Timer? _holdTimer;
-  Timer? _fling;
+  Size? _stage;
+  Timer? _vdDebounce;
   Timer? _toolbarHide;
-  RemoteButton? _mouseButton;
   StreamSubscription<String>? _clipSub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _g = RemoteGestureEngine(
-      toRemote: _vp.toRemote,
-      gain: () => _vp.gain(_s?.logicalWidth ?? 1440),
-    );
-    _input.addListener(_onImeChanged);
+    _zoom.addListener(_onZoom);
     final api = widget.api ?? ref.read(kantorApiProvider);
     if (api != null) {
       final s = RemoteSession(
@@ -97,6 +83,7 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
       _s = s;
       s.addListener(_onSession);
       _clipSub = s.clipFromHost.listen(_onHostClip);
+      s.setMaxStream(_physicalSize());
       s.start();
     }
     _loadPrefs();
@@ -107,15 +94,14 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _holdTimer?.cancel();
-    _fling?.cancel();
+    _vdDebounce?.cancel();
     _toolbarHide?.cancel();
     _clipSub?.cancel();
     _s?.removeListener(_onSession);
     _s?.dispose();
-    _input.dispose();
-    _inputFocus.dispose();
-    _pageFocus.dispose();
+    _zoom.removeListener(_onZoom);
+    _zoom.dispose();
+    _kb.dispose();
     WakelockPlus.disable().catchError((_) {});
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(const []);
@@ -132,8 +118,6 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
         _applyFullscreen();
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
-        _apply(_g.reset());
-        _stopFling();
         s.onBackground();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
@@ -141,10 +125,20 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     }
   }
 
+  /// Fold opened/closed or rotated: new stream cap (and new virtual display
+  /// size, handled by the stage layout).
+  @override
+  void didChangeMetrics() => _s?.setMaxStream(_physicalSize());
+
+  static Size _physicalSize() =>
+      WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+
+  static double _dpr() =>
+      WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+
   Map<String, String> _viewerInfo() {
-    final view = WidgetsBinding.instance.platformDispatcher.views.first;
-    final px = view.physicalSize;
-    final dpr = view.devicePixelRatio;
+    final px = _physicalSize();
+    final dpr = _dpr();
     final shortest = math.min(px.width, px.height) / dpr;
     return {
       'device': shortest >= 600 ? 'Ravel (tablet)' : 'Ravel (HP)',
@@ -157,42 +151,44 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
   Future<void> _loadPrefs() async {
     final p = await SharedPreferences.getInstance();
     if (!mounted) return;
-    final mode = p.getString(_prefMode);
     final q = p.getString(_prefQuality);
-    setState(() {
-      _mode = mode == 'direct'
-          ? RemoteInputMode.direct
-          : RemoteInputMode.trackpad;
-      _g.mode = _mode;
-    });
     final quality = RemoteQuality.values.where((v) => v.wire == q);
     if (quality.isNotEmpty) _s?.quality = quality.first;
+    setState(() {
+      _mode = p.getString(_prefMode) == 'touch'
+          ? InputMode.touch
+          : InputMode.trackpad;
+      _wantVd = p.getBool(_prefVd) ?? false;
+    });
+    _s?.setCursorMode(_cursorFor(_mode));
+    _syncVirtualDisplay();
   }
+
+  static RemoteCursorMode _cursorFor(InputMode m) =>
+      m == InputMode.trackpad ? RemoteCursorMode.local : RemoteCursorMode.video;
 
   void _onSession() {
     if (!mounted) return;
     final s = _s!;
-    // collapse the toolbar a moment after the picture shows up
     if (s.live && s.hasVideo && _toolbar && _toolbarHide == null) {
       _toolbarHide = Timer(const Duration(seconds: 4), () {
-        if (mounted && !_kbd) setState(() => _toolbar = false);
+        if (mounted) setState(() => _toolbar = false);
       });
     }
     setState(() {});
   }
 
+  void _onZoom() {
+    // only the "Pas layar" button depends on zoom; rebuild when it flips
+    final zoomed = _zoom.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomed != _wasZoomed) setState(() => _wasZoomed = zoomed);
+  }
+
+  bool _wasZoomed = false;
+
   void _onHostClip(String text) {
     if (!mounted) return;
-    final n = text.characters.length;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('Clipboard Mac disalin ke HP ($n karakter)'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+    _toast('Clipboard Mac disalin ke HP (${text.characters.length} karakter)');
   }
 
   void _toast(String text) {
@@ -208,215 +204,45 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
   }
 
   // ---------------------------------------------------------------------------
-  // touch & mouse
+  // virtual display (`vd`)
 
-  void _apply(List<GestureAction> actions) {
-    final s = _s;
-    if (actions.isEmpty || s == null) return;
-    var changed = false;
-    for (final a in actions) {
-      switch (a) {
-        case SendCtl(:final msg):
-          if (s.send(msg)) changed = true;
-          if (msg['t'] == 'mr' && _vp.zoomed) _vp.follow(s.cursor);
-        case ZoomView(:final factor, :final focal):
-          _vp.zoom(factor, focal);
-          changed = true;
-        case PanView(:final delta):
-          _vp.pan(delta);
-          changed = true;
-        case Haptic():
-          HapticFeedback.mediumImpact();
-        case ScrollFling(:final velocity):
-          _startFling(velocity);
-      }
-    }
-    if (changed) setState(() {});
+  void _onStageSize(Size size) {
+    if (size == _stage) return;
+    _stage = size;
+    if (!_wantVd) return;
+    // Fold opening/closing and rotation come in several layout passes
+    _vdDebounce?.cancel();
+    _vdDebounce = Timer(const Duration(milliseconds: 700), _syncVirtualDisplay);
   }
 
-  void _onDown(PointerDownEvent e) {
-    if (e.kind == PointerDeviceKind.mouse) {
-      final b = (e.buttons & kSecondaryMouseButton) != 0
-          ? RemoteButton.right
-          : (e.buttons & kMiddleMouseButton) != 0
-          ? RemoteButton.middle
-          : RemoteButton.left;
-      _mouseButton = b;
-      _sendMouseMove(e.localPosition);
-      _s?.send(Ctl.down(b));
+  void _syncVirtualDisplay() {
+    final s = _s;
+    final stage = _stage;
+    if (s == null) return;
+    if (!_wantVd) {
+      s.setVirtualDisplay(on: false);
       return;
     }
-    _stopFling();
-    _apply(_g.down(e.pointer, e.localPosition, _clock.elapsed));
-    _holdTimer?.cancel();
-    _holdTimer = Timer(
-      RemoteGestureEngine.holdDelay + const Duration(milliseconds: 10),
-      () => _apply(_g.tick(_clock.elapsed)),
+    if (stage == null || stage.isEmpty) return;
+    s.setVirtualDisplay(
+      on: true,
+      points: stage,
+      scale: _dpr() >= 1.5 ? 2 : 1,
+      name: s.viewer['device'],
     );
   }
 
-  void _onMove(PointerMoveEvent e) {
-    if (e.kind == PointerDeviceKind.mouse) {
-      _sendMouseMove(e.localPosition);
-      return;
-    }
-    _apply(_g.move(e.pointer, e.localPosition, _clock.elapsed));
-  }
-
-  void _onUp(PointerUpEvent e) {
-    if (e.kind == PointerDeviceKind.mouse) {
-      final b = _mouseButton;
-      if (b != null) _s?.send(Ctl.up(b));
-      _mouseButton = null;
-      return;
-    }
-    _apply(_g.up(e.pointer, _clock.elapsed));
-    if (!_g.active) _holdTimer?.cancel();
-  }
-
-  void _onCancel(PointerCancelEvent e) {
-    if (e.kind == PointerDeviceKind.mouse) {
-      final b = _mouseButton;
-      if (b != null) _s?.send(Ctl.up(b));
-      _mouseButton = null;
-      return;
-    }
-    _apply(_g.cancel(e.pointer));
-    if (!_g.active) _holdTimer?.cancel();
-  }
-
-  void _onHover(PointerHoverEvent e) {
-    if (e.kind == PointerDeviceKind.mouse ||
-        e.kind == PointerDeviceKind.stylus) {
-      _sendMouseMove(e.localPosition);
-    }
-  }
-
-  void _onSignal(PointerSignalEvent e) {
-    if (e is PointerScrollEvent) {
-      _s?.send(Ctl.wheel(e.scrollDelta.dx, e.scrollDelta.dy));
-    }
-  }
-
-  void _sendMouseMove(Offset p) {
-    final n = _vp.toRemote(p);
-    if (_s?.send(Ctl.moveAbs(n.dx, n.dy)) ?? false) setState(() {});
-  }
-
-  void _startFling(Offset velocity) {
-    _stopFling();
-    var v = velocity;
-    const dt = 0.016;
-    _fling = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      v = v * 0.93;
-      if (v.distance < 60) {
-        t.cancel();
-        return;
-      }
-      _s?.send(Ctl.wheel(v.dx * dt, v.dy * dt));
-    });
-  }
-
-  void _stopFling() {
-    _fling?.cancel();
-    _fling = null;
-  }
-
-  // ---------------------------------------------------------------------------
-  // keyboard
-
-  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
-    final s = _s;
-    if (s == null || !s.ctlOpen) return KeyEventResult.ignored;
-    final code = w3cCode(e.physicalKey);
-    if (code == null) return KeyEventResult.ignored;
-    final isMod = RemoteMod.values.any(
-      (m) => code.startsWith(m.code.replaceAll('Left', '')),
+  Future<void> _toggleVd() async {
+    setState(() => _wantVd = !_wantVd);
+    _zoom.value = Matrix4.identity();
+    _syncVirtualDisplay();
+    _toast(
+      _wantVd
+          ? 'Layar virtual seukuran perangkat ini dibuat di Mac'
+          : 'Kembali ke layar Mac',
     );
-    if (e is KeyDownEvent || e is KeyRepeatEvent) {
-      if (_sticky.any && !isMod && e is KeyDownEvent) {
-        s.send(Ctl.key(code, _sticky.active));
-        _swallowUp.add(code);
-        setState(_sticky.consume);
-      } else {
-        s.send(Ctl.keyDown(code));
-      }
-    } else if (e is KeyUpEvent) {
-      if (!_swallowUp.remove(code)) s.send(Ctl.keyUp(code));
-    }
-    return KeyEventResult.handled;
-  }
-
-  void _onImeChanged() {
-    final v = _input.value;
-    final text = v.text;
-    if (text == _prevText) return;
-    final d = textDiff(_prevText, text);
-    _prevText = text;
-    final s = _s;
-    if (s != null) {
-      for (var i = 0; i < d.deleted; i++) {
-        s.send(Ctl.key('Backspace', _sticky.active));
-      }
-      if (d.inserted.isNotEmpty) {
-        final mods = _sticky.active;
-        for (final m in textToCtl(d.inserted, mods)) {
-          s.send(m);
-        }
-      }
-      if (_sticky.any && (d.deleted > 0 || d.inserted.isNotEmpty)) {
-        setState(_sticky.consume);
-      }
-    }
-    // Reset the buffer between words (never while the IME is composing).
-    final composing = v.composing.isValid && !v.composing.isCollapsed;
-    if (!composing && (!text.startsWith(_sentinel) || text.length > 48)) {
-      _prevText = _sentinel;
-      _input.value = const TextEditingValue(
-        text: _sentinel,
-        selection: TextSelection.collapsed(offset: _sentinel.length),
-      );
-    }
-  }
-
-  void _sendKey(String code) {
-    final s = _s;
-    if (s == null) return;
-    s.send(Ctl.key(code, _sticky.active));
-    if (_sticky.any) setState(_sticky.consume);
-  }
-
-  void _shortcut(String code, Set<RemoteMod> mods) {
-    _s?.send(Ctl.key(code, mods));
-    HapticFeedback.selectionClick();
-  }
-
-  Future<void> _pasteToMac() async {
-    final s = _s;
-    if (s == null) return;
-    await s.pushClipboard(force: true);
-    s.send(Ctl.key('KeyV', {RemoteMod.meta}));
-  }
-
-  void _openKeyboard() {
-    setState(() {
-      _kbd = true;
-      _toolbar = false;
-    });
-    if (_inputFocus.hasFocus) {
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-    } else {
-      _inputFocus.requestFocus();
-    }
-  }
-
-  void _closeKeyboard() {
-    _inputFocus.unfocus();
-    _pageFocus.requestFocus();
-    setState(() {
-      _kbd = false;
-      _sticky.clear();
-    });
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_prefVd, _wantVd);
   }
 
   // ---------------------------------------------------------------------------
@@ -447,28 +273,40 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     });
   }
 
-  Future<void> _setMode(RemoteInputMode m) async {
-    _apply(_g.reset());
-    setState(() {
-      _mode = m;
-      _g.mode = m;
-    });
+  Future<void> _setMode(InputMode m) async {
+    setState(() => _mode = m);
+    _s?.setCursorMode(_cursorFor(m));
     _toast(
-      m == RemoteInputMode.trackpad
+      m == InputMode.trackpad
           ? 'Mode trackpad: geser untuk gerakkan kursor, ketuk untuk klik'
           : 'Mode sentuh langsung: ketuk tepat di titik yang mau diklik',
     );
     final p = await SharedPreferences.getInstance();
-    await p.setString(
-      _prefMode,
-      m == RemoteInputMode.direct ? 'direct' : 'trackpad',
-    );
+    await p.setString(_prefMode, m == InputMode.touch ? 'touch' : 'trackpad');
   }
 
   Future<void> _setQuality(RemoteQuality q) async {
     _s?.setQuality(q);
     final p = await SharedPreferences.getInstance();
     await p.setString(_prefQuality, q.wire);
+  }
+
+  void _openKeyboard() {
+    setState(() {
+      _keyBar = true;
+      _toolbar = false;
+    });
+    _kb.showSoftKeyboard();
+  }
+
+  void _closeKeyboard() {
+    _kb.hideSoftKeyboard();
+    setState(() => _keyBar = false);
+  }
+
+  void _shortcut(String code, Set<RemoteMod> mods) {
+    _s?.send(Ctl.key(code, mods));
+    HapticFeedback.selectionClick();
   }
 
   Future<void> _leave() async {
@@ -508,36 +346,40 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (_kbd) {
+        if (_keyBar) {
           _closeKeyboard();
         } else {
           _confirmLeave();
         }
       },
-      child: Focus(
-        focusNode: _pageFocus,
-        autofocus: true,
-        onKeyEvent: _onKey,
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          resizeToAvoidBottomInset: true,
-          body: s == null
-              ? _noConnection()
-              : Column(
-                  children: [
-                    Expanded(child: _stage(s)),
-                    if (_kbd)
-                      RemoteKeyBar(
-                        sticky: _sticky,
-                        onKey: _sendKey,
-                        onMod: (m) => setState(() => _sticky.tap(m)),
-                        onShortcut: _shortcut,
-                        onPaste: _pasteToMac,
-                        onClose: _closeKeyboard,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        resizeToAvoidBottomInset: true,
+        body: s == null
+            ? _noConnection()
+            : Column(
+                children: [
+                  Expanded(child: _stageView(s)),
+                  if (_keyBar)
+                    Material(
+                      color: const Color(0xF0202124),
+                      child: SafeArea(
+                        top: false,
+                        child: Row(
+                          children: [
+                            Expanded(child: RemoteKeyboardBar(controller: _kb)),
+                            IconButton(
+                              tooltip: 'Tutup baris tombol',
+                              color: Colors.white70,
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: _closeKeyboard,
+                            ),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-        ),
+                    ),
+                ],
+              ),
       ),
     );
   }
@@ -561,55 +403,33 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
     ),
   );
 
-  Widget _stage(RemoteSession s) {
+  Widget _stageView(RemoteSession s) {
     return LayoutBuilder(
       builder: (context, c) {
-        _vp.setGeometry(c.biggest, s.pictureSize);
-        final shown = _vp.shown;
-        final showCursor =
-            _mode == RemoteInputMode.trackpad &&
-            s.live &&
-            s.hasVideo &&
-            s.cursorVisible;
+        _onStageSize(c.biggest);
         final pad = MediaQuery.paddingOf(context);
         return Stack(
           fit: StackFit.expand,
           children: [
-            Listener(
-              behavior: HitTestBehavior.opaque,
-              onPointerDown: _onDown,
-              onPointerMove: _onMove,
-              onPointerUp: _onUp,
-              onPointerCancel: _onCancel,
-              onPointerHover: _onHover,
-              onPointerSignal: _onSignal,
-              child: ClipRect(
-                child: Stack(
-                  children: [
-                    if (s.hasVideo)
-                      Positioned.fromRect(
-                        rect: shown,
-                        child: RTCVideoView(
-                          s.renderer,
-                          filterQuality: _vp.zoomed
-                              ? FilterQuality.medium
-                              : FilterQuality.low,
-                        ),
-                      ),
-                    if (showCursor)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: RemoteCursorPainter(
-                              at: _vp.fromRemote(s.cursor),
-                              shape: s.cursorShape,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+            RemoteInputLayer(
+              send: s.send,
+              hostMessages: s.hostMessages,
+              remoteSize: Size(s.logicalWidth, s.logicalHeight),
+              mode: _mode,
+              transformationController: _zoom,
+              keyboardController: _kb,
+              enabled: s.live,
+              settings: RemoteInputSettings(
+                showLocalCursor: _mode == InputMode.trackpad,
               ),
+              child: s.hasVideo
+                  ? RTCVideoView(
+                      s.renderer,
+                      filterQuality: _wasZoomed
+                          ? FilterQuality.medium
+                          : FilterQuality.low,
+                    )
+                  : const SizedBox.expand(),
             ),
             if (!s.live || !s.hasVideo) _statusCard(s),
             if (s.hostWarning != null && !_warnDismissed)
@@ -632,32 +452,6 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
               child: Align(
                 alignment: Alignment.topCenter,
                 child: _toolbar ? _toolbarBar(s) : _toolbarHandle(),
-              ),
-            ),
-            // hidden text field: the phone keyboard (IME, dictation) types here
-            Positioned(
-              left: 0,
-              bottom: 0,
-              width: 2,
-              height: 2,
-              child: Opacity(
-                opacity: 0,
-                child: TextField(
-                  controller: _input,
-                  focusNode: _inputFocus,
-                  keyboardType: TextInputType.multiline,
-                  maxLines: null,
-                  autocorrect: true,
-                  enableSuggestions: true,
-                  enableInteractiveSelection: false,
-                  showCursor: false,
-                  textCapitalization: TextCapitalization.none,
-                  decoration: const InputDecoration.collapsed(hintText: ''),
-                  style: const TextStyle(
-                    fontSize: 1,
-                    color: Colors.transparent,
-                  ),
-                ),
               ),
             ),
           ],
@@ -862,16 +656,16 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
               ],
             ),
             btn(
-              _mode == RemoteInputMode.trackpad
+              _mode == InputMode.trackpad
                   ? Icons.mouse_rounded
                   : Icons.touch_app_rounded,
-              _mode == RemoteInputMode.trackpad
+              _mode == InputMode.trackpad
                   ? 'Mode trackpad (ketuk untuk sentuh langsung)'
                   : 'Mode sentuh langsung (ketuk untuk trackpad)',
               () => _setMode(
-                _mode == RemoteInputMode.trackpad
-                    ? RemoteInputMode.direct
-                    : RemoteInputMode.trackpad,
+                _mode == InputMode.trackpad
+                    ? InputMode.touch
+                    : InputMode.trackpad,
               ),
             ),
             btn(Icons.keyboard_rounded, 'Keyboard', _openKeyboard),
@@ -912,11 +706,19 @@ class _RemoteSessionPageState extends ConsumerState<RemoteSessionPage>
                 }
               },
             ),
-            if (_vp.zoomed)
+            btn(
+              Icons.fit_screen_rounded,
+              _wantVd
+                  ? 'Matikan layar virtual'
+                  : 'Layar virtual seukuran perangkat ini',
+              _toggleVd,
+              color: _wantVd ? Theme.of(context).colorScheme.primary : null,
+            ),
+            if (_wasZoomed)
               btn(
                 Icons.zoom_out_map_rounded,
                 'Pas layar',
-                () => setState(_vp.reset),
+                () => _zoom.value = Matrix4.identity(),
               ),
             btn(
               switch (_rotation) {
