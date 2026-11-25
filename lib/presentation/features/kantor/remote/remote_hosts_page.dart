@@ -7,6 +7,8 @@ import '../../../../di/kantor_providers.dart';
 import '../../../design_system/design_system.dart';
 import '../widgets/kantor_states.dart';
 import '../widgets/kantor_wide.dart';
+import 'remote_auth.dart';
+import 'remote_pairing.dart';
 import 'remote_protocol.dart';
 import 'remote_session_page.dart';
 
@@ -25,16 +27,23 @@ class RemoteHostsPage extends ConsumerStatefulWidget {
 
 class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     with WidgetsBindingObserver {
+  final _store = RemoteDeviceStore();
   List<RemoteHost>? _hosts;
+  List<RemotePendingPair> _pending = const [];
   Object? _error;
   Timer? _timer;
   bool _loading = false;
+
+  /// This device's viewer client (`kcview_` token), null until paired.
+  KantorApi? _viewer;
+  bool _tokenChecked = false;
+  String? _pairNotice;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _load();
+    _initAuth();
     _start();
   }
 
@@ -55,6 +64,43 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
     }
   }
 
+  Future<void> _initAuth() async {
+    final owner = ref.read(kantorApiProvider);
+    if (widget.load == null && owner != null) {
+      final token = await _store.read(owner.config.baseUrl);
+      if (!mounted) return;
+      _viewer = token == null ? null : RemoteAuth.viewerApi(owner, token);
+    }
+    setState(() => _tokenChecked = true);
+    _load();
+  }
+
+  Future<void> _paired(String token) async {
+    final owner = ref.read(kantorApiProvider);
+    if (owner == null) return;
+    await _store.write(owner.config.baseUrl, token);
+    if (!mounted) return;
+    setState(() {
+      _viewer = RemoteAuth.viewerApi(owner, token);
+      _pairNotice = null;
+      _hosts = null;
+      _error = null;
+    });
+    _load();
+  }
+
+  Future<void> _unpair(String notice) async {
+    final owner = ref.read(kantorApiProvider);
+    if (owner != null) await _store.clear(owner.config.baseUrl);
+    if (!mounted) return;
+    setState(() {
+      _viewer = null;
+      _hosts = null;
+      _pending = const [];
+      _pairNotice = notice;
+    });
+  }
+
   void _start() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
@@ -64,19 +110,34 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
   }
 
   Future<void> _load() async {
-    final api = ref.read(kantorApiProvider);
     final load = widget.load;
-    if ((api == null && load == null) || _loading) return;
+    final viewer = _viewer;
+    if ((viewer == null && load == null) || _loading) return;
     _loading = true;
     try {
       final hosts = load != null
           ? await load()
-          : RemoteHost.listFromJson(await api!.get('/api/remote/hosts'));
+          : RemoteHost.listFromJson(await viewer!.get('/api/remote/hosts'));
       if (!mounted) return;
       setState(() {
         _hosts = hosts;
         _error = null;
       });
+      if (viewer != null) {
+        final pending = await RemoteAuth.pending(
+          viewer,
+        ).catchError((_) => const <RemotePendingPair>[]);
+        if (mounted) setState(() => _pending = pending);
+      }
+    } on KantorException catch (e) {
+      if (!mounted) return;
+      if (e.kind == KantorFailure.unauthorized && load == null) {
+        await _unpair(
+          'Izin perangkat ini sudah dicabut atau tidak berlaku. Pasangkan ulang.',
+        );
+      } else {
+        setState(() => _error = e);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
@@ -96,16 +157,43 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
       );
       return;
     }
-    await RemoteSessionPage.open(context, h);
+    await RemoteSessionPage.open(context, h, api: _viewer);
     if (mounted) _load();
+  }
+
+  void _devices() {
+    final viewer = _viewer;
+    if (viewer == null) return;
+    showRemoteDevicesSheet(
+      context,
+      viewer: viewer,
+      onRevokedSelf: () => _unpair('Perangkat ini sudah dicabut.'),
+    ).then((_) => _load());
   }
 
   @override
   Widget build(BuildContext context) {
     final g = context.ghina;
+    final owner = ref.watch(kantorApiProvider);
     final hosts = _hosts;
+    final paired = widget.load != null || _viewer != null;
     Widget body;
-    if (hosts == null && _error != null) {
+    if (!_tokenChecked) {
+      body = const KantorLoading(count: 3);
+    } else if (!paired && owner == null) {
+      body = const KantorErrorView(
+        error: KantorException(
+          KantorFailure.unauthorized,
+          'Token Kantor belum diisi.',
+        ),
+      );
+    } else if (!paired) {
+      body = RemotePairingView(
+        owner: owner!,
+        onPaired: _paired,
+        notice: _pairNotice,
+      );
+    } else if (hosts == null && _error != null) {
       body = KantorErrorView(error: _error!, onRetry: _load);
     } else if (hosts == null) {
       body = const KantorLoading(count: 3);
@@ -161,14 +249,45 @@ class _RemoteHostsPageState extends ConsumerState<RemoteHostsPage>
       appBar: AppBar(
         title: const Text('Remote Mac'),
         actions: [
-          IconButton(
-            tooltip: 'Muat ulang',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
+          if (paired) ...[
+            IconButton(
+              tooltip: 'Perangkat terpasang',
+              icon: Badge(
+                isLabelVisible: _pending.isNotEmpty,
+                label: Text('${_pending.length}'),
+                child: const Icon(Icons.devices_rounded),
+              ),
+              onPressed: _viewer == null ? null : _devices,
+            ),
+            IconButton(
+              tooltip: 'Muat ulang',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _load,
+            ),
+          ],
+        ],
+      ),
+      body: Column(
+        children: [
+          if (_pending.isNotEmpty)
+            MaterialBanner(
+              content: Text(
+                _pending.length == 1
+                    ? '"${_pending.first.device}" minta izin membuka Remote Mac.'
+                    : '${_pending.length} perangkat minta izin membuka Remote Mac.',
+              ),
+              leading: const Icon(Icons.phonelink_ring_rounded),
+              actions: [
+                TextButton(onPressed: _devices, child: const Text('Tinjau')),
+              ],
+            ),
+          Expanded(
+            child: paired
+                ? RefreshIndicator(onRefresh: _load, child: body)
+                : body,
           ),
         ],
       ),
-      body: RefreshIndicator(onRefresh: _load, child: body),
     );
   }
 }

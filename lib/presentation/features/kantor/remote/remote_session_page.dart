@@ -22,16 +22,21 @@ class RemoteSessionPage extends ConsumerStatefulWidget {
 
   final RemoteHost host;
 
-  /// Override for tests; defaults to the active Kantor connection.
+  /// Viewer client (device token from pairing). Falls back to the active
+  /// Kantor connection, which kantor-claude only accepts if it is a viewer
+  /// token.
   final KantorApi? api;
 
-  static Future<void> open(BuildContext context, RemoteHost host) =>
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => RemoteSessionPage(host: host),
-        ),
-      );
+  static Future<void> open(
+    BuildContext context,
+    RemoteHost host, {
+    KantorApi? api,
+  }) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => RemoteSessionPage(host: host, api: api),
+    ),
+  );
 
   @override
   ConsumerState<RemoteSessionPage> createState() => _RemoteSessionPageState();

@@ -7,6 +7,7 @@ import 'package:ghina/di/kantor_providers.dart';
 import 'package:ghina/presentation/design_system/design_system.dart';
 import 'package:ghina/presentation/features/kantor/remote/remote_hosts_page.dart';
 import 'package:ghina/presentation/features/kantor/remote/remote_keys.dart';
+import 'package:ghina/presentation/features/kantor/remote/remote_pairing.dart';
 import 'package:ghina/presentation/features/kantor/remote/remote_protocol.dart';
 import 'package:ghina/presentation/features/kantor/remote/remote_widgets.dart';
 
@@ -96,5 +97,25 @@ void main() {
     expect(mods, [RemoteMod.meta]);
     expect(shortcuts, ['KeyC(meta)']);
     expect(pasted, 1);
+  });
+
+  testWidgets('pairing screen fits the Fold cover screen', (t) async {
+    await _pump(
+      t,
+      const Size(320, 640),
+      Scaffold(
+        body: RemotePairingView(
+          owner: KantorApi(
+            const KantorConfig(baseUrl: 'http://127.0.0.1:9', token: 'x'),
+          ),
+          onPaired: (_) {},
+          notice: 'Izin perangkat ini sudah dicabut.',
+        ),
+      ),
+    );
+    expect(find.text('Pasangkan perangkat ini'), findsOneWidget);
+    expect(find.text('Minta pairing'), findsOneWidget);
+    expect(find.textContaining('dicabut'), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 }

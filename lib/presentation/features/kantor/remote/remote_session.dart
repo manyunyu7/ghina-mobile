@@ -256,14 +256,22 @@ class RemoteSession extends ChangeNotifier {
           _pendingIce.add(c);
         }
       case SignalBye(:final reason):
+        // kantor-claude reasons: host-putus / host-diganti (Mac dropped,
+        // retry), token-dicabut (this device was revoked, stop); ravel-host
+        // may also end it on purpose ("Putuskan semua").
         final byUser =
             reason != null &&
             RegExp(
-              r'user|owner|pemilik|putus|manual|kick|disconnect all',
+              r'dicabut|revoked|putuskan|disconnect.?all|by.?user|pemilik',
               caseSensitive: false,
             ).hasMatch(reason);
         if (byUser) {
-          _fail('Sesi diputus dari Mac.', retry: false);
+          _fail(
+            reason.contains('dicabut')
+                ? 'Izin perangkat ini dicabut. Pasangkan ulang dari daftar Mac.'
+                : 'Sesi diputus dari Mac ($reason).',
+            retry: false,
+          );
         } else {
           _fail('Mac memutus sesi${reason == null ? '' : ' ($reason)'}.');
         }
@@ -716,7 +724,10 @@ class RemoteSession extends ChangeNotifier {
         s.contains('tidak online')) {
       return 'Mac sedang offline. Pastikan Mac menyala dan ravel-host berjalan.';
     }
-    if (s.contains('busy') || s.contains('penuh') || s.contains('max')) {
+    if (s.contains('busy') ||
+        s.contains('penuh') ||
+        s.contains('max') ||
+        s.contains('dipakai')) {
       return 'Mac sedang dipakai sesi lain (maksimal tercapai).';
     }
     return m;
